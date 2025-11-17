@@ -12,7 +12,7 @@
         margin: 0;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
           sans-serif;
-        background: #020617;
+        background: #022c22; /* dark green */
         color: #e5e7eb;
       }
       .app {
@@ -23,47 +23,37 @@
       h1 {
         font-size: 1.8rem;
         margin-bottom: 4px;
+        color: #bbf7d0; /* light green */
       }
       .subtitle {
-        opacity: 0.75;
+        opacity: 0.8;
         margin-bottom: 18px;
         font-size: 0.95rem;
       }
       .card {
-        background: rgba(15, 23, 42, 0.9);
+        background: rgba(3, 24, 20, 0.95);
         border-radius: 18px;
-        border: 1px solid rgba(148, 163, 184, 0.4);
+        border: 1px solid rgba(52, 211, 153, 0.6);
         padding: 16px 18px;
         margin-bottom: 16px;
-        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.7);
+        box-shadow: 0 18px 40px rgba(3, 24, 20, 0.9);
       }
       .card h2 {
         margin-top: 0;
         font-size: 1.1rem;
+        color: #6ee7b7;
       }
       label {
         font-size: 0.9rem;
         margin-bottom: 4px;
         display: block;
       }
-      textarea {
-        width: 100%;
-        min-height: 100px;
-        padding: 8px 10px;
-        border-radius: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.5);
-        background: rgba(15, 23, 42, 0.9);
-        color: #e5e7eb;
-        font-family: monospace;
-        font-size: 0.9rem;
-        resize: vertical;
-      }
       input[type="text"] {
         width: 100%;
         padding: 8px 10px;
         border-radius: 10px;
-        border: 1px solid rgba(148, 163, 184, 0.5);
-        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(52, 211, 153, 0.8);
+        background: rgba(3, 24, 20, 0.95);
         color: #e5e7eb;
         font-family: inherit;
         font-size: 0.95rem;
@@ -71,8 +61,8 @@
       button {
         font-family: inherit;
         border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.7);
-        background: rgba(15, 23, 42, 0.9);
+        border: 1px solid rgba(52, 211, 153, 0.9);
+        background: rgba(5, 46, 34, 0.95);
         color: #e5e7eb;
         padding: 7px 16px;
         font-size: 0.9rem;
@@ -82,8 +72,9 @@
           transform 0.05s ease,
           background 0.15s ease;
       }
-      button:hover {
-        border-color: rgba(148, 163, 184, 1);
+      button:hover:not(:disabled) {
+        border-color: #22c55e;
+        background: rgba(6, 78, 59, 0.98);
         transform: translateY(-1px);
       }
       button:disabled {
@@ -108,7 +99,7 @@
         border-radius: 999px;
         padding: 4px 10px;
         font-size: 0.8rem;
-        border: 1px solid rgba(148, 163, 184, 0.6);
+        border: 1px solid rgba(52, 211, 153, 0.8);
         gap: 6px;
       }
       .pill-dot {
@@ -127,7 +118,7 @@
       .track-list {
         margin-top: 10px;
         border-radius: 14px;
-        border: 1px solid rgba(148, 163, 184, 0.35);
+        border: 1px solid rgba(52, 211, 153, 0.55);
         overflow: hidden;
       }
       .track-row {
@@ -136,28 +127,60 @@
         justify-content: space-between;
         padding: 8px 10px;
         font-size: 0.9rem;
-        border-bottom: 1px solid rgba(15, 23, 42, 0.9);
+        border-bottom: 1px solid rgba(5, 30, 24, 0.9);
       }
       .track-row:last-child {
         border-bottom: none;
+      }
+      .track-main {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        max-width: 70%;
+      }
+      .track-name-line {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
       }
       .track-name {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 60%;
+        max-width: 100%;
       }
       .track-badge {
         font-size: 0.75rem;
         text-transform: uppercase;
         border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.7);
+        border: 1px solid rgba(52, 211, 153, 0.9);
         padding: 2px 8px;
-        margin-right: 8px;
+        margin-right: 2px;
       }
       .track-badge.active {
         border-color: #22c55e;
         color: #bbf7d0;
+      }
+      .track-time {
+        font-size: 0.8rem;
+        opacity: 0.9;
+        cursor: text;
+        padding: 1px 4px;
+        border-radius: 6px;
+        align-self: flex-start;
+      }
+      .track-time:hover {
+        background: rgba(21, 128, 61, 0.35);
+      }
+      .time-input {
+        width: 70px;
+        padding: 2px 4px;
+        border-radius: 6px;
+        border: 1px solid rgba(52, 211, 153, 0.9);
+        background: rgba(3, 24, 20, 0.95);
+        color: #e5e7eb;
+        font-size: 0.8rem;
       }
       #listener-link {
         font-size: 0.9rem;
@@ -165,7 +188,46 @@
         margin-top: 6px;
       }
       .highlight {
-        color: #a5b4fc;
+        color: #6ee7b7;
+      }
+      .select-list {
+        margin-top: 10px;
+        border-radius: 14px;
+        border: 1px solid rgba(52, 211, 153, 0.55);
+        max-height: 260px;
+        overflow-y: auto;
+      }
+      .select-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 8px;
+        border-bottom: 1px solid rgba(5, 30, 24, 0.9);
+        font-size: 0.9rem;
+      }
+      .select-row:last-child {
+        border-bottom: none;
+      }
+      .select-left {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        max-width: 60%;
+      }
+      .filename {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .label-input {
+        width: 40%;
+        min-width: 120px;
+        padding: 4px 6px;
+        border-radius: 8px;
+        border: 1px solid rgba(52, 211, 153, 0.7);
+        background: rgba(3, 24, 20, 0.95);
+        color: #e5e7eb;
+        font-size: 0.85rem;
       }
       .seek-row {
         display: flex;
@@ -178,9 +240,8 @@
     <div class="app">
       <h1>Host – Preloaded Remote Audio Control</h1>
       <div class="subtitle">
-        Your client downloads and buffers all the files from this site. You
-        remotely tell their browser which one to play. Switching and jumps are
-        instant because everything is preloaded.
+        Your listener’s browser buffers your files from this site. You, the
+        mistress, choose which track and position they hear.
       </div>
 
       <!-- ROOM SETUP -->
@@ -197,33 +258,38 @@
           <button id="btn-start-host">Start hosting</button>
         </div>
         <div class="status" id="host-setup-status">
-          Pick a simple ID you can tell your client (“client-001” etc.).
+          Pick a simple ID you can tell your listener (“client-001” etc.).
         </div>
       </section>
 
       <!-- TRACK LIST DEFINITION -->
       <section class="card" id="tracks-card" style="display: none">
-        <h2>2. List the files in your <code>audio/</code> folder</h2>
-        <label for="filenames">
-          One per line. Optionally use <code>filename.mp3 | Nice label</code>.
-        </label>
-        <textarea
-          id="filenames"
-          placeholder="example:\nversion-a.mp3 | Mix A\nversion-b.mp3 | Mix B\npodcast-final.mp3"
-        ></textarea>
-        <div class="button-row">
-          <button id="btn-send-tracks">Send track list to listeners</button>
+        <h2>2. Choose tracks from your <code>audio/</code> folder</h2>
+        <div class="status small" id="files-status">
+          Files are loaded from your public GitHub repo
+          <code>amuletmaiden/amuletmaiden.github.io/audio/</code>.
         </div>
-        <div class="status small">
-          These files must exist in your GitHub repo under
-          <code>audio/</code>. This page assumes the URL pattern
-          <code>https://amuletmaiden.github.io/audio/&lt;filename&gt;</code>.
+
+        <div class="button-row" style="margin-top: 8px">
+          <button id="btn-refresh-files">Reload from audio/</button>
+          <button id="btn-select-all">Select all</button>
+          <button id="btn-clear-selection">Clear</button>
+        </div>
+
+        <div
+          id="available-tracks-list"
+          class="select-list"
+          style="margin-top: 10px"
+        ></div>
+
+        <div class="button-row" style="margin-top: 12px">
+          <button id="btn-send-tracks">Send selected tracks to listeners</button>
         </div>
       </section>
 
       <!-- CONNECTION / LINK -->
       <section class="card" id="room-info" style="display: none">
-        <h2>3. Send this link to your client</h2>
+        <h2>3. Send this link to your listener</h2>
         <div class="status">
           Connection:
           <span class="pill">
@@ -252,7 +318,7 @@
         </div>
 
         <div class="status" style="margin-top: 12px">
-          <label for="seek-input">Jump to time (mm:ss or seconds)</label>
+          <label for="seek-input">Jump all tracks to time (mm:ss or seconds)</label>
           <div class="seek-row">
             <input
               id="seek-input"
@@ -272,18 +338,6 @@
         <div id="track-list" class="track-list" style="display: none"></div>
 
         <div class="status" id="host-status" style="margin-top: 10px"></div>
-      </section>
-
-      <section class="card">
-        <h2>Setup notes</h2>
-        <p class="small">
-          This page uses Firebase Realtime Database for control messages. Audio
-          is streamed directly from this site (<code>audio/&ast;.mp3</code>) to
-          each listener. Files are buffered locally on their side before
-          playback. Mobile browsers may still pause playback if the tab is fully
-          backgrounded; resuming the screen or tab will continue from the same
-          point.
-        </p>
       </section>
     </div>
 
@@ -313,8 +367,17 @@
       const hostSetupStatus = document.getElementById("host-setup-status");
 
       const tracksCard = document.getElementById("tracks-card");
-      const filenamesTextarea = document.getElementById("filenames");
-      const btnSendTracks = document.getElementById("btn-send-tracks");
+      const filesStatus = document.getElementById("files-status");
+      const btnRefreshFiles =
+        document.getElementById("btn-refresh-files");
+      const btnSelectAll =
+        document.getElementById("btn-select-all");
+      const btnClearSelection =
+        document.getElementById("btn-clear-selection");
+      const availableTracksList =
+        document.getElementById("available-tracks-list");
+      const btnSendTracks =
+        document.getElementById("btn-send-tracks");
 
       const roomInfo = document.getElementById("room-info");
       const hostConnDot = document.getElementById("host-conn-dot");
@@ -325,21 +388,26 @@
       const readyStatus = document.getElementById("ready-status");
       const btnPlay = document.getElementById("btn-play");
       const btnPause = document.getElementById("btn-pause");
-      const btnToggleLoop = document.getElementById("btn-toggle-loop");
+      const btnToggleLoop =
+        document.getElementById("btn-toggle-loop");
       const seekInput = document.getElementById("seek-input");
       const btnSeek = document.getElementById("btn-seek");
       const seekHint = document.getElementById("seek-hint");
       const trackListEl = document.getElementById("track-list");
-      const activeTrackLabel = document.getElementById("active-track-label");
+      const activeTrackLabel =
+        document.getElementById("active-track-label");
       const hostStatus = document.getElementById("host-status");
 
       // State
       let currentRoomId = null;
       let roomRef = null;
 
+      let availableFiles = []; // { name }
       let tracks = []; // { id, filename, label }
       const audioMap = {}; // id -> HTMLAudioElement
       const readyMap = {}; // id -> boolean
+      const durationMap = {}; // id -> number
+      const timeDisplayMap = {}; // id -> span
       let readyCount = 0;
 
       let currentState = {
@@ -349,6 +417,7 @@
         seekTo: null,
         seekVersion: 0
       };
+      let lastSeekVersionApplied = 0;
 
       function setHostConnectionStatus(online) {
         if (online) {
@@ -399,7 +468,79 @@
       }
 
       function updateLoopButton() {
-        btnToggleLoop.textContent = currentState.loop ? "Loop: On" : "Loop: Off";
+        btnToggleLoop.textContent = currentState.loop
+          ? "Loop: On"
+          : "Loop: Off";
+      }
+
+      function updateTimeDisplay(trackId) {
+        const audio = audioMap[trackId];
+        const span = timeDisplayMap[trackId];
+        if (!audio || !span) return;
+        const cur = isFinite(audio.currentTime)
+          ? audio.currentTime
+          : 0;
+        const dur = isFinite(audio.duration)
+          ? audio.duration
+          : durationMap[trackId] || null;
+        if (dur && isFinite(dur)) {
+          span.textContent =
+            formatTime(cur) + " / " + formatTime(dur);
+        } else {
+          span.textContent = formatTime(cur);
+        }
+      }
+
+      function enableEditingTime(trackId, span) {
+        const audio = audioMap[trackId];
+        if (!audio) return;
+        const oldText = span.textContent;
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "time-input";
+        input.value = formatTime(audio.currentTime || 0);
+        span.textContent = "";
+        span.appendChild(input);
+        input.focus();
+        input.select();
+
+        const finish = (apply) => {
+          const val = input.value;
+          span.removeChild(input);
+          if (apply) {
+            const seconds = parseTimeInput(val);
+            if (seconds !== null && seconds >= 0) {
+              try {
+                audio.currentTime = seconds;
+              } catch (e) {}
+              updateTimeDisplay(trackId);
+              if (trackId === currentState.activeTrackId && roomRef) {
+                currentState.seekVersion =
+                  (currentState.seekVersion || 0) + 1;
+                currentState.seekTo = seconds;
+                lastSeekVersionApplied =
+                  currentState.seekVersion;
+                roomRef.child("state").update({
+                  seekTo: seconds,
+                  seekVersion: currentState.seekVersion
+                });
+              }
+              return;
+            }
+          }
+          span.textContent = oldText;
+        };
+
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            finish(true);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            finish(false);
+          }
+        });
+        input.addEventListener("blur", () => finish(true));
       }
 
       btnStartHost.addEventListener("click", async () => {
@@ -412,28 +553,46 @@
         await startHost(roomId);
       });
 
+      btnRefreshFiles.addEventListener("click", () => {
+        autoLoadAudioFiles();
+      });
+
+      btnSelectAll.addEventListener("click", () => {
+        availableTracksList
+          .querySelectorAll('input[type="checkbox"]')
+          .forEach((cb) => (cb.checked = true));
+      });
+
+      btnClearSelection.addEventListener("click", () => {
+        availableTracksList
+          .querySelectorAll('input[type="checkbox"]')
+          .forEach((cb) => (cb.checked = false));
+      });
+
       btnSendTracks.addEventListener("click", async () => {
-        const text = filenamesTextarea.value;
-        const lines = text
-          .split("\n")
-          .map((l) => l.trim())
-          .filter((l) => l.length > 0);
-        if (!lines.length) {
-          alert("Enter at least one filename.");
+        const rows =
+          availableTracksList.querySelectorAll(".select-row");
+        const chosen = [];
+        rows.forEach((row) => {
+          const cb = row.querySelector('input[type="checkbox"]');
+          if (!cb || !cb.checked) return;
+          const filename = cb.dataset.filename;
+          const labelInput =
+            row.querySelector(".label-input");
+          const label =
+            (labelInput && labelInput.value.trim()) || filename;
+          chosen.push({ filename, label });
+        });
+        if (!chosen.length) {
+          alert("Select at least one track.");
           return;
         }
 
-        tracks = lines.map((line) => {
-          const parts = line.split("|");
-          const filename = parts[0].trim();
-          const label =
-            (parts[1] && parts[1].trim()) || filename;
-          return {
-            id: randomId(),
-            filename,
-            label
-          };
-        });
+        tracks = chosen.map((item) => ({
+          id: randomId(),
+          filename: item.filename,
+          label: item.label
+        }));
 
         const tracksObj = {};
         tracks.forEach((t) => {
@@ -471,8 +630,10 @@
           alert("Enter a time like 1:30 or 90");
           return;
         }
-        currentState.seekVersion = (currentState.seekVersion || 0) + 1;
+        currentState.seekVersion =
+          (currentState.seekVersion || 0) + 1;
         currentState.seekTo = seconds;
+        lastSeekVersionApplied = currentState.seekVersion;
 
         // Apply locally
         tracks.forEach((track) => {
@@ -480,9 +641,7 @@
           if (!audio) return;
           try {
             audio.currentTime = seconds;
-          } catch (e) {
-            // ignore
-          }
+          } catch (e) {}
         });
 
         if (roomRef) {
@@ -528,20 +687,108 @@
         hostSetupStatus.textContent =
           'Hosting room "' +
           roomId +
-          '". Enter filenames and send tracks.';
+          '". Choose which files to send.';
 
+        // Listen for state (for loop / seek / reconnections)
         roomRef.child("state").on("value", (snap) => {
           const val = snap.val() || {};
+          const incomingVersion = val.seekVersion || 0;
+          const incomingSeek =
+            typeof val.seekTo === "number" ? val.seekTo : null;
+
+          if (
+            incomingSeek !== null &&
+            incomingVersion > lastSeekVersionApplied
+          ) {
+            lastSeekVersionApplied = incomingVersion;
+            tracks.forEach((track) => {
+              const audio = audioMap[track.id];
+              if (!audio) return;
+              try {
+                audio.currentTime = incomingSeek;
+              } catch (e) {}
+            });
+          }
+
           currentState = {
             activeTrackId: val.activeTrackId || null,
             playing: !!val.playing,
             loop: !!val.loop,
-            seekTo:
-              typeof val.seekTo === "number" ? val.seekTo : null,
-            seekVersion: val.seekVersion || 0
+            seekTo: incomingSeek,
+            seekVersion: incomingVersion
           };
           updateLoopButton();
           applyPlaybackState();
+        });
+
+        // Auto-load available files
+        autoLoadAudioFiles();
+      }
+
+      async function autoLoadAudioFiles() {
+        const url =
+          "https://api.github.com/repos/amuletmaiden/amuletmaiden.github.io/contents/audio";
+        filesStatus.textContent =
+          "Loading audio/ from GitHub…";
+        availableTracksList.innerHTML = "";
+        try {
+          const res = await fetch(url);
+          if (!res.ok) {
+            throw new Error("HTTP " + res.status);
+          }
+          const data = await res.json();
+          availableFiles = (data || []).filter(
+            (item) =>
+              item.type === "file" &&
+              /\.(mp3|wav|ogg|m4a)$/i.test(item.name)
+          );
+          if (!availableFiles.length) {
+            filesStatus.textContent =
+              "No audio files found in audio/. Add some to the repo and reload.";
+            return;
+          }
+          filesStatus.textContent =
+            "Loaded " +
+            availableFiles.length +
+            " file(s) from audio/. Check the ones you want to send.";
+          renderAvailableFiles();
+        } catch (e) {
+          filesStatus.textContent =
+            "Could not load audio/ automatically. Check your repo name or try again.";
+        }
+      }
+
+      function renderAvailableFiles() {
+        availableTracksList.innerHTML = "";
+        availableFiles.forEach((file) => {
+          const row = document.createElement("div");
+          row.className = "select-row";
+
+          const left = document.createElement("label");
+          left.className = "select-left";
+
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = true;
+          cb.dataset.filename = file.name;
+
+          const nameSpan = document.createElement("span");
+          nameSpan.className = "filename";
+          nameSpan.textContent = file.name;
+
+          left.appendChild(cb);
+          left.appendChild(nameSpan);
+
+          const labelInput = document.createElement("input");
+          labelInput.type = "text";
+          labelInput.className = "label-input";
+          labelInput.value = file.name;
+          labelInput.placeholder = "Label (optional)";
+
+          row.appendChild(left);
+          row.appendChild(labelInput);
+
+          availableTracksList.appendChild(row);
         });
       }
 
@@ -550,6 +797,9 @@
         readyCount = 0;
         for (const id in readyMap) {
           delete readyMap[id];
+        }
+        for (const id in durationMap) {
+          delete durationMap[id];
         }
 
         trackList.forEach((track) => {
@@ -567,6 +817,15 @@
                 updateReadyStatus();
               }
             });
+            audio.addEventListener("loadedmetadata", () => {
+              if (isFinite(audio.duration)) {
+                durationMap[track.id] = audio.duration;
+              }
+              updateTimeDisplay(track.id);
+            });
+            audio.addEventListener("timeupdate", () => {
+              updateTimeDisplay(track.id);
+            });
             audio.addEventListener("error", () => {
               hostStatus.textContent =
                 "Error loading " +
@@ -583,7 +842,7 @@
       function updateReadyStatus() {
         const total = tracks.length;
         if (!total) {
-          readyStatus.textContent = "No tracks listed yet.";
+          readyStatus.textContent = "No tracks selected yet.";
           btnPlay.disabled = true;
           btnPause.disabled = true;
           btnToggleLoop.disabled = true;
@@ -601,6 +860,10 @@
 
       function renderTrackList() {
         trackListEl.innerHTML = "";
+        for (const id in timeDisplayMap) {
+          delete timeDisplayMap[id];
+        }
+
         if (!tracks.length) {
           trackListEl.style.display = "none";
           activeTrackLabel.textContent = "none";
@@ -612,7 +875,12 @@
           const row = document.createElement("div");
           row.className = "track-row";
 
-          const left = document.createElement("div");
+          const main = document.createElement("div");
+          main.className = "track-main";
+
+          const nameLine = document.createElement("div");
+          nameLine.className = "track-name-line";
+
           const badge = document.createElement("span");
           badge.className = "track-badge";
           if (track.id === currentState.activeTrackId) {
@@ -626,8 +894,19 @@
           nameSpan.className = "track-name";
           nameSpan.textContent = track.label;
 
-          left.appendChild(badge);
-          left.appendChild(nameSpan);
+          nameLine.appendChild(badge);
+          nameLine.appendChild(nameSpan);
+
+          const timeSpan = document.createElement("span");
+          timeSpan.className = "track-time";
+          timeSpan.textContent = "0:00";
+          timeDisplayMap[track.id] = timeSpan;
+          timeSpan.addEventListener("click", () =>
+            enableEditingTime(track.id, timeSpan)
+          );
+
+          main.appendChild(nameLine);
+          main.appendChild(timeSpan);
 
           const switchBtn = document.createElement("button");
           switchBtn.textContent = "Make active";
@@ -635,10 +914,13 @@
             setActiveTrack(track.id);
           });
 
-          row.appendChild(left);
+          row.appendChild(main);
           row.appendChild(switchBtn);
 
           trackListEl.appendChild(row);
+
+          // Initial time display based on any existing metadata
+          updateTimeDisplay(track.id);
         });
 
         const active = tracks.find(
@@ -661,7 +943,7 @@
         renderTrackList();
         if (currentState.playing) {
           hostStatus.textContent =
-            "Switched active track. Listeners should hear it immediately.";
+            "Switched active track. Listener should hear it immediately.";
         } else {
           hostStatus.textContent =
             "Active track changed. Will play when you press Play.";
@@ -681,7 +963,7 @@
           });
         }
         hostStatus.textContent =
-          "Play command sent. Listeners will start playback.";
+          "Play command sent. Listener will start playback.";
         renderTrackList();
         applyPlaybackState();
       });
@@ -694,7 +976,7 @@
           });
         }
         hostStatus.textContent =
-          "Pause command sent. Listeners will stop playback.";
+          "Pause command sent. Listener will stop playback.";
         applyPlaybackState();
       });
 
@@ -718,8 +1000,6 @@
       }
 
       document.addEventListener("visibilitychange", () => {
-        // If the tab comes back to foreground and we were supposed to be playing,
-        // make sure playback resumes.
         if (!document.hidden && currentState.playing) {
           applyPlaybackState();
         }
@@ -727,4 +1007,3 @@
     </script>
   </body>
 </html>
-
