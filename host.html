@@ -233,10 +233,6 @@
         display: flex;
         gap: 8px;
         margin-top: 4px;
-        align-items: center;
-      }
-      input[type="range"] {
-        flex: 1;
       }
     </style>
   </head>
@@ -322,20 +318,6 @@
         </div>
 
         <div class="status" style="margin-top: 12px">
-          <label for="volume-input">Listener volume</label>
-          <div class="seek-row">
-            <input
-              id="volume-input"
-              type="range"
-              min="0"
-              max="100"
-              value="100"
-            />
-            <span class="small" id="volume-label">100%</span>
-          </div>
-        </div>
-
-        <div class="status" style="margin-top: 12px">
           <label for="seek-input">Jump all tracks to time (mm:ss or seconds)</label>
           <div class="seek-row">
             <input
@@ -416,11 +398,6 @@
         document.getElementById("active-track-label");
       const hostStatus = document.getElementById("host-status");
 
-      const volumeInput =
-        document.getElementById("volume-input");
-      const volumeLabel =
-        document.getElementById("volume-label");
-
       // State
       let currentRoomId = null;
       let roomRef = null;
@@ -438,12 +415,9 @@
         playing: false,
         loop: false,
         seekTo: null,
-        seekVersion: 0,
-        volume: 1,
-        livePosition: 0
+        seekVersion: 0
       };
       let lastSeekVersionApplied = 0;
-      let lastLiveUpdateMs = 0;
 
       function setHostConnectionStatus(online) {
         if (online) {
@@ -464,6 +438,7 @@
       }
 
       function getAudioBaseUrl() {
+        // Root site: https://amuletmaiden.github.io/
         return window.location.origin + "/audio/";
       }
 
@@ -498,26 +473,6 @@
           : "Loop: Off";
       }
 
-      function updateVolumeLabel(vol) {
-        if (!volumeLabel) return;
-        const clamped = Math.max(
-          0,
-          Math.min(1, typeof vol === "number" ? vol : 1)
-        );
-        volumeLabel.textContent =
-          Math.round(clamped * 100) + "%";
-      }
-
-      function updateVolumeUI(vol) {
-        if (!volumeInput) return;
-        const clamped = Math.max(
-          0,
-          Math.min(1, typeof vol === "number" ? vol : 1)
-        );
-        volumeInput.value = String(Math.round(clamped * 100));
-        updateVolumeLabel(clamped);
-      }
-
       function updateTimeDisplay(trackId) {
         const audio = audioMap[trackId];
         const span = timeDisplayMap[trackId];
@@ -534,22 +489,6 @@
         } else {
           span.textContent = formatTime(cur);
         }
-      }
-
-      function maybeSendLivePosition(trackId) {
-        if (!roomRef) return;
-        if (!currentState.playing) return;
-        if (trackId !== currentState.activeTrackId) return;
-        const audio = audioMap[trackId];
-        if (!audio) return;
-        const now = Date.now();
-        if (now - lastLiveUpdateMs < 1000) return; // throttle ~1s
-        lastLiveUpdateMs = now;
-        const pos = isFinite(audio.currentTime)
-          ? audio.currentTime
-          : 0;
-        currentState.livePosition = pos;
-        roomRef.child("state").update({ livePosition: pos });
       }
 
       function enableEditingTime(trackId, span) {
@@ -581,11 +520,9 @@
                 currentState.seekTo = seconds;
                 lastSeekVersionApplied =
                   currentState.seekVersion;
-                currentState.livePosition = seconds;
                 roomRef.child("state").update({
                   seekTo: seconds,
-                  seekVersion: currentState.seekVersion,
-                  livePosition: seconds
+                  seekVersion: currentState.seekVersion
                 });
               }
               return;
@@ -631,23 +568,6 @@
           .querySelectorAll('input[type="checkbox"]')
           .forEach((cb) => (cb.checked = false));
       });
-
-      if (volumeInput) {
-        volumeInput.addEventListener("input", () => {
-          const raw = parseInt(volumeInput.value, 10);
-          const vol = isNaN(raw)
-            ? 1
-            : Math.max(0, Math.min(1, raw / 100));
-          currentState.volume = vol;
-          if (roomRef) {
-            roomRef.child("state").update({
-              volume: vol
-            });
-          }
-          updateVolumeLabel(vol);
-          applyPlaybackState();
-        });
-      }
 
       btnSendTracks.addEventListener("click", async () => {
         const rows =
@@ -714,8 +634,8 @@
           (currentState.seekVersion || 0) + 1;
         currentState.seekTo = seconds;
         lastSeekVersionApplied = currentState.seekVersion;
-        currentState.livePosition = seconds;
 
+        // Apply locally
         tracks.forEach((track) => {
           const audio = audioMap[track.id];
           if (!audio) return;
@@ -727,8 +647,7 @@
         if (roomRef) {
           roomRef.child("state").update({
             seekTo: seconds,
-            seekVersion: currentState.seekVersion,
-            livePosition: seconds
+            seekVersion: currentState.seekVersion
           });
         }
 
@@ -753,10 +672,6 @@
           .remove()
           .catch(() => {});
 
-        roomRef.child("state").update({
-          volume: currentState.volume
-        });
-
         const listenerUrl =
           window.location.origin +
           "/listener.html?room=" +
@@ -774,19 +689,12 @@
           roomId +
           '". Choose which files to send.';
 
+        // Listen for state (for loop / seek / reconnections)
         roomRef.child("state").on("value", (snap) => {
           const val = snap.val() || {};
           const incomingVersion = val.seekVersion || 0;
           const incomingSeek =
             typeof val.seekTo === "number" ? val.seekTo : null;
-          const incomingVolume =
-            typeof val.volume === "number"
-              ? val.volume
-              : currentState.volume ?? 1;
-          const incomingLive =
-            typeof val.livePosition === "number"
-              ? val.livePosition
-              : currentState.livePosition ?? 0;
 
           if (
             incomingSeek !== null &&
@@ -807,15 +715,13 @@
             playing: !!val.playing,
             loop: !!val.loop,
             seekTo: incomingSeek,
-            seekVersion: incomingVersion,
-            volume: incomingVolume,
-            livePosition: incomingLive
+            seekVersion: incomingVersion
           };
           updateLoopButton();
-          updateVolumeUI(incomingVolume);
           applyPlaybackState();
         });
 
+        // Auto-load available files
         autoLoadAudioFiles();
       }
 
@@ -919,7 +825,6 @@
             });
             audio.addEventListener("timeupdate", () => {
               updateTimeDisplay(track.id);
-              maybeSendLivePosition(track.id);
             });
             audio.addEventListener("error", () => {
               hostStatus.textContent =
@@ -942,7 +847,6 @@
           btnPause.disabled = true;
           btnToggleLoop.disabled = true;
           btnSeek.disabled = true;
-          if (volumeInput) volumeInput.disabled = true;
           return;
         }
         readyStatus.textContent =
@@ -952,7 +856,6 @@
         btnPause.disabled = !anyReady;
         btnToggleLoop.disabled = !anyReady;
         btnSeek.disabled = !anyReady;
-        if (volumeInput) volumeInput.disabled = !anyReady;
       }
 
       function renderTrackList() {
@@ -1016,6 +919,7 @@
 
           trackListEl.appendChild(row);
 
+          // Initial time display based on any existing metadata
           updateTimeDisplay(track.id);
         });
 
@@ -1030,23 +934,12 @@
       function setActiveTrack(id) {
         if (!tracks.find((t) => t.id === id)) return;
         currentState.activeTrackId = id;
-        const audio = audioMap[id];
-        if (audio && isFinite(audio.currentTime)) {
-          currentState.livePosition = audio.currentTime;
-          if (roomRef) {
-            roomRef.child("state").update({
-              activeTrackId: id,
-              livePosition: audio.currentTime,
-              playing: currentState.playing
-            });
-          }
-        } else if (roomRef) {
+        if (roomRef) {
           roomRef.child("state").update({
             activeTrackId: id,
             playing: currentState.playing
           });
         }
-
         renderTrackList();
         if (currentState.playing) {
           hostStatus.textContent =
@@ -1062,19 +955,11 @@
         if (!currentState.activeTrackId) {
           currentState.activeTrackId = tracks[0].id;
         }
-
-        const audio =
-          audioMap[currentState.activeTrackId] || null;
-        if (audio && isFinite(audio.currentTime)) {
-          currentState.livePosition = audio.currentTime;
-        }
-
         currentState.playing = true;
         if (roomRef) {
           roomRef.child("state").update({
             activeTrackId: currentState.activeTrackId,
-            playing: true,
-            livePosition: currentState.livePosition
+            playing: true
           });
         }
         hostStatus.textContent =
@@ -1084,20 +969,10 @@
       });
 
       btnPause.addEventListener("click", () => {
-        const audio =
-          currentState.activeTrackId &&
-          audioMap[currentState.activeTrackId]
-            ? audioMap[currentState.activeTrackId]
-            : null;
-        if (audio && isFinite(audio.currentTime)) {
-          currentState.livePosition = audio.currentTime;
-        }
-
         currentState.playing = false;
         if (roomRef) {
           roomRef.child("state").update({
-            playing: false,
-            livePosition: currentState.livePosition
+            playing: false
           });
         }
         hostStatus.textContent =
@@ -1106,16 +981,11 @@
       });
 
       function applyPlaybackState() {
-        const { activeTrackId, playing, loop, volume } = currentState;
-        const vol =
-          typeof volume === "number"
-            ? Math.max(0, Math.min(1, volume))
-            : 1;
+        const { activeTrackId, playing, loop } = currentState;
         tracks.forEach((track) => {
           const audio = audioMap[track.id];
           if (!audio) return;
           audio.loop = !!loop;
-          audio.volume = vol;
           if (
             playing &&
             track.id === activeTrackId &&
@@ -1134,8 +1004,6 @@
           applyPlaybackState();
         }
       });
-
-      updateVolumeUI(currentState.volume);
     </script>
   </body>
 </html>
