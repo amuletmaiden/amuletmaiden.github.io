@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Four-Color Tumblr-Style Editor</title>
+  <style>
+    :root {
+      --red: #ff0000;
+      --green: #00ff00;
+      --pink: #ff00ff;
+      --blue: #0000ff;
+      --bg: #fbfbfb;
+      --panel: #ffffff;
+      --line: #d9d9d9;
+      --text: #111111;
+      --muted: #666666;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .app {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 16px;
+      line-height: 1.45;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .palette {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-right: 6px;
+    }
+
+    .swatch {
+      appearance: none;
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 2px solid #000000;
+      cursor: pointer;
+      padding: 0;
+      position: relative;
+      transition: transform 0.12s ease;
+    }
+
+    .swatch:hover,
+    .button:hover {
+      transform: translateY(-1px);
+    }
+
+    .swatch.active::after {
+      content: "";
+      position: absolute;
+      inset: -6px;
+      border: 2px solid #000000;
+      border-radius: 999px;
+      pointer-events: none;
+    }
+
+    .button,
+    .pattern-input {
+      appearance: none;
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      height: 40px;
+    }
+
+    .button {
+      cursor: pointer;
+    }
+
+    .button:focus,
+    .pattern-input:focus,
+    .output:focus {
+      outline: 2px solid #bbbbbb;
+      outline-offset: 1px;
+    }
+
+    .pattern-input {
+      min-width: 120px;
+    }
+
+    .status,
+    .label,
+    .hint {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .editor-wrap {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .editor {
+      min-height: 320px;
+      padding: 18px;
+      font-size: 28px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      outline: none;
+      caret-color: #000000;
+    }
+
+    .editor:empty::before {
+      content: attr(data-placeholder);
+      color: #9a9a9a;
+    }
+
+    .output-wrap {
+      margin-top: 16px;
+    }
+
+    .output-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .output-label {
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 700;
+      margin-right: auto;
+    }
+
+    .output {
+      width: 100%;
+      min-height: 220px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      font: 13px/1.45 "Courier New", Courier, monospace;
+      color: #1a1a1a;
+      background: #ffffff;
+    }
+
+    .hint {
+      margin-top: 10px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 12px;
+      }
+
+      .editor {
+        min-height: 260px;
+        font-size: 22px;
+      }
+
+      .swatch {
+        width: 38px;
+        height: 38px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="panel">
+      <div class="title">Four-Color Text Editor</div>
+      <div class="subtitle">Click a color to set what newly typed text becomes. Select existing text and click a color to recolor it, apply repeating patterns like GB or RGPB, or paste HTML into the lower box and load it back into the editor.</div>
+
+      <div class="toolbar">
+        <div class="palette" aria-label="Color palette">
+          <button class="swatch active" type="button" data-color="#ff0000" data-key="R" title="Red" aria-label="Red" style="background:#ff0000;"></button>
+          <button class="swatch" type="button" data-color="#00ff00" data-key="G" title="Green" aria-label="Green" style="background:#00ff00;"></button>
+          <button class="swatch" type="button" data-color="#ff00ff" data-key="P" title="Pink" aria-label="Pink" style="background:#ff00ff;"></button>
+          <button class="swatch" type="button" data-color="#0000ff" data-key="B" title="Blue" aria-label="Blue" style="background:#0000ff;"></button>
+        </div>
+
+        <button class="button pattern-button" type="button" data-pattern="GB">GB</button>
+        <button class="button pattern-button" type="button" data-pattern="BG">BG</button>
+        <button class="button pattern-button" type="button" data-pattern="RGPB">RGPB</button>
+        <button class="button pattern-button" type="button" data-pattern="RP">RP</button>
+        <button class="button pattern-button" type="button" data-pattern="PR">PR</button>
+
+        <span class="label">Custom</span>
+        <input id="customPattern" class="pattern-input" type="text" value="GB" maxlength="32" spellcheck="false" autocomplete="off" />
+        <button id="applyPattern" class="button" type="button">Apply pattern</button>
+        <button id="clearEditor" class="button" type="button">Clear</button>
+        <button id="copyHtml" class="button" type="button">Copy HTML</button>
+        <span id="status" class="status">Typing color: red</span>
+      </div>
+
+      <div class="editor-wrap">
+        <div id="editor" class="editor" contenteditable="true" spellcheck="false" data-placeholder="Type here..."></div>
+      </div>
+
+      <div class="hint">Patterns run across selected text one visible character at a time. Spaces and other whitespace do not advance the pattern.</div>
+
+      <div class="output-wrap">
+        <div class="output-toolbar">
+          <div class="output-label">HTML input / output</div>
+          <button id="loadHtml" class="button" type="button">Load HTML</button>
+        </div>
+        <textarea id="output" class="output" spellcheck="false"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const COLORS = {
+      R: '#ff0000',
+      G: '#00ff00',
+      P: '#ff00ff',
+      B: '#0000ff'
+    };
+
+    const ALLOWED_COLORS = new Set(Object.values(COLORS));
+    const BLOCK_TAGS = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'UL', 'OL', 'BLOCKQUOTE', 'PRE']);
+
+    const COLOR_NAMES = {
+      '#ff0000': 'red',
+      '#00ff00': 'green',
+      '#ff00ff': 'pink',
+      '#0000ff': 'blue'
+    };
+
+    const editor = document.getElementById('editor');
+    const output = document.getElementById('output');
+    const status = document.getElementById('status');
+    const customPattern = document.getElementById('customPattern');
+    const applyPatternButton = document.getElementById('applyPattern');
+    const clearEditorButton = document.getElementById('clearEditor');
+    const copyHtmlButton = document.getElementById('copyHtml');
+    const loadHtmlButton = document.getElementById('loadHtml');
+    const swatches = Array.from(document.querySelectorAll('.swatch'));
+    const patternButtons = Array.from(document.querySelectorAll('.pattern-button'));
+
+    let activeColor = COLORS.R;
+    let savedRange = null;
+
+    function canonicalHex(color) {
+      if (!color) return '';
+      const value = String(color).trim().toLowerCase();
+      if (value.startsWith('#')) return value;
+      const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      if (!match) return value;
+      const r = Number(match[1]).toString(16).padStart(2, '0');
+      const g = Number(match[2]).toString(16).padStart(2, '0');
+      const b = Number(match[3]).toString(16).padStart(2, '0');
+      return `#${r}${g}${b}`;
+    }
+
+    function sanitizeImportedColor(color) {
+      const hex = canonicalHex(color);
+      return ALLOWED_COLORS.has(hex) ? hex : '';
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function serializeText(text) {
+      return text
+        .split('\n')
+        .map((part) => escapeHtml(part))
+        .join('<br>');
+    }
+
+    function serializeNode(node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return serializeText(node.textContent || '');
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return '';
+      }
+
+      if (node.tagName === 'BR') {
+        return '<br>';
+      }
+
+      let inner = '';
+      node.childNodes.forEach((child) => {
+        inner += serializeNode(child);
+      });
+
+      if (node.tagName === 'SPAN') {
+        return `<span style="color:${canonicalHex(node.style.color)};">${inner}</span>`;
+      }
+
+      return inner;
+    }
+
+    function updateOutput() {
+      normalizeEditor(editor);
+      output.value = serializeNode(editor);
+    }
+
+    function setStatus() {
+      status.textContent = `Typing color: ${COLOR_NAMES[activeColor]}`;
+    }
+
+    function setActiveColor(color) {
+      activeColor = canonicalHex(color);
+      swatches.forEach((button) => {
+        button.classList.toggle('active', canonicalHex(button.dataset.color) === activeColor);
+      });
+      setStatus();
+    }
+
+    function isInsideEditor(node) {
+      return node && (node === editor || editor.contains(node));
+    }
+
+    function saveSelection() {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+      if (isInsideEditor(range.commonAncestorContainer)) {
+        savedRange = range.cloneRange();
+      }
+    }
+
+    function restoreSelection() {
+      if (!savedRange) return false;
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(savedRange);
+      return true;
+    }
+
+    function placeCaretAfter(node) {
+      const range = document.createRange();
+      range.setStartAfter(node);
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      saveSelection();
+    }
+
+    function placeCaretAtEnd(target) {
+      const range = document.createRange();
+      range.selectNodeContents(target);
+      range.collapse(false);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      saveSelection();
+    }
+
+    function makeColorSpan(text, color) {
+      const span = document.createElement('span');
+      span.style.color = canonicalHex(color);
+      span.textContent = text;
+      return span;
+    }
+
+    function sanitizePattern(value) {
+      return String(value || '').toUpperCase().replace(/[^RGPB]/g, '');
+    }
+
+    function buildTypedFragmentFromText(text, color) {
+      const fragment = document.createDocumentFragment();
+
+      for (const char of text) {
+        if (char === '\n') {
+          fragment.appendChild(document.createElement('br'));
+          continue;
+        }
+
+        if (/\s/.test(char)) {
+          fragment.appendChild(document.createTextNode(char));
+          continue;
+        }
+
+        fragment.appendChild(makeColorSpan(char, color));
+      }
+
+      return fragment;
+    }
+
+    function buildSingleColorFragmentFromText(text, color) {
+      const fragment = document.createDocumentFragment();
+
+      for (const char of text) {
+        if (char === '\n') {
+          fragment.appendChild(document.createElement('br'));
+          continue;
+        }
+
+        if (/\s/.test(char)) {
+          fragment.appendChild(document.createTextNode(char));
+          continue;
+        }
+
+        fragment.appendChild(makeColorSpan(char, color));
+      }
+
+      return fragment;
+    }
+
+    function buildPatternFragmentFromText(text, getColorForIndex, startIndexRef) {
+      const fragment = document.createDocumentFragment();
+
+      for (const char of text) {
+        if (char === '\n') {
+          fragment.appendChild(document.createElement('br'));
+          continue;
+        }
+
+        if (/\s/.test(char)) {
+          fragment.appendChild(document.createTextNode(char));
+          continue;
+        }
+
+        const color = getColorForIndex(startIndexRef.index);
+        fragment.appendChild(makeColorSpan(char, color));
+        startIndexRef.index += 1;
+      }
+
+      return fragment;
+    }
+
+    function rebuildFragment(sourceFragment, textTransformer) {
+      const result = document.createDocumentFragment();
+
+      function walk(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          result.appendChild(textTransformer(node.textContent || ''));
+          return;
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+          return;
+        }
+
+        if (node.tagName === 'BR') {
+          result.appendChild(document.createElement('br'));
+          return;
+        }
+
+        Array.from(node.childNodes).forEach(walk);
+      }
+
+      Array.from(sourceFragment.childNodes).forEach(walk);
+      return result;
+    }
+
+    function importHtmlToEditor(html) {
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+      const fragment = document.createDocumentFragment();
+
+      function appendChildren(node, target) {
+        Array.from(node.childNodes).forEach((child, index, list) => {
+          appendImportedNode(child, target);
+          const isLast = index === list.length - 1;
+          if (
+            child.nodeType === Node.ELEMENT_NODE &&
+            BLOCK_TAGS.has(child.tagName) &&
+            !isLast
+          ) {
+            target.appendChild(document.createElement('br'));
+          }
+        });
+      }
+
+      function appendImportedNode(node, target) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          target.appendChild(document.createTextNode(node.textContent || ''));
+          return;
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+          return;
+        }
+
+        const tag = node.tagName;
+
+        if (tag === 'BR') {
+          target.appendChild(document.createElement('br'));
+          return;
+        }
+
+        if (tag === 'SPAN') {
+          const color = sanitizeImportedColor(node.style.color);
+          if (color) {
+            const span = document.createElement('span');
+            span.style.color = color;
+            appendChildren(node, span);
+            target.appendChild(span);
+            return;
+          }
+        }
+
+        appendChildren(node, target);
+      }
+
+      appendChildren(temp, fragment);
+      editor.innerHTML = '';
+      editor.appendChild(fragment);
+      normalizeEditor(editor);
+      placeCaretAtEnd(editor);
+      updateOutput();
+    }
+
+    function applySingleColorToSelection(color) {
+      editor.focus();
+      restoreSelection();
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+
+      if (range.collapsed) {
+        setActiveColor(color);
+        return;
+      }
+
+      const extracted = range.extractContents();
+      const rebuilt = rebuildFragment(extracted, (text) => buildSingleColorFragmentFromText(text, color));
+      const endMarker = document.createTextNode('');
+      range.insertNode(endMarker);
+      range.insertNode(rebuilt);
+      placeCaretAfter(endMarker);
+      endMarker.remove();
+      updateOutput();
+    }
+
+    function applyPatternToSelection(pattern) {
+      const cleanPattern = sanitizePattern(pattern);
+      if (!cleanPattern) return;
+
+      editor.focus();
+      restoreSelection();
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+      if (range.collapsed) return;
+
+      const keys = cleanPattern.split('');
+      const extracted = range.extractContents();
+      const state = { index: 0 };
+      const rebuilt = rebuildFragment(
+        extracted,
+        (text) => buildPatternFragmentFromText(text, (i) => COLORS[keys[i % keys.length]], state)
+      );
+
+      const endMarker = document.createTextNode('');
+      range.insertNode(endMarker);
+      range.insertNode(rebuilt);
+      placeCaretAfter(endMarker);
+      endMarker.remove();
+      updateOutput();
+    }
+
+    function insertColoredText(text) {
+      editor.focus();
+      restoreSelection();
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) {
+        placeCaretAtEnd(editor);
+      }
+
+      const liveSelection = window.getSelection();
+      const range = liveSelection.getRangeAt(0);
+      const fragment = buildTypedFragmentFromText(text, activeColor);
+      const endMarker = document.createTextNode('');
+      range.deleteContents();
+      range.insertNode(endMarker);
+      range.insertNode(fragment);
+      placeCaretAfter(endMarker);
+      endMarker.remove();
+      updateOutput();
+    }
+
+    function insertLineBreak() {
+      editor.focus();
+      restoreSelection();
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) {
+        placeCaretAtEnd(editor);
+      }
+
+      const liveSelection = window.getSelection();
+      const range = liveSelection.getRangeAt(0);
+      const br = document.createElement('br');
+      const marker = document.createTextNode('');
+      range.deleteContents();
+      range.insertNode(marker);
+      range.insertNode(br);
+      placeCaretAfter(marker);
+      marker.remove();
+      updateOutput();
+    }
+
+    function normalizeEditor(root) {
+      unwrapUnknownElements(root);
+      mergeAdjacentSpans(root);
+      removeEmptySpans(root);
+    }
+
+    function unwrapUnknownElements(root) {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+      const toUnwrap = [];
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        if (node === root) continue;
+        if (node.tagName !== 'SPAN' && node.tagName !== 'BR') {
+          toUnwrap.push(node);
+        }
+        if (node.tagName === 'SPAN') {
+          const color = sanitizeImportedColor(node.style.color);
+          if (color) {
+            node.style.color = color;
+          } else {
+            toUnwrap.push(node);
+          }
+        }
+      }
+
+      toUnwrap.forEach((node) => {
+        if (!node.parentNode) return;
+        const fragment = document.createDocumentFragment();
+        while (node.firstChild) {
+          fragment.appendChild(node.firstChild);
+        }
+        node.parentNode.replaceChild(fragment, node);
+      });
+    }
+
+    function removeEmptySpans(root) {
+      const spans = Array.from(root.querySelectorAll('span'));
+      spans.forEach((span) => {
+        if (!span.textContent && !span.querySelector('br')) {
+          span.remove();
+        }
+      });
+    }
+
+    function mergeAdjacentSpans(root) {
+      root.normalize();
+      let changed = true;
+
+      while (changed) {
+        changed = false;
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          if (node.tagName !== 'SPAN') continue;
+          const next = node.nextSibling;
+          if (
+            next &&
+            next.nodeType === Node.ELEMENT_NODE &&
+            next.tagName === 'SPAN' &&
+            canonicalHex(node.style.color) === canonicalHex(next.style.color)
+          ) {
+            while (next.firstChild) {
+              node.appendChild(next.firstChild);
+            }
+            next.remove();
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+
+    function handleSwatchClick(button) {
+      const color = canonicalHex(button.dataset.color);
+      setActiveColor(color);
+      applySingleColorToSelection(color);
+    }
+
+    swatches.forEach((button) => {
+      button.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+      });
+      button.addEventListener('click', () => {
+        handleSwatchClick(button);
+      });
+    });
+
+    patternButtons.forEach((button) => {
+      button.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+      });
+      button.addEventListener('click', () => {
+        const pattern = button.dataset.pattern || '';
+        customPattern.value = pattern;
+        applyPatternToSelection(pattern);
+      });
+    });
+
+    applyPatternButton.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+    });
+
+    applyPatternButton.addEventListener('click', () => {
+      applyPatternToSelection(customPattern.value);
+    });
+
+    loadHtmlButton.addEventListener('click', () => {
+      importHtmlToEditor(output.value);
+    });
+
+    output.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        importHtmlToEditor(output.value);
+      }
+    });
+
+    output.addEventListener('paste', () => {
+      setTimeout(() => {
+        importHtmlToEditor(output.value);
+      }, 0);
+    });
+
+    customPattern.addEventListener('input', () => {
+      customPattern.value = sanitizePattern(customPattern.value);
+    });
+
+    customPattern.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        applyPatternToSelection(customPattern.value);
+      }
+    });
+
+    clearEditorButton.addEventListener('click', () => {
+      editor.innerHTML = '';
+      placeCaretAtEnd(editor);
+      updateOutput();
+    });
+
+    copyHtmlButton.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(output.value);
+        const oldLabel = copyHtmlButton.textContent;
+        copyHtmlButton.textContent = 'Copied';
+        setTimeout(() => {
+          copyHtmlButton.textContent = oldLabel;
+        }, 900);
+      } catch (error) {
+        output.focus();
+        output.select();
+      }
+    });
+
+    editor.addEventListener('beforeinput', (event) => {
+      if (event.inputType === 'insertText') {
+        event.preventDefault();
+        insertColoredText(event.data || '');
+        return;
+      }
+
+      if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
+        event.preventDefault();
+        insertLineBreak();
+      }
+    });
+
+    editor.addEventListener('paste', (event) => {
+      event.preventDefault();
+      const text = (event.clipboardData || window.clipboardData).getData('text');
+      insertColoredText(text);
+    });
+
+    editor.addEventListener('keydown', (event) => {
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        insertColoredText('    ');
+      }
+    });
+
+    editor.addEventListener('input', updateOutput);
+    editor.addEventListener('mouseup', saveSelection);
+    editor.addEventListener('keyup', saveSelection);
+    editor.addEventListener('focus', saveSelection);
+
+    document.addEventListener('selectionchange', () => {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+      if (isInsideEditor(range.commonAncestorContainer)) {
+        savedRange = range.cloneRange();
+      }
+    });
+
+    setActiveColor(COLORS.R);
+    placeCaretAtEnd(editor);
+    updateOutput();
+  </script>
+</body>
+</html>
