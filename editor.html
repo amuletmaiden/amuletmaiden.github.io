@@ -31,7 +31,7 @@
     }
 
     .app {
-      max-width: 980px;
+      max-width: 1080px;
       margin: 0 auto;
     }
 
@@ -81,6 +81,7 @@
       padding: 0;
       position: relative;
       transition: transform 0.12s ease;
+      flex: 0 0 auto;
     }
 
     .swatch:hover,
@@ -98,14 +99,21 @@
     }
 
     .button,
-    .pattern-input {
+    .pattern-input,
+    .mode-select,
+    .output {
       appearance: none;
       border: 1px solid var(--line);
       background: #ffffff;
       color: var(--text);
       border-radius: 10px;
-      padding: 10px 14px;
       font-size: 14px;
+    }
+
+    .button,
+    .pattern-input,
+    .mode-select {
+      padding: 10px 14px;
       height: 40px;
     }
 
@@ -115,13 +123,23 @@
 
     .button:focus,
     .pattern-input:focus,
+    .mode-select:focus,
     .output:focus {
       outline: 2px solid #bbbbbb;
       outline-offset: 1px;
     }
 
+    .button.active {
+      border-color: #000000;
+      box-shadow: inset 0 0 0 1px #000000;
+    }
+
     .pattern-input {
       min-width: 120px;
+    }
+
+    .mode-select {
+      min-width: 190px;
     }
 
     .status,
@@ -147,6 +165,20 @@
       word-break: break-word;
       outline: none;
       caret-color: #000000;
+    }
+
+    .editor h1,
+    .editor h2,
+    .editor p,
+    .editor div {
+      margin: 0 0 0.5em;
+    }
+
+    .editor h1:last-child,
+    .editor h2:last-child,
+    .editor p:last-child,
+    .editor div:last-child {
+      margin-bottom: 0;
     }
 
     .editor:empty::before {
@@ -179,12 +211,8 @@
       width: 100%;
       min-height: 220px;
       resize: vertical;
-      border: 1px solid var(--line);
-      border-radius: 14px;
       padding: 14px;
       font: 13px/1.45 "Courier New", Courier, monospace;
-      color: #1a1a1a;
-      background: #ffffff;
     }
 
     .hint {
@@ -213,16 +241,25 @@
   <div class="app">
     <div class="panel">
       <div class="title">Four-Color Text Editor</div>
-      <div class="subtitle">Click a color to set what newly typed text becomes. Select existing text and click a color to recolor it, apply repeating patterns like GB or RGPB, or paste HTML into the lower box and load it back into the editor.</div>
+      <div class="subtitle">Click a color to set what newly typed text becomes. Select text to recolor it, apply repeating patterns, use bold or italics, switch blocks to H1 or paragraph, and paste HTML into the lower box to load it back into the editor.</div>
 
       <div class="toolbar">
         <div class="palette" aria-label="Color palette">
-          <button class="swatch active" type="button" data-color="#ff0000" data-key="R" title="Red" aria-label="Red" style="background:#ff0000;"></button>
-          <button class="swatch" type="button" data-color="#00ff00" data-key="G" title="Green" aria-label="Green" style="background:#00ff00;"></button>
-          <button class="swatch" type="button" data-color="#ff00ff" data-key="P" title="Pink" aria-label="Pink" style="background:#ff00ff;"></button>
-          <button class="swatch" type="button" data-color="#0000ff" data-key="B" title="Blue" aria-label="Blue" style="background:#0000ff;"></button>
+          <button class="swatch active" type="button" data-color="#ff0000" title="Red" aria-label="Red" style="background:#ff0000;"></button>
+          <button class="swatch" type="button" data-color="#00ff00" title="Green" aria-label="Green" style="background:#00ff00;"></button>
+          <button class="swatch" type="button" data-color="#ff00ff" title="Pink" aria-label="Pink" style="background:#ff00ff;"></button>
+          <button class="swatch" type="button" data-color="#0000ff" title="Blue" aria-label="Blue" style="background:#0000ff;"></button>
         </div>
 
+        <button id="undoButton" class="button" type="button" title="Undo (Ctrl+Z)">Undo</button>
+        <button id="redoButton" class="button" type="button" title="Redo (Ctrl+Y)">Redo</button>
+        <button id="boldButton" class="button" type="button"><strong>B</strong></button>
+        <button id="italicButton" class="button" type="button"><em>I</em></button>
+        <button id="h1Button" class="button" type="button">H1</button>
+        <button id="paragraphButton" class="button" type="button">P</button>
+      </div>
+
+      <div class="toolbar">
         <button class="button pattern-button" type="button" data-pattern="GB">GB</button>
         <button class="button pattern-button" type="button" data-pattern="BG">BG</button>
         <button class="button pattern-button" type="button" data-pattern="RGPB">RGPB</button>
@@ -231,17 +268,24 @@
 
         <span class="label">Custom</span>
         <input id="customPattern" class="pattern-input" type="text" value="GB" maxlength="32" spellcheck="false" autocomplete="off" />
+
+        <span class="label">Pattern mode</span>
+        <select id="patternMode" class="mode-select">
+          <option value="character">Character</option>
+          <option value="word">Word + punctuation</option>
+        </select>
+
         <button id="applyPattern" class="button" type="button">Apply pattern</button>
         <button id="clearEditor" class="button" type="button">Clear</button>
         <button id="copyHtml" class="button" type="button">Copy HTML</button>
-        <span id="status" class="status">Typing color: red</span>
+        <span id="status" class="status">Typing color: red · Pattern mode: character</span>
       </div>
 
       <div class="editor-wrap">
         <div id="editor" class="editor" contenteditable="true" spellcheck="false" data-placeholder="Type here..."></div>
       </div>
 
-      <div class="hint">Patterns run across selected text one visible character at a time. Spaces and other whitespace do not advance the pattern.</div>
+      <div class="hint">Ctrl+Z and Ctrl+Y use the editor’s own history stack. Character mode colors one visible character at a time. Word + punctuation mode colors each word as one hit and each punctuation mark as its own hit. Spaces and other whitespace never advance the pattern.</div>
 
       <div class="output-wrap">
         <div class="output-toolbar">
@@ -262,7 +306,9 @@
     };
 
     const ALLOWED_COLORS = new Set(Object.values(COLORS));
-    const BLOCK_TAGS = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'UL', 'OL', 'BLOCKQUOTE', 'PRE']);
+    const BLOCK_TAGS = new Set(['P', 'DIV', 'H1', 'H2']);
+    const INLINE_TAGS = new Set(['STRONG', 'EM']);
+    const ALLOWED_TAGS = new Set(['SPAN', 'STRONG', 'EM', 'BR', 'P', 'DIV', 'H1', 'H2']);
 
     const COLOR_NAMES = {
       '#ff0000': 'red',
@@ -275,15 +321,26 @@
     const output = document.getElementById('output');
     const status = document.getElementById('status');
     const customPattern = document.getElementById('customPattern');
+    const patternMode = document.getElementById('patternMode');
     const applyPatternButton = document.getElementById('applyPattern');
     const clearEditorButton = document.getElementById('clearEditor');
     const copyHtmlButton = document.getElementById('copyHtml');
     const loadHtmlButton = document.getElementById('loadHtml');
+    const undoButton = document.getElementById('undoButton');
+    const redoButton = document.getElementById('redoButton');
+    const boldButton = document.getElementById('boldButton');
+    const italicButton = document.getElementById('italicButton');
+    const h1Button = document.getElementById('h1Button');
+    const paragraphButton = document.getElementById('paragraphButton');
     const swatches = Array.from(document.querySelectorAll('.swatch'));
     const patternButtons = Array.from(document.querySelectorAll('.pattern-button'));
 
     let activeColor = COLORS.R;
     let savedRange = null;
+    let history = [];
+    let historyIndex = -1;
+    let isRestoringHistory = false;
+    let typingCommitTimer = null;
 
     function canonicalHex(color) {
       if (!color) return '';
@@ -310,23 +367,143 @@
         .replace(/"/g, '&quot;');
     }
 
-    function serializeText(text) {
-      return text
-        .split('\n')
-        .map((part) => escapeHtml(part))
-        .join('<br>');
+    function getNodePath(root, node) {
+      const path = [];
+      let current = node;
+      while (current && current !== root) {
+        const parent = current.parentNode;
+        if (!parent) return null;
+        path.unshift(Array.prototype.indexOf.call(parent.childNodes, current));
+        current = parent;
+      }
+      return current === root ? path : null;
+    }
+
+    function getNodeFromPath(root, path) {
+      let current = root;
+      for (const index of path || []) {
+        if (!current || !current.childNodes || index < 0 || index >= current.childNodes.length) {
+          return null;
+        }
+        current = current.childNodes[index];
+      }
+      return current;
+    }
+
+    function captureSelection() {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return null;
+      const range = selection.getRangeAt(0);
+      if (!isInsideEditor(range.commonAncestorContainer)) return null;
+      return {
+        startPath: getNodePath(editor, range.startContainer),
+        startOffset: range.startOffset,
+        endPath: getNodePath(editor, range.endContainer),
+        endOffset: range.endOffset
+      };
+    }
+
+    function restoreSelectionFromSnapshot(selectionState) {
+      if (!selectionState) {
+        placeCaretAtEnd(editor);
+        return;
+      }
+
+      const startNode = getNodeFromPath(editor, selectionState.startPath);
+      const endNode = getNodeFromPath(editor, selectionState.endPath);
+      if (!startNode || !endNode) {
+        placeCaretAtEnd(editor);
+        return;
+      }
+
+      const range = document.createRange();
+      try {
+        range.setStart(startNode, Math.min(selectionState.startOffset, getMaxOffset(startNode)));
+        range.setEnd(endNode, Math.min(selectionState.endOffset, getMaxOffset(endNode)));
+      } catch (error) {
+        placeCaretAtEnd(editor);
+        return;
+      }
+
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      savedRange = range.cloneRange();
+    }
+
+    function getMaxOffset(node) {
+      return node.nodeType === Node.TEXT_NODE ? (node.textContent || '').length : node.childNodes.length;
+    }
+
+    function snapshotState() {
+      normalizeEditor(editor);
+      return {
+        html: editor.innerHTML,
+        selection: captureSelection()
+      };
+    }
+
+    function updateUndoRedoButtons() {
+      undoButton.disabled = historyIndex <= 0;
+      redoButton.disabled = historyIndex >= history.length - 1;
+    }
+
+    function pushHistory(force = false) {
+      if (isRestoringHistory) return;
+      const snapshot = snapshotState();
+      const last = history[historyIndex];
+      if (!force && last && last.html === snapshot.html) {
+        history[historyIndex] = snapshot;
+        updateUndoRedoButtons();
+        return;
+      }
+
+      history = history.slice(0, historyIndex + 1);
+      history.push(snapshot);
+      historyIndex = history.length - 1;
+      updateUndoRedoButtons();
+    }
+
+    function scheduleHistoryCommit() {
+      window.clearTimeout(typingCommitTimer);
+      typingCommitTimer = window.setTimeout(() => {
+        pushHistory();
+      }, 350);
+    }
+
+    function applyHistorySnapshot(index) {
+      if (index < 0 || index >= history.length) return;
+      isRestoringHistory = true;
+      historyIndex = index;
+      editor.innerHTML = history[historyIndex].html;
+      normalizeEditor(editor);
+      restoreSelectionFromSnapshot(history[historyIndex].selection);
+      updateOutput();
+      updateUndoRedoButtons();
+      isRestoringHistory = false;
+    }
+
+    function undo() {
+      if (historyIndex <= 0) return;
+      applyHistorySnapshot(historyIndex - 1);
+    }
+
+    function redo() {
+      if (historyIndex >= history.length - 1) return;
+      applyHistorySnapshot(historyIndex + 1);
     }
 
     function serializeNode(node) {
       if (node.nodeType === Node.TEXT_NODE) {
-        return serializeText(node.textContent || '');
+        return escapeHtml(node.textContent || '');
       }
 
       if (node.nodeType !== Node.ELEMENT_NODE) {
         return '';
       }
 
-      if (node.tagName === 'BR') {
+      const tag = normalizeTagName(node.tagName);
+      if (tag === 'BR') {
         return '<br>';
       }
 
@@ -335,20 +512,28 @@
         inner += serializeNode(child);
       });
 
-      if (node.tagName === 'SPAN') {
+      if (tag === 'SPAN') {
         return `<span style="color:${canonicalHex(node.style.color)};">${inner}</span>`;
       }
 
+      if (tag === 'STRONG') return `<strong>${inner}</strong>`;
+      if (tag === 'EM') return `<em>${inner}</em>`;
+      if (tag === 'H1') return `<h1>${inner}</h1>`;
+      if (tag === 'H2') return `<h2>${inner}</h2>`;
+      if (tag === 'P') return `<p>${inner}</p>`;
+      if (tag === 'DIV') return `<div>${inner}</div>`;
       return inner;
     }
 
     function updateOutput() {
       normalizeEditor(editor);
       output.value = serializeNode(editor);
+      updateFormatButtonStates();
     }
 
-    function setStatus() {
-      status.textContent = `Typing color: ${COLOR_NAMES[activeColor]}`;
+    function updateStatus() {
+      const modeLabel = patternMode.value === 'word' ? 'word + punctuation' : 'character';
+      status.textContent = `Typing color: ${COLOR_NAMES[activeColor]} · Pattern mode: ${modeLabel}`;
     }
 
     function setActiveColor(color) {
@@ -356,7 +541,7 @@
       swatches.forEach((button) => {
         button.classList.toggle('active', canonicalHex(button.dataset.color) === activeColor);
       });
-      setStatus();
+      updateStatus();
     }
 
     function isInsideEditor(node) {
@@ -432,6 +617,10 @@
     }
 
     function buildSingleColorFragmentFromText(text, color) {
+      return buildTypedFragmentFromText(text, color);
+    }
+
+    function buildPatternFragmentByCharacter(text, getColorForIndex, state) {
       const fragment = document.createDocumentFragment();
 
       for (const char of text) {
@@ -445,56 +634,122 @@
           continue;
         }
 
+        const color = getColorForIndex(state.index);
         fragment.appendChild(makeColorSpan(char, color));
+        state.index += 1;
       }
 
       return fragment;
     }
 
-    function buildPatternFragmentFromText(text, getColorForIndex, startIndexRef) {
-      const fragment = document.createDocumentFragment();
-
-      for (const char of text) {
-        if (char === '\n') {
-          fragment.appendChild(document.createElement('br'));
+    function pushWordModeTokensFromLine(line, tokens) {
+      let index = 0;
+      while (index < line.length) {
+        const rest = line.slice(index);
+        const whitespaceMatch = rest.match(/^[\t\f\v\r ]+/);
+        if (whitespaceMatch) {
+          tokens.push({ type: 'space', value: whitespaceMatch[0] });
+          index += whitespaceMatch[0].length;
           continue;
         }
 
-        if (/\s/.test(char)) {
-          fragment.appendChild(document.createTextNode(char));
+        const wordMatch = rest.match(/^[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/u);
+        if (wordMatch) {
+          tokens.push({ type: 'word', value: wordMatch[0] });
+          index += wordMatch[0].length;
           continue;
         }
 
-        const color = getColorForIndex(startIndexRef.index);
-        fragment.appendChild(makeColorSpan(char, color));
-        startIndexRef.index += 1;
+        const symbol = Array.from(rest)[0];
+        tokens.push({ type: 'punct', value: symbol });
+        index += symbol.length;
       }
+    }
+
+    function tokenizeWordModeText(text) {
+      const tokens = [];
+      const parts = text.split('\n');
+      parts.forEach((line, lineIndex) => {
+        pushWordModeTokensFromLine(line, tokens);
+        if (lineIndex < parts.length - 1) {
+          tokens.push({ type: 'newline', value: '\n' });
+        }
+      });
+      return tokens;
+    }
+
+    function buildPatternFragmentByWord(text, getColorForIndex, state) {
+      const fragment = document.createDocumentFragment();
+      const tokens = tokenizeWordModeText(text);
+
+      tokens.forEach((token) => {
+        if (token.type === 'newline') {
+          fragment.appendChild(document.createElement('br'));
+          return;
+        }
+
+        if (token.type === 'space') {
+          fragment.appendChild(document.createTextNode(token.value));
+          return;
+        }
+
+        const color = getColorForIndex(state.index);
+        fragment.appendChild(makeColorSpan(token.value, color));
+        state.index += 1;
+      });
 
       return fragment;
+    }
+
+    function normalizeTagName(tag) {
+      if (!tag) return '';
+      if (tag === 'B') return 'STRONG';
+      if (tag === 'I') return 'EM';
+      return tag.toUpperCase();
+    }
+
+    function cloneTransformedNode(node, textTransformer) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return textTransformer(node.textContent || '');
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return document.createDocumentFragment();
+      }
+
+      const tag = normalizeTagName(node.tagName);
+      if (tag === 'BR') {
+        return document.createElement('br');
+      }
+
+      if (tag === 'SPAN') {
+        const fragment = document.createDocumentFragment();
+        Array.from(node.childNodes).forEach((child) => {
+          fragment.appendChild(cloneTransformedNode(child, textTransformer));
+        });
+        return fragment;
+      }
+
+      if (!ALLOWED_TAGS.has(tag)) {
+        const fragment = document.createDocumentFragment();
+        Array.from(node.childNodes).forEach((child) => {
+          fragment.appendChild(cloneTransformedNode(child, textTransformer));
+        });
+        return fragment;
+      }
+
+      const element = document.createElement(tag.toLowerCase());
+      Array.from(node.childNodes).forEach((child) => {
+        element.appendChild(cloneTransformedNode(child, textTransformer));
+      });
+      return element;
     }
 
     function rebuildFragment(sourceFragment, textTransformer) {
       const result = document.createDocumentFragment();
-
-      function walk(node) {
-        if (node.nodeType === Node.TEXT_NODE) {
-          result.appendChild(textTransformer(node.textContent || ''));
-          return;
-        }
-
-        if (node.nodeType !== Node.ELEMENT_NODE) {
-          return;
-        }
-
-        if (node.tagName === 'BR') {
-          result.appendChild(document.createElement('br'));
-          return;
-        }
-
-        Array.from(node.childNodes).forEach(walk);
-      }
-
-      Array.from(sourceFragment.childNodes).forEach(walk);
+      Array.from(sourceFragment.childNodes).forEach((child) => {
+        result.appendChild(cloneTransformedNode(child, textTransformer));
+      });
       return result;
     }
 
@@ -504,34 +759,23 @@
       const fragment = document.createDocumentFragment();
 
       function appendChildren(node, target) {
-        Array.from(node.childNodes).forEach((child, index, list) => {
-          appendImportedNode(child, target);
-          const isLast = index === list.length - 1;
-          if (
-            child.nodeType === Node.ELEMENT_NODE &&
-            BLOCK_TAGS.has(child.tagName) &&
-            !isLast
-          ) {
-            target.appendChild(document.createElement('br'));
-          }
+        Array.from(node.childNodes).forEach((child) => {
+          target.appendChild(importNode(child));
         });
       }
 
-      function appendImportedNode(node, target) {
+      function importNode(node) {
         if (node.nodeType === Node.TEXT_NODE) {
-          target.appendChild(document.createTextNode(node.textContent || ''));
-          return;
+          return document.createTextNode(node.textContent || '');
         }
 
         if (node.nodeType !== Node.ELEMENT_NODE) {
-          return;
+          return document.createDocumentFragment();
         }
 
-        const tag = node.tagName;
-
+        const tag = normalizeTagName(node.tagName);
         if (tag === 'BR') {
-          target.appendChild(document.createElement('br'));
-          return;
+          return document.createElement('br');
         }
 
         if (tag === 'SPAN') {
@@ -540,12 +784,22 @@
             const span = document.createElement('span');
             span.style.color = color;
             appendChildren(node, span);
-            target.appendChild(span);
-            return;
+            return span;
           }
+          const fragment = document.createDocumentFragment();
+          appendChildren(node, fragment);
+          return fragment;
         }
 
-        appendChildren(node, target);
+        if (INLINE_TAGS.has(tag) || BLOCK_TAGS.has(tag)) {
+          const element = document.createElement(tag.toLowerCase());
+          appendChildren(node, element);
+          return element;
+        }
+
+        const fragment = document.createDocumentFragment();
+        appendChildren(node, fragment);
+        return fragment;
       }
 
       appendChildren(temp, fragment);
@@ -553,6 +807,14 @@
       editor.appendChild(fragment);
       normalizeEditor(editor);
       placeCaretAtEnd(editor);
+      pushHistory(true);
+      updateOutput();
+    }
+
+    function withHistory(action, force = false) {
+      window.clearTimeout(typingCommitTimer);
+      action();
+      pushHistory(force);
       updateOutput();
     }
 
@@ -568,14 +830,15 @@
         return;
       }
 
-      const extracted = range.extractContents();
-      const rebuilt = rebuildFragment(extracted, (text) => buildSingleColorFragmentFromText(text, color));
-      const endMarker = document.createTextNode('');
-      range.insertNode(endMarker);
-      range.insertNode(rebuilt);
-      placeCaretAfter(endMarker);
-      endMarker.remove();
-      updateOutput();
+      withHistory(() => {
+        const extracted = range.extractContents();
+        const rebuilt = rebuildFragment(extracted, (text) => buildSingleColorFragmentFromText(text, color));
+        const marker = document.createTextNode('');
+        range.insertNode(marker);
+        range.insertNode(rebuilt);
+        placeCaretAfter(marker);
+        marker.remove();
+      });
     }
 
     function applyPatternToSelection(pattern) {
@@ -589,20 +852,20 @@
       const range = selection.getRangeAt(0);
       if (range.collapsed) return;
 
-      const keys = cleanPattern.split('');
-      const extracted = range.extractContents();
-      const state = { index: 0 };
-      const rebuilt = rebuildFragment(
-        extracted,
-        (text) => buildPatternFragmentFromText(text, (i) => COLORS[keys[i % keys.length]], state)
-      );
-
-      const endMarker = document.createTextNode('');
-      range.insertNode(endMarker);
-      range.insertNode(rebuilt);
-      placeCaretAfter(endMarker);
-      endMarker.remove();
-      updateOutput();
+      withHistory(() => {
+        const keys = cleanPattern.split('');
+        const state = { index: 0 };
+        const extracted = range.extractContents();
+        const transformer = patternMode.value === 'word'
+          ? (text) => buildPatternFragmentByWord(text, (i) => COLORS[keys[i % keys.length]], state)
+          : (text) => buildPatternFragmentByCharacter(text, (i) => COLORS[keys[i % keys.length]], state);
+        const rebuilt = rebuildFragment(extracted, transformer);
+        const marker = document.createTextNode('');
+        range.insertNode(marker);
+        range.insertNode(rebuilt);
+        placeCaretAfter(marker);
+        marker.remove();
+      });
     }
 
     function insertColoredText(text) {
@@ -616,13 +879,14 @@
       const liveSelection = window.getSelection();
       const range = liveSelection.getRangeAt(0);
       const fragment = buildTypedFragmentFromText(text, activeColor);
-      const endMarker = document.createTextNode('');
+      const marker = document.createTextNode('');
       range.deleteContents();
-      range.insertNode(endMarker);
+      range.insertNode(marker);
       range.insertNode(fragment);
-      placeCaretAfter(endMarker);
-      endMarker.remove();
+      placeCaretAfter(marker);
+      marker.remove();
       updateOutput();
+      scheduleHistoryCommit();
     }
 
     function insertLineBreak() {
@@ -643,46 +907,85 @@
       placeCaretAfter(marker);
       marker.remove();
       updateOutput();
+      scheduleHistoryCommit();
+    }
+
+    function applyCommand(command, value = null) {
+      editor.focus();
+      restoreSelection();
+      withHistory(() => {
+        document.execCommand('styleWithCSS', false, false);
+        document.execCommand(command, false, value);
+        saveSelection();
+      }, true);
+    }
+
+    function applyBlockCommand(tagName) {
+      editor.focus();
+      restoreSelection();
+      withHistory(() => {
+        document.execCommand('formatBlock', false, `<${tagName.toLowerCase()}>`);
+        saveSelection();
+      }, true);
     }
 
     function normalizeEditor(root) {
-      unwrapUnknownElements(root);
+      normalizeNode(root);
+      root.normalize();
       mergeAdjacentSpans(root);
       removeEmptySpans(root);
     }
 
-    function unwrapUnknownElements(root) {
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
-      const toUnwrap = [];
-      while (walker.nextNode()) {
-        const node = walker.currentNode;
-        if (node === root) continue;
-        if (node.tagName !== 'SPAN' && node.tagName !== 'BR') {
-          toUnwrap.push(node);
+    function normalizeNode(node) {
+      Array.from(node.childNodes).forEach((child) => {
+        if (child.nodeType !== Node.ELEMENT_NODE) {
+          return;
         }
-        if (node.tagName === 'SPAN') {
-          const color = sanitizeImportedColor(node.style.color);
-          if (color) {
-            node.style.color = color;
-          } else {
-            toUnwrap.push(node);
-          }
-        }
-      }
 
-      toUnwrap.forEach((node) => {
-        if (!node.parentNode) return;
-        const fragment = document.createDocumentFragment();
-        while (node.firstChild) {
-          fragment.appendChild(node.firstChild);
+        const normalizedTag = normalizeTagName(child.tagName);
+        if (!ALLOWED_TAGS.has(normalizedTag)) {
+          const fragment = document.createDocumentFragment();
+          while (child.firstChild) {
+            fragment.appendChild(child.firstChild);
+          }
+          child.replaceWith(fragment);
+          return;
         }
-        node.parentNode.replaceChild(fragment, node);
+
+        if (normalizedTag !== child.tagName) {
+          const replacement = document.createElement(normalizedTag.toLowerCase());
+          while (child.firstChild) {
+            replacement.appendChild(child.firstChild);
+          }
+          child.replaceWith(replacement);
+          normalizeNode(replacement);
+          return;
+        }
+
+        if (normalizedTag === 'SPAN') {
+          const color = sanitizeImportedColor(child.style.color);
+          if (color) {
+            child.setAttribute('style', `color:${color};`);
+          } else {
+            const fragment = document.createDocumentFragment();
+            while (child.firstChild) {
+              fragment.appendChild(child.firstChild);
+            }
+            child.replaceWith(fragment);
+            return;
+          }
+        } else {
+          Array.from(child.attributes).forEach((attribute) => {
+            child.removeAttribute(attribute.name);
+          });
+        }
+
+        normalizeNode(child);
       });
     }
 
     function removeEmptySpans(root) {
-      const spans = Array.from(root.querySelectorAll('span'));
-      spans.forEach((span) => {
+      Array.from(root.querySelectorAll('span')).forEach((span) => {
         if (!span.textContent && !span.querySelector('br')) {
           span.remove();
         }
@@ -690,20 +993,18 @@
     }
 
     function mergeAdjacentSpans(root) {
-      root.normalize();
       let changed = true;
-
       while (changed) {
         changed = false;
         const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
         while (walker.nextNode()) {
           const node = walker.currentNode;
-          if (node.tagName !== 'SPAN') continue;
+          if (normalizeTagName(node.tagName) !== 'SPAN') continue;
           const next = node.nextSibling;
           if (
             next &&
             next.nodeType === Node.ELEMENT_NODE &&
-            next.tagName === 'SPAN' &&
+            normalizeTagName(next.tagName) === 'SPAN' &&
             canonicalHex(node.style.color) === canonicalHex(next.style.color)
           ) {
             while (next.firstChild) {
@@ -715,6 +1016,32 @@
           }
         }
       }
+    }
+
+    function getClosestTagName(node, tagName) {
+      let current = node;
+      const target = tagName.toUpperCase();
+      while (current && current !== editor) {
+        if (current.nodeType === Node.ELEMENT_NODE && normalizeTagName(current.tagName) === target) {
+          return current;
+        }
+        current = current.parentNode;
+      }
+      return null;
+    }
+
+    function getSelectionContainer() {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return null;
+      return selection.getRangeAt(0).commonAncestorContainer;
+    }
+
+    function updateFormatButtonStates() {
+      const container = getSelectionContainer();
+      boldButton.classList.toggle('active', !!getClosestTagName(container, 'STRONG'));
+      italicButton.classList.toggle('active', !!getClosestTagName(container, 'EM'));
+      h1Button.classList.toggle('active', !!getClosestTagName(container, 'H1'));
+      paragraphButton.classList.toggle('active', !!getClosestTagName(container, 'P'));
     }
 
     function handleSwatchClick(button) {
@@ -743,12 +1070,55 @@
       });
     });
 
-    applyPatternButton.addEventListener('mousedown', (event) => {
-      event.preventDefault();
+    [applyPatternButton, undoButton, redoButton, boldButton, italicButton, h1Button, paragraphButton].forEach((button) => {
+      button.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+      });
     });
 
     applyPatternButton.addEventListener('click', () => {
       applyPatternToSelection(customPattern.value);
+    });
+
+    undoButton.addEventListener('click', undo);
+    redoButton.addEventListener('click', redo);
+    boldButton.addEventListener('click', () => applyCommand('bold'));
+    italicButton.addEventListener('click', () => applyCommand('italic'));
+    h1Button.addEventListener('click', () => applyBlockCommand('H1'));
+    paragraphButton.addEventListener('click', () => applyBlockCommand('P'));
+
+    customPattern.addEventListener('input', () => {
+      customPattern.value = sanitizePattern(customPattern.value);
+    });
+
+    customPattern.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        applyPatternToSelection(customPattern.value);
+      }
+    });
+
+    patternMode.addEventListener('change', updateStatus);
+
+    clearEditorButton.addEventListener('click', () => {
+      withHistory(() => {
+        editor.innerHTML = '';
+        placeCaretAtEnd(editor);
+      }, true);
+    });
+
+    copyHtmlButton.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(output.value);
+        const oldLabel = copyHtmlButton.textContent;
+        copyHtmlButton.textContent = 'Copied';
+        setTimeout(() => {
+          copyHtmlButton.textContent = oldLabel;
+        }, 900);
+      } catch (error) {
+        output.focus();
+        output.select();
+      }
     });
 
     loadHtmlButton.addEventListener('click', () => {
@@ -768,38 +1138,14 @@
       }, 0);
     });
 
-    customPattern.addEventListener('input', () => {
-      customPattern.value = sanitizePattern(customPattern.value);
-    });
-
-    customPattern.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        applyPatternToSelection(customPattern.value);
-      }
-    });
-
-    clearEditorButton.addEventListener('click', () => {
-      editor.innerHTML = '';
-      placeCaretAtEnd(editor);
-      updateOutput();
-    });
-
-    copyHtmlButton.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(output.value);
-        const oldLabel = copyHtmlButton.textContent;
-        copyHtmlButton.textContent = 'Copied';
-        setTimeout(() => {
-          copyHtmlButton.textContent = oldLabel;
-        }, 900);
-      } catch (error) {
-        output.focus();
-        output.select();
-      }
-    });
-
     editor.addEventListener('beforeinput', (event) => {
+      if (event.inputType === 'historyUndo' || event.inputType === 'historyRedo') {
+        event.preventDefault();
+        if (event.inputType === 'historyUndo') undo();
+        else redo();
+        return;
+      }
+
       if (event.inputType === 'insertText') {
         event.preventDefault();
         insertColoredText(event.data || '');
@@ -819,6 +1165,31 @@
     });
 
     editor.addEventListener('keydown', (event) => {
+      const isPrimaryModifier = event.ctrlKey || event.metaKey;
+      if (isPrimaryModifier && !event.shiftKey && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        undo();
+        return;
+      }
+
+      if ((isPrimaryModifier && event.key.toLowerCase() === 'y') || (isPrimaryModifier && event.shiftKey && event.key.toLowerCase() === 'z')) {
+        event.preventDefault();
+        redo();
+        return;
+      }
+
+      if (isPrimaryModifier && event.key.toLowerCase() === 'b') {
+        event.preventDefault();
+        applyCommand('bold');
+        return;
+      }
+
+      if (isPrimaryModifier && event.key.toLowerCase() === 'i') {
+        event.preventDefault();
+        applyCommand('italic');
+        return;
+      }
+
       if (event.key === 'Tab') {
         event.preventDefault();
         insertColoredText('    ');
@@ -826,9 +1197,18 @@
     });
 
     editor.addEventListener('input', updateOutput);
-    editor.addEventListener('mouseup', saveSelection);
-    editor.addEventListener('keyup', saveSelection);
-    editor.addEventListener('focus', saveSelection);
+    editor.addEventListener('mouseup', () => {
+      saveSelection();
+      updateFormatButtonStates();
+    });
+    editor.addEventListener('keyup', () => {
+      saveSelection();
+      updateFormatButtonStates();
+    });
+    editor.addEventListener('focus', () => {
+      saveSelection();
+      updateFormatButtonStates();
+    });
 
     document.addEventListener('selectionchange', () => {
       const selection = window.getSelection();
@@ -836,11 +1216,13 @@
       const range = selection.getRangeAt(0);
       if (isInsideEditor(range.commonAncestorContainer)) {
         savedRange = range.cloneRange();
+        updateFormatButtonStates();
       }
     });
 
     setActiveColor(COLORS.R);
     placeCaretAtEnd(editor);
+    pushHistory(true);
     updateOutput();
   </script>
 </body>
