@@ -10,12 +10,32 @@
       --green: #00ff00;
       --pink: #ff00ff;
       --blue: #0000ff;
+
+      --outside: #001935;
       --bg: #fbfbfb;
       --panel: #ffffff;
+      --editor-bg: #ffffff;
+      --button-bg: #ffffff;
       --line: #d9d9d9;
       --text: #111111;
       --muted: #666666;
-      --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      --placeholder: #9a9a9a;
+      --focus: #bbbbbb;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+    }
+
+    body[data-theme="dark"] {
+      --outside: #1a1a1a;
+      --bg: #1a1a1a;
+      --panel: #242424;
+      --editor-bg: #1a1a1a;
+      --button-bg: #303030;
+      --line: #444444;
+      --text: #f4f4f4;
+      --muted: #b8b8b8;
+      --placeholder: #858585;
+      --focus: #777777;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
     }
 
     * {
@@ -26,7 +46,7 @@
       margin: 0;
       padding: 20px;
       font-family: Arial, Helvetica, sans-serif;
-      background: var(--bg);
+      background: var(--outside);
       color: var(--text);
     }
 
@@ -84,6 +104,10 @@
       flex: 0 0 auto;
     }
 
+    body[data-theme="dark"] .swatch {
+      border-color: #f4f4f4;
+    }
+
     .swatch:hover,
     .button:hover {
       transform: translateY(-1px);
@@ -98,13 +122,17 @@
       pointer-events: none;
     }
 
+    body[data-theme="dark"] .swatch.active::after {
+      border-color: #f4f4f4;
+    }
+
     .button,
     .pattern-input,
     .mode-select,
     .output {
       appearance: none;
       border: 1px solid var(--line);
-      background: #ffffff;
+      background: var(--button-bg);
       color: var(--text);
       border-radius: 10px;
       font-size: 14px;
@@ -121,17 +149,24 @@
       cursor: pointer;
     }
 
+    .button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
     .button:focus,
     .pattern-input:focus,
     .mode-select:focus,
-    .output:focus {
-      outline: 2px solid #bbbbbb;
+    .output:focus,
+    .color-input:focus {
+      outline: 2px solid var(--focus);
       outline-offset: 1px;
     }
 
     .button.active {
-      border-color: #000000;
-      box-shadow: inset 0 0 0 1px #000000;
+      border-color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--text);
     }
 
     .pattern-input {
@@ -142,6 +177,10 @@
       min-width: 190px;
     }
 
+    .preset-select {
+      min-width: 180px;
+    }
+
     .status,
     .label,
     .hint {
@@ -149,11 +188,61 @@
       color: var(--muted);
     }
 
+    .color-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .color-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--button-bg);
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .color-control span {
+      min-width: 18px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .color-input {
+      appearance: none;
+      width: 34px;
+      height: 28px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .color-input::-webkit-color-swatch-wrapper {
+      padding: 2px;
+    }
+
+    .color-input::-webkit-color-swatch {
+      border: none;
+      border-radius: 6px;
+    }
+
+    .color-input::-moz-color-swatch {
+      border: none;
+      border-radius: 6px;
+    }
+
     .editor-wrap {
       border: 1px solid var(--line);
       border-radius: 16px;
       overflow: hidden;
-      background: #ffffff;
+      background: var(--editor-bg);
     }
 
     .editor {
@@ -164,7 +253,9 @@
       white-space: pre-wrap;
       word-break: break-word;
       outline: none;
-      caret-color: #000000;
+      caret-color: var(--text);
+      background: var(--editor-bg);
+      color: var(--text);
     }
 
     .editor h1,
@@ -183,7 +274,7 @@
 
     .editor:empty::before {
       content: attr(data-placeholder);
-      color: #9a9a9a;
+      color: var(--placeholder);
     }
 
     .output-wrap {
@@ -213,6 +304,8 @@
       resize: vertical;
       padding: 14px;
       font: 13px/1.45 "Courier New", Courier, monospace;
+      background: var(--editor-bg);
+      color: var(--text);
     }
 
     .hint {
@@ -234,23 +327,68 @@
         width: 38px;
         height: 38px;
       }
+
+      .mode-select,
+      .preset-select,
+      .pattern-input {
+        min-width: 100%;
+      }
     }
   </style>
 </head>
-<body>
+<body data-theme="light">
   <div class="app">
     <div class="panel">
       <div class="title">Four-Color Text Editor</div>
       <div class="subtitle">Click a color to set what newly typed text becomes. Select text to recolor it, apply repeating patterns, use bold or italics, switch blocks to H1 or paragraph, and paste HTML into the lower box to load it back into the editor.</div>
 
       <div class="toolbar">
+        <button id="themeToggle" class="button" type="button" aria-pressed="false">Dark mode</button>
+
+        <span class="label">Palette preset</span>
+        <select id="palettePreset" class="mode-select preset-select">
+          <option value="brightest">Brightest</option>
+          <option value="tumblr">Tumblr standard</option>
+          <option value="jewel">Jewel neon</option>
+          <option value="candy">Candy glass</option>
+          <option value="dusk">Dusk glow</option>
+          <option value="lagoon">Lagoon flame</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+
+      <div class="toolbar">
         <div class="palette" aria-label="Color palette">
-          <button class="swatch active" type="button" data-color="#ff0000" title="Red" aria-label="Red" style="background:#ff0000;"></button>
-          <button class="swatch" type="button" data-color="#00ff00" title="Green" aria-label="Green" style="background:#00ff00;"></button>
-          <button class="swatch" type="button" data-color="#ff00ff" title="Pink" aria-label="Pink" style="background:#ff00ff;"></button>
-          <button class="swatch" type="button" data-color="#0000ff" title="Blue" aria-label="Blue" style="background:#0000ff;"></button>
+          <button class="swatch active" type="button" data-key="R" data-color="#ff0000" title="Red slot" aria-label="Red slot" style="background:#ff0000;"></button>
+          <button class="swatch" type="button" data-key="G" data-color="#00ff00" title="Green slot" aria-label="Green slot" style="background:#00ff00;"></button>
+          <button class="swatch" type="button" data-key="P" data-color="#ff00ff" title="Pink slot" aria-label="Pink slot" style="background:#ff00ff;"></button>
+          <button class="swatch" type="button" data-key="B" data-color="#0000ff" title="Blue slot" aria-label="Blue slot" style="background:#0000ff;"></button>
         </div>
 
+        <div class="color-controls" aria-label="Custom colors">
+          <label class="color-control" title="Red slot custom color">
+            <span>R</span>
+            <input id="colorR" class="color-input" type="color" data-key="R" value="#ff0000" />
+          </label>
+
+          <label class="color-control" title="Green slot custom color">
+            <span>G</span>
+            <input id="colorG" class="color-input" type="color" data-key="G" value="#00ff00" />
+          </label>
+
+          <label class="color-control" title="Pink slot custom color">
+            <span>P</span>
+            <input id="colorP" class="color-input" type="color" data-key="P" value="#ff00ff" />
+          </label>
+
+          <label class="color-control" title="Blue slot custom color">
+            <span>B</span>
+            <input id="colorB" class="color-input" type="color" data-key="B" value="#0000ff" />
+          </label>
+        </div>
+      </div>
+
+      <div class="toolbar">
         <button id="undoButton" class="button" type="button" title="Undo (Ctrl+Z)">Undo</button>
         <button id="redoButton" class="button" type="button" title="Redo (Ctrl+Y)">Redo</button>
         <button id="boldButton" class="button" type="button"><strong>B</strong></button>
@@ -305,7 +443,45 @@
       B: '#0000ff'
     };
 
-    const ALLOWED_COLORS = new Set(Object.values(COLORS));
+    const PALETTE_PRESETS = {
+      brightest: {
+        R: '#ff0000',
+        G: '#00ff00',
+        P: '#ff00ff',
+        B: '#0000ff'
+      },
+      tumblr: {
+        R: '#ff492f',
+        G: '#00cf35',
+        P: '#ff62ce',
+        B: '#00b8ff'
+      },
+      jewel: {
+        R: '#ff335f',
+        G: '#2efc8f',
+        P: '#ff4fd8',
+        B: '#3d7bff'
+      },
+      candy: {
+        R: '#ff5c8a',
+        G: '#6fffd2',
+        P: '#ff9af2',
+        B: '#66c7ff'
+      },
+      dusk: {
+        R: '#ff7a59',
+        G: '#98ffcb',
+        P: '#db8cff',
+        B: '#88aaff'
+      },
+      lagoon: {
+        R: '#ff6b35',
+        G: '#00f5a0',
+        P: '#f15bb5',
+        B: '#00bbf9'
+      }
+    };
+
     const BLOCK_TAGS = new Set(['P', 'DIV', 'H1', 'H2']);
     const INLINE_TAGS = new Set(['STRONG', 'EM']);
     const ALLOWED_TAGS = new Set(['SPAN', 'STRONG', 'EM', 'BR', 'P', 'DIV', 'H1', 'H2']);
@@ -314,14 +490,23 @@
       '#ff0000': 'red',
       '#00ff00': 'green',
       '#ff00ff': 'pink',
-      '#0000ff': 'blue'
+      '#0000ff': 'blue',
+      '#ff492f': 'tumblr red',
+      '#00cf35': 'tumblr green',
+      '#ff62ce': 'tumblr pink',
+      '#00b8ff': 'tumblr blue'
     };
+
+    const THEME_STORAGE_KEY = 'fourColorEditorTheme';
+    const PALETTE_STORAGE_KEY = 'fourColorEditorPalette';
 
     const editor = document.getElementById('editor');
     const output = document.getElementById('output');
     const status = document.getElementById('status');
     const customPattern = document.getElementById('customPattern');
     const patternMode = document.getElementById('patternMode');
+    const palettePreset = document.getElementById('palettePreset');
+    const themeToggle = document.getElementById('themeToggle');
     const applyPatternButton = document.getElementById('applyPattern');
     const clearEditorButton = document.getElementById('clearEditor');
     const copyHtmlButton = document.getElementById('copyHtml');
@@ -334,7 +519,9 @@
     const paragraphButton = document.getElementById('paragraphButton');
     const swatches = Array.from(document.querySelectorAll('.swatch'));
     const patternButtons = Array.from(document.querySelectorAll('.pattern-button'));
+    const colorInputs = Array.from(document.querySelectorAll('.color-input'));
 
+    let activeKey = 'R';
     let activeColor = COLORS.R;
     let savedRange = null;
     let history = [];
@@ -345,18 +532,32 @@
     function canonicalHex(color) {
       if (!color) return '';
       const value = String(color).trim().toLowerCase();
-      if (value.startsWith('#')) return value;
+
+      if (/^#[0-9a-f]{3}$/i.test(value)) {
+        return `#${value[1]}${value[1]}${value[2]}${value[2]}${value[3]}${value[3]}`.toLowerCase();
+      }
+
+      if (/^#[0-9a-f]{6}$/i.test(value)) {
+        return value;
+      }
+
       const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
       if (!match) return value;
-      const r = Number(match[1]).toString(16).padStart(2, '0');
-      const g = Number(match[2]).toString(16).padStart(2, '0');
-      const b = Number(match[3]).toString(16).padStart(2, '0');
+
+      const r = Math.max(0, Math.min(255, Number(match[1]))).toString(16).padStart(2, '0');
+      const g = Math.max(0, Math.min(255, Number(match[2]))).toString(16).padStart(2, '0');
+      const b = Math.max(0, Math.min(255, Number(match[3]))).toString(16).padStart(2, '0');
+
       return `#${r}${g}${b}`;
+    }
+
+    function isValidHexColor(color) {
+      return /^#[0-9a-f]{6}$/i.test(canonicalHex(color));
     }
 
     function sanitizeImportedColor(color) {
       const hex = canonicalHex(color);
-      return ALLOWED_COLORS.has(hex) ? hex : '';
+      return isValidHexColor(hex) ? hex : '';
     }
 
     function escapeHtml(text) {
@@ -367,34 +568,141 @@
         .replace(/"/g, '&quot;');
     }
 
+    function getColorLabel(color) {
+      const hex = canonicalHex(color);
+
+      if (hex === COLORS.R) return COLOR_NAMES[hex] || 'red slot';
+      if (hex === COLORS.G) return COLOR_NAMES[hex] || 'green slot';
+      if (hex === COLORS.P) return COLOR_NAMES[hex] || 'pink slot';
+      if (hex === COLORS.B) return COLOR_NAMES[hex] || 'blue slot';
+
+      return COLOR_NAMES[hex] || hex;
+    }
+
+    function saveTheme(theme) {
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, theme);
+      } catch (error) {}
+    }
+
+    function loadTheme() {
+      try {
+        return localStorage.getItem(THEME_STORAGE_KEY);
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function applyTheme(theme) {
+      const normalizedTheme = theme === 'dark' ? 'dark' : 'light';
+      document.body.dataset.theme = normalizedTheme;
+      themeToggle.textContent = normalizedTheme === 'dark' ? 'Light mode' : 'Dark mode';
+      themeToggle.setAttribute('aria-pressed', normalizedTheme === 'dark' ? 'true' : 'false');
+      saveTheme(normalizedTheme);
+    }
+
+    function savePaletteState() {
+      try {
+        localStorage.setItem(PALETTE_STORAGE_KEY, JSON.stringify({
+          preset: palettePreset.value,
+          colors: {
+            R: COLORS.R,
+            G: COLORS.G,
+            P: COLORS.P,
+            B: COLORS.B
+          }
+        }));
+      } catch (error) {}
+    }
+
+    function loadPaletteState() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(PALETTE_STORAGE_KEY) || 'null');
+        if (!stored || !stored.colors) return;
+
+        ['R', 'G', 'P', 'B'].forEach((key) => {
+          if (isValidHexColor(stored.colors[key])) {
+            COLORS[key] = canonicalHex(stored.colors[key]);
+          }
+        });
+
+        if (stored.preset && palettePreset.querySelector(`option[value="${stored.preset}"]`)) {
+          palettePreset.value = stored.preset;
+        } else {
+          palettePreset.value = 'custom';
+        }
+      } catch (error) {}
+    }
+
+    function setPalettePresetValue(value) {
+      if (!PALETTE_PRESETS[value]) return;
+
+      Object.entries(PALETTE_PRESETS[value]).forEach(([key, color]) => {
+        COLORS[key] = canonicalHex(color);
+      });
+
+      palettePreset.value = value;
+      refreshPaletteControls();
+      setActiveColor(COLORS[activeKey], activeKey);
+      savePaletteState();
+    }
+
+    function refreshPaletteControls() {
+      swatches.forEach((button) => {
+        const key = button.dataset.key;
+        const color = canonicalHex(COLORS[key]);
+        button.dataset.color = color;
+        button.style.background = color;
+      });
+
+      colorInputs.forEach((input) => {
+        const key = input.dataset.key;
+        input.value = canonicalHex(COLORS[key]);
+      });
+
+      updateStatus();
+    }
+
+    function markPaletteCustom() {
+      palettePreset.value = 'custom';
+      savePaletteState();
+    }
+
     function getNodePath(root, node) {
       const path = [];
       let current = node;
+
       while (current && current !== root) {
         const parent = current.parentNode;
         if (!parent) return null;
         path.unshift(Array.prototype.indexOf.call(parent.childNodes, current));
         current = parent;
       }
+
       return current === root ? path : null;
     }
 
     function getNodeFromPath(root, path) {
       let current = root;
+
       for (const index of path || []) {
         if (!current || !current.childNodes || index < 0 || index >= current.childNodes.length) {
           return null;
         }
+
         current = current.childNodes[index];
       }
+
       return current;
     }
 
     function captureSelection() {
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) return null;
+
       const range = selection.getRangeAt(0);
       if (!isInsideEditor(range.commonAncestorContainer)) return null;
+
       return {
         startPath: getNodePath(editor, range.startContainer),
         startOffset: range.startOffset,
@@ -411,12 +719,14 @@
 
       const startNode = getNodeFromPath(editor, selectionState.startPath);
       const endNode = getNodeFromPath(editor, selectionState.endPath);
+
       if (!startNode || !endNode) {
         placeCaretAtEnd(editor);
         return;
       }
 
       const range = document.createRange();
+
       try {
         range.setStart(startNode, Math.min(selectionState.startOffset, getMaxOffset(startNode)));
         range.setEnd(endNode, Math.min(selectionState.endOffset, getMaxOffset(endNode)));
@@ -437,6 +747,7 @@
 
     function snapshotState() {
       normalizeEditor(editor);
+
       return {
         html: editor.innerHTML,
         selection: captureSelection()
@@ -450,8 +761,10 @@
 
     function pushHistory(force = false) {
       if (isRestoringHistory) return;
+
       const snapshot = snapshotState();
       const last = history[historyIndex];
+
       if (!force && last && last.html === snapshot.html) {
         history[historyIndex] = snapshot;
         updateUndoRedoButtons();
@@ -473,6 +786,7 @@
 
     function applyHistorySnapshot(index) {
       if (index < 0 || index >= history.length) return;
+
       isRestoringHistory = true;
       historyIndex = index;
       editor.innerHTML = history[historyIndex].html;
@@ -503,6 +817,7 @@
       }
 
       const tag = normalizeTagName(node.tagName);
+
       if (tag === 'BR') {
         return '<br>';
       }
@@ -522,6 +837,7 @@
       if (tag === 'H2') return `<h2>${inner}</h2>`;
       if (tag === 'P') return `<p>${inner}</p>`;
       if (tag === 'DIV') return `<div>${inner}</div>`;
+
       return inner;
     }
 
@@ -533,14 +849,20 @@
 
     function updateStatus() {
       const modeLabel = patternMode.value === 'word' ? 'word + punctuation' : 'character';
-      status.textContent = `Typing color: ${COLOR_NAMES[activeColor]} · Pattern mode: ${modeLabel}`;
+      status.textContent = `Typing color: ${getColorLabel(activeColor)} · Pattern mode: ${modeLabel}`;
     }
 
-    function setActiveColor(color) {
-      activeColor = canonicalHex(color);
+    function setActiveColor(color, key = activeKey) {
+      const cleanColor = canonicalHex(color);
+      if (!isValidHexColor(cleanColor)) return;
+
+      activeKey = key;
+      activeColor = cleanColor;
+
       swatches.forEach((button) => {
-        button.classList.toggle('active', canonicalHex(button.dataset.color) === activeColor);
+        button.classList.toggle('active', button.dataset.key === activeKey);
       });
+
       updateStatus();
     }
 
@@ -551,6 +873,7 @@
     function saveSelection() {
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) return;
+
       const range = selection.getRangeAt(0);
       if (isInsideEditor(range.commonAncestorContainer)) {
         savedRange = range.cloneRange();
@@ -559,9 +882,11 @@
 
     function restoreSelection() {
       if (!savedRange) return false;
+
       const selection = window.getSelection();
       selection.removeAllRanges();
       selection.addRange(savedRange);
+
       return true;
     }
 
@@ -569,9 +894,11 @@
       const range = document.createRange();
       range.setStartAfter(node);
       range.collapse(true);
+
       const selection = window.getSelection();
       selection.removeAllRanges();
       selection.addRange(range);
+
       saveSelection();
     }
 
@@ -579,9 +906,11 @@
       const range = document.createRange();
       range.selectNodeContents(target);
       range.collapse(false);
+
       const selection = window.getSelection();
       selection.removeAllRanges();
       selection.addRange(range);
+
       saveSelection();
     }
 
@@ -644,9 +973,11 @@
 
     function pushWordModeTokensFromLine(line, tokens) {
       let index = 0;
+
       while (index < line.length) {
         const rest = line.slice(index);
         const whitespaceMatch = rest.match(/^[\t\f\v\r ]+/);
+
         if (whitespaceMatch) {
           tokens.push({ type: 'space', value: whitespaceMatch[0] });
           index += whitespaceMatch[0].length;
@@ -654,6 +985,7 @@
         }
 
         const wordMatch = rest.match(/^[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/u);
+
         if (wordMatch) {
           tokens.push({ type: 'word', value: wordMatch[0] });
           index += wordMatch[0].length;
@@ -669,12 +1001,15 @@
     function tokenizeWordModeText(text) {
       const tokens = [];
       const parts = text.split('\n');
+
       parts.forEach((line, lineIndex) => {
         pushWordModeTokensFromLine(line, tokens);
+
         if (lineIndex < parts.length - 1) {
           tokens.push({ type: 'newline', value: '\n' });
         }
       });
+
       return tokens;
     }
 
@@ -718,38 +1053,47 @@
       }
 
       const tag = normalizeTagName(node.tagName);
+
       if (tag === 'BR') {
         return document.createElement('br');
       }
 
       if (tag === 'SPAN') {
         const fragment = document.createDocumentFragment();
+
         Array.from(node.childNodes).forEach((child) => {
           fragment.appendChild(cloneTransformedNode(child, textTransformer));
         });
+
         return fragment;
       }
 
       if (!ALLOWED_TAGS.has(tag)) {
         const fragment = document.createDocumentFragment();
+
         Array.from(node.childNodes).forEach((child) => {
           fragment.appendChild(cloneTransformedNode(child, textTransformer));
         });
+
         return fragment;
       }
 
       const element = document.createElement(tag.toLowerCase());
+
       Array.from(node.childNodes).forEach((child) => {
         element.appendChild(cloneTransformedNode(child, textTransformer));
       });
+
       return element;
     }
 
     function rebuildFragment(sourceFragment, textTransformer) {
       const result = document.createDocumentFragment();
+
       Array.from(sourceFragment.childNodes).forEach((child) => {
         result.appendChild(cloneTransformedNode(child, textTransformer));
       });
+
       return result;
     }
 
@@ -774,18 +1118,21 @@
         }
 
         const tag = normalizeTagName(node.tagName);
+
         if (tag === 'BR') {
           return document.createElement('br');
         }
 
         if (tag === 'SPAN') {
           const color = sanitizeImportedColor(node.style.color);
+
           if (color) {
             const span = document.createElement('span');
             span.style.color = color;
             appendChildren(node, span);
             return span;
           }
+
           const fragment = document.createDocumentFragment();
           appendChildren(node, fragment);
           return fragment;
@@ -821,8 +1168,10 @@
     function applySingleColorToSelection(color) {
       editor.focus();
       restoreSelection();
+
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) return;
+
       const range = selection.getRangeAt(0);
 
       if (range.collapsed) {
@@ -834,6 +1183,7 @@
         const extracted = range.extractContents();
         const rebuilt = rebuildFragment(extracted, (text) => buildSingleColorFragmentFromText(text, color));
         const marker = document.createTextNode('');
+
         range.insertNode(marker);
         range.insertNode(rebuilt);
         placeCaretAfter(marker);
@@ -847,8 +1197,10 @@
 
       editor.focus();
       restoreSelection();
+
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) return;
+
       const range = selection.getRangeAt(0);
       if (range.collapsed) return;
 
@@ -856,11 +1208,14 @@
         const keys = cleanPattern.split('');
         const state = { index: 0 };
         const extracted = range.extractContents();
+
         const transformer = patternMode.value === 'word'
           ? (text) => buildPatternFragmentByWord(text, (i) => COLORS[keys[i % keys.length]], state)
           : (text) => buildPatternFragmentByCharacter(text, (i) => COLORS[keys[i % keys.length]], state);
+
         const rebuilt = rebuildFragment(extracted, transformer);
         const marker = document.createTextNode('');
+
         range.insertNode(marker);
         range.insertNode(rebuilt);
         placeCaretAfter(marker);
@@ -871,6 +1226,7 @@
     function insertColoredText(text) {
       editor.focus();
       restoreSelection();
+
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) {
         placeCaretAtEnd(editor);
@@ -880,11 +1236,13 @@
       const range = liveSelection.getRangeAt(0);
       const fragment = buildTypedFragmentFromText(text, activeColor);
       const marker = document.createTextNode('');
+
       range.deleteContents();
       range.insertNode(marker);
       range.insertNode(fragment);
       placeCaretAfter(marker);
       marker.remove();
+
       updateOutput();
       scheduleHistoryCommit();
     }
@@ -892,6 +1250,7 @@
     function insertLineBreak() {
       editor.focus();
       restoreSelection();
+
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) {
         placeCaretAtEnd(editor);
@@ -901,11 +1260,13 @@
       const range = liveSelection.getRangeAt(0);
       const br = document.createElement('br');
       const marker = document.createTextNode('');
+
       range.deleteContents();
       range.insertNode(marker);
       range.insertNode(br);
       placeCaretAfter(marker);
       marker.remove();
+
       updateOutput();
       scheduleHistoryCommit();
     }
@@ -913,6 +1274,7 @@
     function applyCommand(command, value = null) {
       editor.focus();
       restoreSelection();
+
       withHistory(() => {
         document.execCommand('styleWithCSS', false, false);
         document.execCommand(command, false, value);
@@ -923,6 +1285,7 @@
     function applyBlockCommand(tagName) {
       editor.focus();
       restoreSelection();
+
       withHistory(() => {
         document.execCommand('formatBlock', false, `<${tagName.toLowerCase()}>`);
         saveSelection();
@@ -943,20 +1306,25 @@
         }
 
         const normalizedTag = normalizeTagName(child.tagName);
+
         if (!ALLOWED_TAGS.has(normalizedTag)) {
           const fragment = document.createDocumentFragment();
+
           while (child.firstChild) {
             fragment.appendChild(child.firstChild);
           }
+
           child.replaceWith(fragment);
           return;
         }
 
         if (normalizedTag !== child.tagName) {
           const replacement = document.createElement(normalizedTag.toLowerCase());
+
           while (child.firstChild) {
             replacement.appendChild(child.firstChild);
           }
+
           child.replaceWith(replacement);
           normalizeNode(replacement);
           return;
@@ -964,13 +1332,16 @@
 
         if (normalizedTag === 'SPAN') {
           const color = sanitizeImportedColor(child.style.color);
+
           if (color) {
             child.setAttribute('style', `color:${color};`);
           } else {
             const fragment = document.createDocumentFragment();
+
             while (child.firstChild) {
               fragment.appendChild(child.firstChild);
             }
+
             child.replaceWith(fragment);
             return;
           }
@@ -994,13 +1365,19 @@
 
     function mergeAdjacentSpans(root) {
       let changed = true;
+
       while (changed) {
         changed = false;
+
         const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null);
+
         while (walker.nextNode()) {
           const node = walker.currentNode;
+
           if (normalizeTagName(node.tagName) !== 'SPAN') continue;
+
           const next = node.nextSibling;
+
           if (
             next &&
             next.nodeType === Node.ELEMENT_NODE &&
@@ -1010,6 +1387,7 @@
             while (next.firstChild) {
               node.appendChild(next.firstChild);
             }
+
             next.remove();
             changed = true;
             break;
@@ -1021,12 +1399,15 @@
     function getClosestTagName(node, tagName) {
       let current = node;
       const target = tagName.toUpperCase();
+
       while (current && current !== editor) {
         if (current.nodeType === Node.ELEMENT_NODE && normalizeTagName(current.tagName) === target) {
           return current;
         }
+
         current = current.parentNode;
       }
+
       return null;
     }
 
@@ -1038,6 +1419,7 @@
 
     function updateFormatButtonStates() {
       const container = getSelectionContainer();
+
       boldButton.classList.toggle('active', !!getClosestTagName(container, 'STRONG'));
       italicButton.classList.toggle('active', !!getClosestTagName(container, 'EM'));
       h1Button.classList.toggle('active', !!getClosestTagName(container, 'H1'));
@@ -1045,8 +1427,10 @@
     }
 
     function handleSwatchClick(button) {
-      const color = canonicalHex(button.dataset.color);
-      setActiveColor(color);
+      const key = button.dataset.key;
+      const color = COLORS[key];
+
+      setActiveColor(color, key);
       applySingleColorToSelection(color);
     }
 
@@ -1054,15 +1438,49 @@
       button.addEventListener('mousedown', (event) => {
         event.preventDefault();
       });
+
       button.addEventListener('click', () => {
         handleSwatchClick(button);
       });
+    });
+
+    colorInputs.forEach((input) => {
+      input.addEventListener('input', () => {
+        const key = input.dataset.key;
+        const color = canonicalHex(input.value);
+
+        if (!isValidHexColor(color)) return;
+
+        COLORS[key] = color;
+        refreshPaletteControls();
+
+        if (activeKey === key) {
+          setActiveColor(color, key);
+        }
+
+        markPaletteCustom();
+      });
+    });
+
+    palettePreset.addEventListener('change', () => {
+      if (palettePreset.value === 'custom') {
+        savePaletteState();
+        return;
+      }
+
+      setPalettePresetValue(palettePreset.value);
+    });
+
+    themeToggle.addEventListener('click', () => {
+      const currentTheme = document.body.dataset.theme === 'dark' ? 'dark' : 'light';
+      applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
     });
 
     patternButtons.forEach((button) => {
       button.addEventListener('mousedown', (event) => {
         event.preventDefault();
       });
+
       button.addEventListener('click', () => {
         const pattern = button.dataset.pattern || '';
         customPattern.value = pattern;
@@ -1110,8 +1528,10 @@
     copyHtmlButton.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(output.value);
+
         const oldLabel = copyHtmlButton.textContent;
         copyHtmlButton.textContent = 'Copied';
+
         setTimeout(() => {
           copyHtmlButton.textContent = oldLabel;
         }, 900);
@@ -1141,8 +1561,10 @@
     editor.addEventListener('beforeinput', (event) => {
       if (event.inputType === 'historyUndo' || event.inputType === 'historyRedo') {
         event.preventDefault();
+
         if (event.inputType === 'historyUndo') undo();
         else redo();
+
         return;
       }
 
@@ -1160,12 +1582,14 @@
 
     editor.addEventListener('paste', (event) => {
       event.preventDefault();
+
       const text = (event.clipboardData || window.clipboardData).getData('text');
       insertColoredText(text);
     });
 
     editor.addEventListener('keydown', (event) => {
       const isPrimaryModifier = event.ctrlKey || event.metaKey;
+
       if (isPrimaryModifier && !event.shiftKey && event.key.toLowerCase() === 'z') {
         event.preventDefault();
         undo();
@@ -1197,14 +1621,17 @@
     });
 
     editor.addEventListener('input', updateOutput);
+
     editor.addEventListener('mouseup', () => {
       saveSelection();
       updateFormatButtonStates();
     });
+
     editor.addEventListener('keyup', () => {
       saveSelection();
       updateFormatButtonStates();
     });
+
     editor.addEventListener('focus', () => {
       saveSelection();
       updateFormatButtonStates();
@@ -1213,14 +1640,19 @@
     document.addEventListener('selectionchange', () => {
       const selection = window.getSelection();
       if (!selection || selection.rangeCount === 0) return;
+
       const range = selection.getRangeAt(0);
+
       if (isInsideEditor(range.commonAncestorContainer)) {
         savedRange = range.cloneRange();
         updateFormatButtonStates();
       }
     });
 
-    setActiveColor(COLORS.R);
+    applyTheme(loadTheme() || 'light');
+    loadPaletteState();
+    refreshPaletteControls();
+    setActiveColor(COLORS.R, 'R');
     placeCaretAtEnd(editor);
     pushHistory(true);
     updateOutput();
