@@ -12,29 +12,31 @@
       --blue: #0000ff;
 
       --outside: #001935;
-      --bg: #fbfbfb;
       --panel: #ffffff;
-      --editor-bg: #ffffff;
+      --post-card: #ffffff;
+      --post-card-soft: #f6f6f6;
       --button-bg: #ffffff;
       --line: #d9d9d9;
       --text: #111111;
       --muted: #666666;
       --placeholder: #9a9a9a;
       --focus: #bbbbbb;
+      --post-shadow: 0 2px 10px rgba(0, 0, 0, 0.20);
       --shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
     }
 
     body[data-theme="dark"] {
       --outside: #1a1a1a;
-      --bg: #1a1a1a;
       --panel: #242424;
-      --editor-bg: #1a1a1a;
+      --post-card: #1a1a1a;
+      --post-card-soft: #222222;
       --button-bg: #303030;
       --line: #444444;
       --text: #f4f4f4;
       --muted: #b8b8b8;
       --placeholder: #858585;
       --focus: #777777;
+      --post-shadow: 0 2px 12px rgba(0, 0, 0, 0.40);
       --shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
     }
 
@@ -238,23 +240,78 @@
       border-radius: 6px;
     }
 
-    .editor-wrap {
+    .post-stage {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      padding: 34px 14px;
       border: 1px solid var(--line);
       border-radius: 16px;
+      background: var(--outside);
+      overflow: auto;
+    }
+
+    .tumblr-post-card {
+      width: 100%;
+      max-width: 540px;
+      background: var(--post-card);
+      color: var(--text);
+      border: 1px solid rgba(0, 0, 0, 0.10);
+      border-radius: 4px;
+      box-shadow: var(--post-shadow);
       overflow: hidden;
-      background: var(--editor-bg);
+    }
+
+    body[data-theme="dark"] .tumblr-post-card {
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .tumblr-post-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 48px;
+      padding: 12px 20px 10px;
+      border-bottom: 1px solid var(--line);
+      background: var(--post-card);
+      color: var(--text);
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    }
+
+    .tumblr-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      background:
+        linear-gradient(135deg, var(--red), var(--pink) 45%, var(--blue));
+      flex: 0 0 auto;
+    }
+
+    .tumblr-blog-name {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .tumblr-post-note {
+      margin-top: 1px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.2;
     }
 
     .editor {
-      min-height: 320px;
-      padding: 18px;
-      font-size: 28px;
-      line-height: 1.45;
+      min-height: 340px;
+      padding: 18px 20px 24px;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 15px;
+      font-weight: 400;
+      line-height: 1.46;
       white-space: pre-wrap;
       word-break: break-word;
       outline: none;
       caret-color: var(--text);
-      background: var(--editor-bg);
+      background: var(--post-card);
       color: var(--text);
     }
 
@@ -262,7 +319,27 @@
     .editor h2,
     .editor p,
     .editor div {
-      margin: 0 0 0.5em;
+      margin: 0 0 1em;
+    }
+
+    .editor h1 {
+      font-size: 36px;
+      line-height: 1.15;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .editor h2 {
+      font-size: 24px;
+      line-height: 1.22;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .editor p,
+    .editor div {
+      font-size: 15px;
+      line-height: 1.46;
     }
 
     .editor h1:last-child,
@@ -304,7 +381,7 @@
       resize: vertical;
       padding: 14px;
       font: 13px/1.45 "Courier New", Courier, monospace;
-      background: var(--editor-bg);
+      background: var(--post-card-soft);
       color: var(--text);
     }
 
@@ -318,9 +395,22 @@
         padding: 12px;
       }
 
+      .post-stage {
+        padding: 18px 8px;
+      }
+
+      .tumblr-post-meta {
+        padding: 10px 14px 9px;
+      }
+
       .editor {
-        min-height: 260px;
-        font-size: 22px;
+        min-height: 300px;
+        padding: 16px 14px 20px;
+        font-size: 15px;
+      }
+
+      .editor h1 {
+        font-size: 30px;
       }
 
       .swatch {
@@ -336,14 +426,14 @@
     }
   </style>
 </head>
-<body data-theme="light">
+<body>
   <div class="app">
     <div class="panel">
       <div class="title">Four-Color Text Editor</div>
       <div class="subtitle">Click a color to set what newly typed text becomes. Select text to recolor it, apply repeating patterns, use bold or italics, switch blocks to H1 or paragraph, and paste HTML into the lower box to load it back into the editor.</div>
 
       <div class="toolbar">
-        <button id="themeToggle" class="button" type="button" aria-pressed="false">Dark mode</button>
+        <span id="themeStatus" class="status">Theme follows system</span>
 
         <span class="label">Palette preset</span>
         <select id="palettePreset" class="mode-select preset-select">
@@ -419,8 +509,18 @@
         <span id="status" class="status">Typing color: red · Pattern mode: character</span>
       </div>
 
-      <div class="editor-wrap">
-        <div id="editor" class="editor" contenteditable="true" spellcheck="false" data-placeholder="Type here..."></div>
+      <div class="post-stage">
+        <article class="tumblr-post-card" aria-label="Tumblr-style post preview editor">
+          <div class="tumblr-post-meta" aria-hidden="true">
+            <div class="tumblr-avatar"></div>
+            <div>
+              <div class="tumblr-blog-name">preview-post</div>
+              <div class="tumblr-post-note">Tumblr-style text post preview</div>
+            </div>
+          </div>
+
+          <div id="editor" class="editor" contenteditable="true" spellcheck="false" data-placeholder="Type here..."></div>
+        </article>
       </div>
 
       <div class="hint">Ctrl+Z and Ctrl+Y use the editor’s own history stack. Character mode colors one visible character at a time. Word + punctuation mode colors each word as one hit and each punctuation mark as its own hit. Spaces and other whitespace never advance the pattern.</div>
@@ -497,16 +597,16 @@
       '#00b8ff': 'tumblr blue'
     };
 
-    const THEME_STORAGE_KEY = 'fourColorEditorTheme';
     const PALETTE_STORAGE_KEY = 'fourColorEditorPalette';
+    const SYSTEM_THEME_QUERY = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
     const editor = document.getElementById('editor');
     const output = document.getElementById('output');
     const status = document.getElementById('status');
+    const themeStatus = document.getElementById('themeStatus');
     const customPattern = document.getElementById('customPattern');
     const patternMode = document.getElementById('patternMode');
     const palettePreset = document.getElementById('palettePreset');
-    const themeToggle = document.getElementById('themeToggle');
     const applyPatternButton = document.getElementById('applyPattern');
     const clearEditorButton = document.getElementById('clearEditor');
     const copyHtmlButton = document.getElementById('copyHtml');
@@ -579,26 +679,18 @@
       return COLOR_NAMES[hex] || hex;
     }
 
-    function saveTheme(theme) {
-      try {
-        localStorage.setItem(THEME_STORAGE_KEY, theme);
-      } catch (error) {}
-    }
-
-    function loadTheme() {
-      try {
-        return localStorage.getItem(THEME_STORAGE_KEY);
-      } catch (error) {
-        return null;
-      }
+    function getSystemTheme() {
+      return SYSTEM_THEME_QUERY && SYSTEM_THEME_QUERY.matches ? 'dark' : 'light';
     }
 
     function applyTheme(theme) {
       const normalizedTheme = theme === 'dark' ? 'dark' : 'light';
       document.body.dataset.theme = normalizedTheme;
-      themeToggle.textContent = normalizedTheme === 'dark' ? 'Light mode' : 'Dark mode';
-      themeToggle.setAttribute('aria-pressed', normalizedTheme === 'dark' ? 'true' : 'false');
-      saveTheme(normalizedTheme);
+      themeStatus.textContent = `Theme follows system: ${normalizedTheme}`;
+    }
+
+    function updateSystemTheme() {
+      applyTheme(getSystemTheme());
     }
 
     function savePaletteState() {
@@ -1471,11 +1563,6 @@
       setPalettePresetValue(palettePreset.value);
     });
 
-    themeToggle.addEventListener('click', () => {
-      const currentTheme = document.body.dataset.theme === 'dark' ? 'dark' : 'light';
-      applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
-    });
-
     patternButtons.forEach((button) => {
       button.addEventListener('mousedown', (event) => {
         event.preventDefault();
@@ -1649,7 +1736,15 @@
       }
     });
 
-    applyTheme(loadTheme() || 'light');
+    if (SYSTEM_THEME_QUERY) {
+      if (typeof SYSTEM_THEME_QUERY.addEventListener === 'function') {
+        SYSTEM_THEME_QUERY.addEventListener('change', updateSystemTheme);
+      } else if (typeof SYSTEM_THEME_QUERY.addListener === 'function') {
+        SYSTEM_THEME_QUERY.addListener(updateSystemTheme);
+      }
+    }
+
+    updateSystemTheme();
     loadPaletteState();
     refreshPaletteControls();
     setActiveColor(COLORS.R, 'R');
