@@ -53,7 +53,7 @@
     }
 
     .app {
-      max-width: 1080px;
+      max-width: 1120px;
       margin: 0 auto;
     }
 
@@ -88,15 +88,34 @@
 
     .palette {
       display: flex;
+      flex-wrap: wrap;
       gap: 10px;
       align-items: center;
       margin-right: 6px;
     }
 
+    .slot-control {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--button-bg);
+    }
+
+    .slot-label {
+      min-width: 16px;
+      font-size: 13px;
+      font-weight: 800;
+      text-align: center;
+      color: var(--text);
+    }
+
     .swatch {
       appearance: none;
-      width: 42px;
-      height: 42px;
+      width: 34px;
+      height: 34px;
       border-radius: 999px;
       border: 2px solid #000000;
       cursor: pointer;
@@ -164,6 +183,7 @@
     .hex-input:focus,
     .mode-select:focus,
     .output:focus,
+    .slot-color-picker:focus,
     .custom-color-picker:focus {
       outline: 2px solid var(--focus);
       outline-offset: 1px;
@@ -185,6 +205,12 @@
       text-transform: uppercase;
     }
 
+    .slot-hex-input {
+      width: 96px;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
     .mode-select {
       min-width: 190px;
     }
@@ -200,17 +226,7 @@
       color: var(--muted);
     }
 
-    .custom-color-tool {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      padding: 6px 8px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: var(--button-bg);
-    }
-
+    .slot-color-picker,
     .custom-color-picker {
       appearance: none;
       width: 36px;
@@ -222,18 +238,32 @@
       cursor: pointer;
     }
 
+    .slot-color-picker::-webkit-color-swatch-wrapper,
     .custom-color-picker::-webkit-color-swatch-wrapper {
       padding: 2px;
     }
 
+    .slot-color-picker::-webkit-color-swatch,
     .custom-color-picker::-webkit-color-swatch {
       border: none;
       border-radius: 6px;
     }
 
+    .slot-color-picker::-moz-color-swatch,
     .custom-color-picker::-moz-color-swatch {
       border: none;
       border-radius: 6px;
+    }
+
+    .custom-color-tool {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--button-bg);
     }
 
     .post-stage {
@@ -279,7 +309,7 @@
       height: 28px;
       border-radius: 999px;
       background:
-        linear-gradient(135deg, var(--red), var(--pink) 45%, var(--blue));
+        conic-gradient(from 180deg, var(--red), var(--pink), var(--blue), var(--green), var(--red));
       flex: 0 0 auto;
     }
 
@@ -409,6 +439,11 @@
         font-size: 30px;
       }
 
+      .slot-control,
+      .custom-color-tool {
+        width: 100%;
+      }
+
       .swatch {
         width: 38px;
         height: 38px;
@@ -416,15 +451,10 @@
 
       .mode-select,
       .preset-select,
-      .pattern-input {
+      .pattern-input,
+      .hex-input,
+      .slot-hex-input {
         min-width: 100%;
-      }
-
-      .hex-input {
-        width: 100%;
-      }
-
-      .custom-color-tool {
         width: 100%;
       }
     }
@@ -434,7 +464,7 @@
   <div class="app">
     <div class="panel">
       <div class="title">Four-Color Text Editor</div>
-      <div class="subtitle">Click a palette color to set newly typed text. Use Default for normal Tumblr black/white text. Use Custom to paste a hex code or pick any color; it applies instantly to selected text without changing the four pattern colors.</div>
+      <div class="subtitle">R/G/P/B are live color identities. Text made with the B slot remembers that it is B, so changing the B hex updates all B text already in the editor. Custom color is separate and does not redefine the four pattern colors.</div>
 
       <div class="toolbar">
         <span id="themeStatus" class="status">Theme follows system</span>
@@ -451,13 +481,38 @@
       </div>
 
       <div class="toolbar">
-        <div class="palette" aria-label="Color palette">
-          <button class="swatch active" type="button" data-key="R" data-color="#ff0000" title="Red slot" aria-label="Red slot" style="background:#ff0000;"></button>
-          <button class="swatch" type="button" data-key="G" data-color="#00ff00" title="Green slot" aria-label="Green slot" style="background:#00ff00;"></button>
-          <button class="swatch" type="button" data-key="P" data-color="#ff00ff" title="Pink slot" aria-label="Pink slot" style="background:#ff00ff;"></button>
-          <button class="swatch" type="button" data-key="B" data-color="#0000ff" title="Blue slot" aria-label="Blue slot" style="background:#0000ff;"></button>
-        </div>
+        <div class="palette" aria-label="Live color slots">
+          <div class="slot-control">
+            <span class="slot-label">R</span>
+            <button class="swatch active" type="button" data-key="R" title="Red slot" aria-label="Red slot" style="background:#ff0000;"></button>
+            <input class="slot-color-picker" type="color" data-key="R" value="#ff0000" aria-label="Red slot color picker" />
+            <input class="hex-input slot-hex-input" type="text" data-key="R" value="#FF0000" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Red slot hex" />
+          </div>
 
+          <div class="slot-control">
+            <span class="slot-label">G</span>
+            <button class="swatch" type="button" data-key="G" title="Green slot" aria-label="Green slot" style="background:#00ff00;"></button>
+            <input class="slot-color-picker" type="color" data-key="G" value="#00ff00" aria-label="Green slot color picker" />
+            <input class="hex-input slot-hex-input" type="text" data-key="G" value="#00FF00" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Green slot hex" />
+          </div>
+
+          <div class="slot-control">
+            <span class="slot-label">P</span>
+            <button class="swatch" type="button" data-key="P" title="Pink slot" aria-label="Pink slot" style="background:#ff00ff;"></button>
+            <input class="slot-color-picker" type="color" data-key="P" value="#ff00ff" aria-label="Pink slot color picker" />
+            <input class="hex-input slot-hex-input" type="text" data-key="P" value="#FF00FF" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Pink slot hex" />
+          </div>
+
+          <div class="slot-control">
+            <span class="slot-label">B</span>
+            <button class="swatch" type="button" data-key="B" title="Blue slot" aria-label="Blue slot" style="background:#0000ff;"></button>
+            <input class="slot-color-picker" type="color" data-key="B" value="#0000ff" aria-label="Blue slot color picker" />
+            <input class="hex-input slot-hex-input" type="text" data-key="B" value="#0000FF" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Blue slot hex" />
+          </div>
+        </div>
+      </div>
+
+      <div class="toolbar">
         <button id="defaultButton" class="button" type="button">Default</button>
         <button id="blackButton" class="button" type="button">Black</button>
         <button id="whiteButton" class="button" type="button">White</button>
@@ -514,7 +569,7 @@
         </article>
       </div>
 
-      <div class="hint">Default removes color styling so text behaves like normal Tumblr text: black on light, white on dark. Custom hex accepts pasted codes like #004DFF and immediately recolors selected text. Spaces and other whitespace never advance patterns.</div>
+      <div class="hint">Changing a slot hex updates every span tagged as that slot. Imported HTML is re-recognized by exact color match against the current R/G/P/B values. Default removes color styling so text behaves like normal Tumblr text: black on light, white on dark.</div>
 
       <div class="output-wrap">
         <div class="output-toolbar">
@@ -527,6 +582,8 @@
   </div>
 
   <script>
+    const SLOT_KEYS = ['R', 'G', 'P', 'B'];
+
     const COLORS = {
       R: '#ff0000',
       G: '#00ff00',
@@ -590,7 +647,7 @@
       '#ffffff': 'white'
     };
 
-    const PALETTE_STORAGE_KEY = 'fourColorEditorPalette';
+    const PALETTE_STORAGE_KEY = 'fourColorEditorLivePalette';
     const CUSTOM_COLOR_STORAGE_KEY = 'fourColorEditorCustomColor';
     const SYSTEM_THEME_QUERY = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
@@ -617,6 +674,8 @@
     const h1Button = document.getElementById('h1Button');
     const paragraphButton = document.getElementById('paragraphButton');
     const swatches = Array.from(document.querySelectorAll('.swatch'));
+    const slotColorPickers = Array.from(document.querySelectorAll('.slot-color-picker'));
+    const slotHexInputs = Array.from(document.querySelectorAll('.slot-hex-input'));
     const patternButtons = Array.from(document.querySelectorAll('.pattern-button'));
 
     let activeKey = 'R';
@@ -665,6 +724,13 @@
       return /^#[0-9a-f]{6}$/i.test(canonicalHex(color));
     }
 
+    function isValidInputHex(value, allowShort = false) {
+      const raw = String(value || '').trim();
+      if (/^#?[0-9a-f]{6}$/i.test(raw)) return true;
+      if (allowShort && /^#?[0-9a-f]{3}$/i.test(raw)) return true;
+      return false;
+    }
+
     function sanitizeImportedColor(color) {
       const hex = canonicalHex(color);
       return isValidHexColor(hex) ? hex : '';
@@ -678,16 +744,26 @@
         .replace(/"/g, '&quot;');
     }
 
+    function isSlotKey(key) {
+      return SLOT_KEYS.includes(key);
+    }
+
+    function getSlotKeyForColor(color) {
+      const hex = canonicalHex(color);
+      if (!isValidHexColor(hex)) return '';
+
+      return SLOT_KEYS.find((key) => canonicalHex(COLORS[key]) === hex) || '';
+    }
+
     function getColorLabel(color, key = activeKey) {
       if (color === null) return 'default';
 
       const hex = canonicalHex(color);
 
       if (key === 'CUSTOM') return COLOR_NAMES[hex] || displayHex(hex);
-      if (hex === COLORS.R) return COLOR_NAMES[hex] || 'red slot';
-      if (hex === COLORS.G) return COLOR_NAMES[hex] || 'green slot';
-      if (hex === COLORS.P) return COLOR_NAMES[hex] || 'pink slot';
-      if (hex === COLORS.B) return COLOR_NAMES[hex] || 'blue slot';
+      if (key === 'BLACK') return 'black';
+      if (key === 'WHITE') return 'white';
+      if (isSlotKey(key)) return `${key} slot ${displayHex(COLORS[key])}`;
 
       return COLOR_NAMES[hex] || displayHex(hex);
     }
@@ -725,7 +801,7 @@
         const stored = JSON.parse(localStorage.getItem(PALETTE_STORAGE_KEY) || 'null');
         if (!stored || !stored.colors) return;
 
-        ['R', 'G', 'P', 'B'].forEach((key) => {
+        SLOT_KEYS.forEach((key) => {
           if (isValidHexColor(stored.colors[key])) {
             COLORS[key] = canonicalHex(stored.colors[key]);
           }
@@ -754,20 +830,16 @@
       }
     }
 
-    function setPalettePresetValue(value) {
-      if (!PALETTE_PRESETS[value]) return;
-
-      Object.entries(PALETTE_PRESETS[value]).forEach(([key, color]) => {
-        COLORS[key] = canonicalHex(color);
-      });
-
-      palettePreset.value = value;
-      refreshPaletteControls();
-      setActiveColor(COLORS[activeKey] || COLORS.R, activeKey);
-      savePaletteState();
+    function refreshRootPaletteVars() {
+      document.documentElement.style.setProperty('--red', COLORS.R);
+      document.documentElement.style.setProperty('--green', COLORS.G);
+      document.documentElement.style.setProperty('--pink', COLORS.P);
+      document.documentElement.style.setProperty('--blue', COLORS.B);
     }
 
     function refreshPaletteControls() {
+      refreshRootPaletteVars();
+
       swatches.forEach((button) => {
         const key = button.dataset.key;
         const color = canonicalHex(COLORS[key]);
@@ -775,7 +847,101 @@
         button.style.background = color;
       });
 
+      slotColorPickers.forEach((input) => {
+        const key = input.dataset.key;
+        input.value = canonicalHex(COLORS[key]);
+      });
+
+      slotHexInputs.forEach((input) => {
+        const key = input.dataset.key;
+        input.value = displayHex(COLORS[key]);
+      });
+
       updateStatus();
+    }
+
+    function setSpanToSlot(span, key) {
+      if (!isSlotKey(key)) return;
+
+      span.dataset.colorKey = key;
+      span.setAttribute('style', `color:${canonicalHex(COLORS[key])};`);
+    }
+
+    function setSpanToCustomColor(span, color) {
+      const hex = canonicalHex(color);
+      if (!isValidHexColor(hex)) return;
+
+      span.removeAttribute('data-color-key');
+      span.setAttribute('style', `color:${hex};`);
+    }
+
+    function updateSpansForSlot(key, oldColor) {
+      if (!isSlotKey(key)) return;
+
+      const oldHex = canonicalHex(oldColor);
+
+      Array.from(editor.querySelectorAll('span')).forEach((span) => {
+        const storedKey = span.dataset.colorKey;
+        const spanColor = canonicalHex(span.style.color);
+
+        if (storedKey === key || (!storedKey && oldHex && spanColor === oldHex)) {
+          setSpanToSlot(span, key);
+        }
+      });
+    }
+
+    function changeSlotColor(key, color, force = false) {
+      if (!isSlotKey(key) || !isValidHexColor(color)) return;
+
+      const cleanColor = canonicalHex(color);
+      const oldColor = COLORS[key];
+
+      if (!force && canonicalHex(oldColor) === cleanColor) {
+        refreshPaletteControls();
+        return;
+      }
+
+      withHistory(() => {
+        COLORS[key] = cleanColor;
+        updateSpansForSlot(key, oldColor);
+        refreshPaletteControls();
+
+        if (activeKey === key) {
+          activeColor = COLORS[key];
+        }
+      }, true);
+
+      savePaletteState();
+    }
+
+    function setPalettePresetValue(value) {
+      if (!PALETTE_PRESETS[value]) return;
+
+      const oldColors = {
+        R: COLORS.R,
+        G: COLORS.G,
+        P: COLORS.P,
+        B: COLORS.B
+      };
+
+      withHistory(() => {
+        SLOT_KEYS.forEach((key) => {
+          COLORS[key] = canonicalHex(PALETTE_PRESETS[value][key]);
+        });
+
+        SLOT_KEYS.forEach((key) => {
+          updateSpansForSlot(key, oldColors[key]);
+        });
+
+        palettePreset.value = value;
+        refreshPaletteControls();
+
+        if (isSlotKey(activeKey)) {
+          activeColor = COLORS[activeKey];
+        }
+      }, true);
+
+      savePaletteState();
     }
 
     function setCustomColorControls(color) {
@@ -793,7 +959,7 @@
       const hex = canonicalHex(color);
       setCustomColorControls(hex);
       setActiveColor(hex, 'CUSTOM');
-      applySingleColorToSelection(hex);
+      applySingleColorToSelection(hex, null);
     }
 
     function getNodePath(root, node) {
@@ -1045,9 +1211,15 @@
       saveSelection();
     }
 
-    function makeColorSpan(text, color) {
+    function makeColorSpan(text, color, colorKey = null) {
       const span = document.createElement('span');
-      span.style.color = canonicalHex(color);
+
+      if (isSlotKey(colorKey)) {
+        setSpanToSlot(span, colorKey);
+      } else {
+        setSpanToCustomColor(span, color);
+      }
+
       span.textContent = text;
       return span;
     }
@@ -1056,7 +1228,7 @@
       return String(value || '').toUpperCase().replace(/[^RGPB]/g, '');
     }
 
-    function buildTypedFragmentFromText(text, color) {
+    function buildTypedFragmentFromText(text, color, colorKey = null) {
       const fragment = document.createDocumentFragment();
 
       for (const char of text) {
@@ -1070,17 +1242,17 @@
           continue;
         }
 
-        fragment.appendChild(makeColorSpan(char, color));
+        fragment.appendChild(makeColorSpan(char, color, colorKey));
       }
 
       return fragment;
     }
 
-    function buildSingleColorFragmentFromText(text, color) {
-      return buildTypedFragmentFromText(text, color);
+    function buildSingleColorFragmentFromText(text, color, colorKey = null) {
+      return buildTypedFragmentFromText(text, color, colorKey);
     }
 
-    function buildPatternFragmentByCharacter(text, getColorForIndex, state) {
+    function buildPatternFragmentByCharacter(text, getKeyForIndex, state) {
       const fragment = document.createDocumentFragment();
 
       for (const char of text) {
@@ -1094,8 +1266,8 @@
           continue;
         }
 
-        const color = getColorForIndex(state.index);
-        fragment.appendChild(makeColorSpan(char, color));
+        const key = getKeyForIndex(state.index);
+        fragment.appendChild(makeColorSpan(char, COLORS[key], key));
         state.index += 1;
       }
 
@@ -1144,7 +1316,7 @@
       return tokens;
     }
 
-    function buildPatternFragmentByWord(text, getColorForIndex, state) {
+    function buildPatternFragmentByWord(text, getKeyForIndex, state) {
       const fragment = document.createDocumentFragment();
       const tokens = tokenizeWordModeText(text);
 
@@ -1159,8 +1331,8 @@
           return;
         }
 
-        const color = getColorForIndex(state.index);
-        fragment.appendChild(makeColorSpan(token.value, color));
+        const key = getKeyForIndex(state.index);
+        fragment.appendChild(makeColorSpan(token.value, COLORS[key], key));
         state.index += 1;
       });
 
@@ -1259,7 +1431,14 @@
 
           if (color) {
             const span = document.createElement('span');
-            span.style.color = color;
+            const slotKey = getSlotKeyForColor(color);
+
+            if (slotKey) {
+              setSpanToSlot(span, slotKey);
+            } else {
+              setSpanToCustomColor(span, color);
+            }
+
             appendChildren(node, span);
             return span;
           }
@@ -1296,7 +1475,7 @@
       updateOutput();
     }
 
-    function applySingleColorToSelection(color) {
+    function applySingleColorToSelection(color, colorKey = isSlotKey(activeKey) ? activeKey : null) {
       editor.focus();
       restoreSelection();
 
@@ -1312,7 +1491,7 @@
 
       withHistory(() => {
         const extracted = range.extractContents();
-        const rebuilt = rebuildFragment(extracted, (text) => buildSingleColorFragmentFromText(text, color));
+        const rebuilt = rebuildFragment(extracted, (text) => buildSingleColorFragmentFromText(text, color, colorKey));
         const marker = document.createTextNode('');
 
         range.insertNode(marker);
@@ -1341,8 +1520,8 @@
         const extracted = range.extractContents();
 
         const transformer = patternMode.value === 'word'
-          ? (text) => buildPatternFragmentByWord(text, (i) => COLORS[keys[i % keys.length]], state)
-          : (text) => buildPatternFragmentByCharacter(text, (i) => COLORS[keys[i % keys.length]], state);
+          ? (text) => buildPatternFragmentByWord(text, (i) => keys[i % keys.length], state)
+          : (text) => buildPatternFragmentByCharacter(text, (i) => keys[i % keys.length], state);
 
         const rebuilt = rebuildFragment(extracted, transformer);
         const marker = document.createTextNode('');
@@ -1365,7 +1544,8 @@
 
       const liveSelection = window.getSelection();
       const range = liveSelection.getRangeAt(0);
-      const fragment = buildTypedFragmentFromText(text, activeColor);
+      const colorKey = isSlotKey(activeKey) ? activeKey : null;
+      const fragment = buildTypedFragmentFromText(text, activeColor, colorKey);
       const marker = document.createTextNode('');
 
       range.deleteContents();
@@ -1462,19 +1642,41 @@
         }
 
         if (normalizedTag === 'SPAN') {
-          const color = sanitizeImportedColor(child.style.color);
+          const storedKey = child.dataset.colorKey;
 
-          if (color) {
-            child.setAttribute('style', `color:${color};`);
+          if (isSlotKey(storedKey)) {
+            Array.from(child.attributes).forEach((attribute) => {
+              if (attribute.name !== 'style' && attribute.name !== 'data-color-key') {
+                child.removeAttribute(attribute.name);
+              }
+            });
+
+            setSpanToSlot(child, storedKey);
           } else {
-            const fragment = document.createDocumentFragment();
+            const color = sanitizeImportedColor(child.style.color);
 
-            while (child.firstChild) {
-              fragment.appendChild(child.firstChild);
+            if (color) {
+              const inferredKey = getSlotKeyForColor(color);
+
+              Array.from(child.attributes).forEach((attribute) => {
+                child.removeAttribute(attribute.name);
+              });
+
+              if (inferredKey) {
+                setSpanToSlot(child, inferredKey);
+              } else {
+                setSpanToCustomColor(child, color);
+              }
+            } else {
+              const fragment = document.createDocumentFragment();
+
+              while (child.firstChild) {
+                fragment.appendChild(child.firstChild);
+              }
+
+              child.replaceWith(fragment);
+              return;
             }
-
-            child.replaceWith(fragment);
-            return;
           }
         } else {
           Array.from(child.attributes).forEach((attribute) => {
@@ -1513,7 +1715,8 @@
             next &&
             next.nodeType === Node.ELEMENT_NODE &&
             normalizeTagName(next.tagName) === 'SPAN' &&
-            canonicalHex(node.style.color) === canonicalHex(next.style.color)
+            canonicalHex(node.style.color) === canonicalHex(next.style.color) &&
+            (node.dataset.colorKey || '') === (next.dataset.colorKey || '')
           ) {
             while (next.firstChild) {
               node.appendChild(next.firstChild);
@@ -1562,7 +1765,29 @@
       const color = COLORS[key];
 
       setActiveColor(color, key);
-      applySingleColorToSelection(color);
+      applySingleColorToSelection(color, key);
+    }
+
+    function tryApplySlotHexFromInput(input, allowShort = false) {
+      if (!isValidInputHex(input.value, allowShort)) return;
+
+      const key = input.dataset.key;
+      const clean = canonicalHex(input.value);
+
+      if (isSlotKey(key) && isValidHexColor(clean)) {
+        palettePreset.value = 'custom';
+        changeSlotColor(key, clean);
+      }
+    }
+
+    function tryApplyCustomHexFromInput(input, allowShort = false) {
+      if (!isValidInputHex(input.value, allowShort)) return;
+
+      const clean = canonicalHex(input.value);
+
+      if (isValidHexColor(clean)) {
+        applyCustomColor(clean);
+      }
     }
 
     swatches.forEach((button) => {
@@ -1575,6 +1800,45 @@
       });
     });
 
+    slotColorPickers.forEach((input) => {
+      input.addEventListener('input', () => {
+        const key = input.dataset.key;
+
+        if (isSlotKey(key)) {
+          palettePreset.value = 'custom';
+          changeSlotColor(key, input.value);
+        }
+      });
+    });
+
+    slotHexInputs.forEach((input) => {
+      input.addEventListener('input', () => {
+        tryApplySlotHexFromInput(input, false);
+      });
+
+      input.addEventListener('paste', () => {
+        window.setTimeout(() => {
+          tryApplySlotHexFromInput(input, false);
+        }, 0);
+      });
+
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          tryApplySlotHexFromInput(input, true);
+        }
+      });
+
+      input.addEventListener('blur', () => {
+        tryApplySlotHexFromInput(input, true);
+
+        const key = input.dataset.key;
+        if (isSlotKey(key)) {
+          input.value = displayHex(COLORS[key]);
+        }
+      });
+    });
+
     [defaultButton, blackButton, whiteButton].forEach((button) => {
       button.addEventListener('mousedown', (event) => {
         event.preventDefault();
@@ -1583,17 +1847,17 @@
 
     defaultButton.addEventListener('click', () => {
       setActiveColor(null, 'DEFAULT');
-      applySingleColorToSelection(null);
+      applySingleColorToSelection(null, null);
     });
 
     blackButton.addEventListener('click', () => {
       setActiveColor('#000000', 'BLACK');
-      applySingleColorToSelection('#000000');
+      applySingleColorToSelection('#000000', null);
     });
 
     whiteButton.addEventListener('click', () => {
       setActiveColor('#ffffff', 'WHITE');
-      applySingleColorToSelection('#ffffff');
+      applySingleColorToSelection('#ffffff', null);
     });
 
     customColorPicker.addEventListener('input', () => {
@@ -1601,38 +1865,26 @@
     });
 
     customHexInput.addEventListener('input', () => {
-      const clean = canonicalHex(customHexInput.value);
-
-      if (isValidHexColor(clean)) {
-        applyCustomColor(clean);
-      }
+      tryApplyCustomHexFromInput(customHexInput, false);
     });
 
     customHexInput.addEventListener('paste', () => {
       window.setTimeout(() => {
-        const clean = canonicalHex(customHexInput.value);
-
-        if (isValidHexColor(clean)) {
-          applyCustomColor(clean);
-        }
+        tryApplyCustomHexFromInput(customHexInput, false);
       }, 0);
     });
 
     customHexInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
-
-        const clean = canonicalHex(customHexInput.value);
-
-        if (isValidHexColor(clean)) {
-          applyCustomColor(clean);
-        }
+        tryApplyCustomHexFromInput(customHexInput, true);
       }
     });
 
     customHexInput.addEventListener('blur', () => {
-      const clean = canonicalHex(customHexInput.value);
+      tryApplyCustomHexFromInput(customHexInput, true);
 
+      const clean = canonicalHex(customHexInput.value);
       if (isValidHexColor(clean)) {
         customHexInput.value = displayHex(clean);
       }
