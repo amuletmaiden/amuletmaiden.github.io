@@ -130,6 +130,7 @@
 
     .button,
     .pattern-input,
+    .hex-input,
     .mode-select,
     .output {
       appearance: none;
@@ -142,6 +143,7 @@
 
     .button,
     .pattern-input,
+    .hex-input,
     .mode-select {
       padding: 10px 14px;
       height: 40px;
@@ -159,9 +161,10 @@
 
     .button:focus,
     .pattern-input:focus,
+    .hex-input:focus,
     .mode-select:focus,
     .output:focus,
-    .color-input:focus {
+    .custom-color-picker:focus {
       outline: 2px solid var(--focus);
       outline-offset: 1px;
     }
@@ -173,6 +176,13 @@
 
     .pattern-input {
       min-width: 120px;
+    }
+
+    .hex-input {
+      width: 118px;
+      font-family: "Courier New", Courier, monospace;
+      font-weight: 700;
+      text-transform: uppercase;
     }
 
     .mode-select {
@@ -190,35 +200,21 @@
       color: var(--muted);
     }
 
-    .color-controls {
+    .custom-color-tool {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
-    }
-
-    .color-control {
-      display: flex;
-      align-items: center;
-      gap: 6px;
       padding: 6px 8px;
       border: 1px solid var(--line);
       border-radius: 12px;
       background: var(--button-bg);
-      color: var(--text);
-      font-size: 13px;
     }
 
-    .color-control span {
-      min-width: 18px;
-      font-weight: 700;
-      text-align: center;
-    }
-
-    .color-input {
+    .custom-color-picker {
       appearance: none;
-      width: 34px;
-      height: 28px;
+      width: 36px;
+      height: 30px;
       padding: 0;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -226,16 +222,16 @@
       cursor: pointer;
     }
 
-    .color-input::-webkit-color-swatch-wrapper {
+    .custom-color-picker::-webkit-color-swatch-wrapper {
       padding: 2px;
     }
 
-    .color-input::-webkit-color-swatch {
+    .custom-color-picker::-webkit-color-swatch {
       border: none;
       border-radius: 6px;
     }
 
-    .color-input::-moz-color-swatch {
+    .custom-color-picker::-moz-color-swatch {
       border: none;
       border-radius: 6px;
     }
@@ -281,7 +277,7 @@
     .tumblr-avatar {
       width: 28px;
       height: 28px;
-      border-radius: 4px;
+      border-radius: 999px;
       background:
         linear-gradient(135deg, var(--red), var(--pink) 45%, var(--blue));
       flex: 0 0 auto;
@@ -423,6 +419,14 @@
       .pattern-input {
         min-width: 100%;
       }
+
+      .hex-input {
+        width: 100%;
+      }
+
+      .custom-color-tool {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -430,7 +434,7 @@
   <div class="app">
     <div class="panel">
       <div class="title">Four-Color Text Editor</div>
-      <div class="subtitle">Click a color to set what newly typed text becomes. Select text to recolor it, apply repeating patterns, use bold or italics, switch blocks to H1 or paragraph, and paste HTML into the lower box to load it back into the editor.</div>
+      <div class="subtitle">Click a palette color to set newly typed text. Use Default for normal Tumblr black/white text. Use Custom to paste a hex code or pick any color; it applies instantly to selected text without changing the four pattern colors.</div>
 
       <div class="toolbar">
         <span id="themeStatus" class="status">Theme follows system</span>
@@ -443,7 +447,6 @@
           <option value="candy">Candy glass</option>
           <option value="dusk">Dusk glow</option>
           <option value="lagoon">Lagoon flame</option>
-          <option value="custom">Custom</option>
         </select>
       </div>
 
@@ -455,26 +458,14 @@
           <button class="swatch" type="button" data-key="B" data-color="#0000ff" title="Blue slot" aria-label="Blue slot" style="background:#0000ff;"></button>
         </div>
 
-        <div class="color-controls" aria-label="Custom colors">
-          <label class="color-control" title="Red slot custom color">
-            <span>R</span>
-            <input id="colorR" class="color-input" type="color" data-key="R" value="#ff0000" />
-          </label>
+        <button id="defaultButton" class="button" type="button">Default</button>
+        <button id="blackButton" class="button" type="button">Black</button>
+        <button id="whiteButton" class="button" type="button">White</button>
 
-          <label class="color-control" title="Green slot custom color">
-            <span>G</span>
-            <input id="colorG" class="color-input" type="color" data-key="G" value="#00ff00" />
-          </label>
-
-          <label class="color-control" title="Pink slot custom color">
-            <span>P</span>
-            <input id="colorP" class="color-input" type="color" data-key="P" value="#ff00ff" />
-          </label>
-
-          <label class="color-control" title="Blue slot custom color">
-            <span>B</span>
-            <input id="colorB" class="color-input" type="color" data-key="B" value="#0000ff" />
-          </label>
+        <div class="custom-color-tool">
+          <span class="label">Custom</span>
+          <input id="customColorPicker" class="custom-color-picker" type="color" value="#004dff" aria-label="Custom color picker" />
+          <input id="customHexInput" class="hex-input" type="text" value="#004DFF" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Custom hex color" />
         </div>
       </div>
 
@@ -494,7 +485,7 @@
         <button class="button pattern-button" type="button" data-pattern="RP">RP</button>
         <button class="button pattern-button" type="button" data-pattern="PR">PR</button>
 
-        <span class="label">Custom</span>
+        <span class="label">Custom pattern</span>
         <input id="customPattern" class="pattern-input" type="text" value="GB" maxlength="32" spellcheck="false" autocomplete="off" />
 
         <span class="label">Pattern mode</span>
@@ -523,7 +514,7 @@
         </article>
       </div>
 
-      <div class="hint">Ctrl+Z and Ctrl+Y use the editor’s own history stack. Character mode colors one visible character at a time. Word + punctuation mode colors each word as one hit and each punctuation mark as its own hit. Spaces and other whitespace never advance the pattern.</div>
+      <div class="hint">Default removes color styling so text behaves like normal Tumblr text: black on light, white on dark. Custom hex accepts pasted codes like #004DFF and immediately recolors selected text. Spaces and other whitespace never advance patterns.</div>
 
       <div class="output-wrap">
         <div class="output-toolbar">
@@ -594,10 +585,13 @@
       '#ff492f': 'tumblr red',
       '#00cf35': 'tumblr green',
       '#ff62ce': 'tumblr pink',
-      '#00b8ff': 'tumblr blue'
+      '#00b8ff': 'tumblr blue',
+      '#000000': 'black',
+      '#ffffff': 'white'
     };
 
     const PALETTE_STORAGE_KEY = 'fourColorEditorPalette';
+    const CUSTOM_COLOR_STORAGE_KEY = 'fourColorEditorCustomColor';
     const SYSTEM_THEME_QUERY = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
     const editor = document.getElementById('editor');
@@ -607,6 +601,11 @@
     const customPattern = document.getElementById('customPattern');
     const patternMode = document.getElementById('patternMode');
     const palettePreset = document.getElementById('palettePreset');
+    const customColorPicker = document.getElementById('customColorPicker');
+    const customHexInput = document.getElementById('customHexInput');
+    const defaultButton = document.getElementById('defaultButton');
+    const blackButton = document.getElementById('blackButton');
+    const whiteButton = document.getElementById('whiteButton');
     const applyPatternButton = document.getElementById('applyPattern');
     const clearEditorButton = document.getElementById('clearEditor');
     const copyHtmlButton = document.getElementById('copyHtml');
@@ -619,7 +618,6 @@
     const paragraphButton = document.getElementById('paragraphButton');
     const swatches = Array.from(document.querySelectorAll('.swatch'));
     const patternButtons = Array.from(document.querySelectorAll('.pattern-button'));
-    const colorInputs = Array.from(document.querySelectorAll('.color-input'));
 
     let activeKey = 'R';
     let activeColor = COLORS.R;
@@ -637,8 +635,16 @@
         return `#${value[1]}${value[1]}${value[2]}${value[2]}${value[3]}${value[3]}`.toLowerCase();
       }
 
+      if (/^[0-9a-f]{3}$/i.test(value)) {
+        return `#${value[0]}${value[0]}${value[1]}${value[1]}${value[2]}${value[2]}`.toLowerCase();
+      }
+
       if (/^#[0-9a-f]{6}$/i.test(value)) {
         return value;
+      }
+
+      if (/^[0-9a-f]{6}$/i.test(value)) {
+        return `#${value}`;
       }
 
       const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
@@ -649,6 +655,10 @@
       const b = Math.max(0, Math.min(255, Number(match[3]))).toString(16).padStart(2, '0');
 
       return `#${r}${g}${b}`;
+    }
+
+    function displayHex(color) {
+      return canonicalHex(color).toUpperCase();
     }
 
     function isValidHexColor(color) {
@@ -668,15 +678,18 @@
         .replace(/"/g, '&quot;');
     }
 
-    function getColorLabel(color) {
+    function getColorLabel(color, key = activeKey) {
+      if (color === null) return 'default';
+
       const hex = canonicalHex(color);
 
+      if (key === 'CUSTOM') return COLOR_NAMES[hex] || displayHex(hex);
       if (hex === COLORS.R) return COLOR_NAMES[hex] || 'red slot';
       if (hex === COLORS.G) return COLOR_NAMES[hex] || 'green slot';
       if (hex === COLORS.P) return COLOR_NAMES[hex] || 'pink slot';
       if (hex === COLORS.B) return COLOR_NAMES[hex] || 'blue slot';
 
-      return COLOR_NAMES[hex] || hex;
+      return COLOR_NAMES[hex] || displayHex(hex);
     }
 
     function getSystemTheme() {
@@ -720,10 +733,25 @@
 
         if (stored.preset && palettePreset.querySelector(`option[value="${stored.preset}"]`)) {
           palettePreset.value = stored.preset;
-        } else {
-          palettePreset.value = 'custom';
         }
       } catch (error) {}
+    }
+
+    function saveCustomColor(color) {
+      if (!isValidHexColor(color)) return;
+
+      try {
+        localStorage.setItem(CUSTOM_COLOR_STORAGE_KEY, canonicalHex(color));
+      } catch (error) {}
+    }
+
+    function loadCustomColor() {
+      try {
+        const stored = localStorage.getItem(CUSTOM_COLOR_STORAGE_KEY);
+        return isValidHexColor(stored) ? canonicalHex(stored) : '#004dff';
+      } catch (error) {
+        return '#004dff';
+      }
     }
 
     function setPalettePresetValue(value) {
@@ -735,7 +763,7 @@
 
       palettePreset.value = value;
       refreshPaletteControls();
-      setActiveColor(COLORS[activeKey], activeKey);
+      setActiveColor(COLORS[activeKey] || COLORS.R, activeKey);
       savePaletteState();
     }
 
@@ -747,17 +775,25 @@
         button.style.background = color;
       });
 
-      colorInputs.forEach((input) => {
-        const key = input.dataset.key;
-        input.value = canonicalHex(COLORS[key]);
-      });
-
       updateStatus();
     }
 
-    function markPaletteCustom() {
-      palettePreset.value = 'custom';
-      savePaletteState();
+    function setCustomColorControls(color) {
+      if (!isValidHexColor(color)) return;
+
+      const hex = canonicalHex(color);
+      customColorPicker.value = hex;
+      customHexInput.value = displayHex(hex);
+      saveCustomColor(hex);
+    }
+
+    function applyCustomColor(color) {
+      if (!isValidHexColor(color)) return;
+
+      const hex = canonicalHex(color);
+      setCustomColorControls(hex);
+      setActiveColor(hex, 'CUSTOM');
+      applySingleColorToSelection(hex);
     }
 
     function getNodePath(root, node) {
@@ -941,19 +977,22 @@
 
     function updateStatus() {
       const modeLabel = patternMode.value === 'word' ? 'word + punctuation' : 'character';
-      status.textContent = `Typing color: ${getColorLabel(activeColor)} · Pattern mode: ${modeLabel}`;
+      status.textContent = `Typing color: ${getColorLabel(activeColor, activeKey)} · Pattern mode: ${modeLabel}`;
     }
 
     function setActiveColor(color, key = activeKey) {
-      const cleanColor = canonicalHex(color);
-      if (!isValidHexColor(cleanColor)) return;
+      if (color !== null && !isValidHexColor(color)) return;
 
       activeKey = key;
-      activeColor = cleanColor;
+      activeColor = color === null ? null : canonicalHex(color);
 
       swatches.forEach((button) => {
         button.classList.toggle('active', button.dataset.key === activeKey);
       });
+
+      defaultButton.classList.toggle('active', activeKey === 'DEFAULT');
+      blackButton.classList.toggle('active', activeKey === 'BLACK');
+      whiteButton.classList.toggle('active', activeKey === 'WHITE');
 
       updateStatus();
     }
@@ -1026,7 +1065,7 @@
           continue;
         }
 
-        if (/\s/.test(char)) {
+        if (color === null || /\s/.test(char)) {
           fragment.appendChild(document.createTextNode(char));
           continue;
         }
@@ -1267,7 +1306,7 @@
       const range = selection.getRangeAt(0);
 
       if (range.collapsed) {
-        setActiveColor(color);
+        setActiveColor(color, activeKey);
         return;
       }
 
@@ -1536,30 +1575,70 @@
       });
     });
 
-    colorInputs.forEach((input) => {
-      input.addEventListener('input', () => {
-        const key = input.dataset.key;
-        const color = canonicalHex(input.value);
-
-        if (!isValidHexColor(color)) return;
-
-        COLORS[key] = color;
-        refreshPaletteControls();
-
-        if (activeKey === key) {
-          setActiveColor(color, key);
-        }
-
-        markPaletteCustom();
+    [defaultButton, blackButton, whiteButton].forEach((button) => {
+      button.addEventListener('mousedown', (event) => {
+        event.preventDefault();
       });
     });
 
-    palettePreset.addEventListener('change', () => {
-      if (palettePreset.value === 'custom') {
-        savePaletteState();
-        return;
-      }
+    defaultButton.addEventListener('click', () => {
+      setActiveColor(null, 'DEFAULT');
+      applySingleColorToSelection(null);
+    });
 
+    blackButton.addEventListener('click', () => {
+      setActiveColor('#000000', 'BLACK');
+      applySingleColorToSelection('#000000');
+    });
+
+    whiteButton.addEventListener('click', () => {
+      setActiveColor('#ffffff', 'WHITE');
+      applySingleColorToSelection('#ffffff');
+    });
+
+    customColorPicker.addEventListener('input', () => {
+      applyCustomColor(customColorPicker.value);
+    });
+
+    customHexInput.addEventListener('input', () => {
+      const clean = canonicalHex(customHexInput.value);
+
+      if (isValidHexColor(clean)) {
+        applyCustomColor(clean);
+      }
+    });
+
+    customHexInput.addEventListener('paste', () => {
+      window.setTimeout(() => {
+        const clean = canonicalHex(customHexInput.value);
+
+        if (isValidHexColor(clean)) {
+          applyCustomColor(clean);
+        }
+      }, 0);
+    });
+
+    customHexInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+
+        const clean = canonicalHex(customHexInput.value);
+
+        if (isValidHexColor(clean)) {
+          applyCustomColor(clean);
+        }
+      }
+    });
+
+    customHexInput.addEventListener('blur', () => {
+      const clean = canonicalHex(customHexInput.value);
+
+      if (isValidHexColor(clean)) {
+        customHexInput.value = displayHex(clean);
+      }
+    });
+
+    palettePreset.addEventListener('change', () => {
       setPalettePresetValue(palettePreset.value);
     });
 
@@ -1747,6 +1826,7 @@
     updateSystemTheme();
     loadPaletteState();
     refreshPaletteControls();
+    setCustomColorControls(loadCustomColor());
     setActiveColor(COLORS.R, 'R');
     placeCaretAtEnd(editor);
     pushHistory(true);
