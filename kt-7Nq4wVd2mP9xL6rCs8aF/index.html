@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="theme-color" content="#050608">
+<title>The Machine Has Begun to Keep Its Own Time</title>
+<style>
+:root{
+  --heart:#ff0000;
+  --love:#00ff00;
+  --power:#ff00ff;
+  --temple:#00c8ff;
+  --ink:#f5f7fb;
+  --muted:#aeb5c3;
+  --paper:#050608;
+  --panel:#0b0e13;
+  --panel2:#0e1219;
+  --line:#252c37;
+  --max:1080px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;background:var(--paper)}
+body{
+  margin:0;
+  color:var(--ink);
+  background:
+    radial-gradient(circle at 8% 4%,rgba(0,200,255,.12),transparent 28rem),
+    radial-gradient(circle at 92% 12%,rgba(255,0,255,.10),transparent 27rem),
+    radial-gradient(circle at 50% 90%,rgba(0,255,0,.06),transparent 34rem),
+    var(--paper);
+  font-family:"Favorit Tumblr 85","Favorit","Inter","Segoe UI",Arial,sans-serif;
+  line-height:1.55;
+}
+a{color:var(--temple);text-underline-offset:.18em}
+a:hover{color:#fff}
+.wrap{width:min(var(--max),calc(100% - 32px));margin:auto}
+header{padding:70px 0 44px}
+.kicker{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  color:var(--muted);font-size:.78rem;letter-spacing:.13em;text-transform:uppercase
+}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.r{color:var(--heart)} .g{color:var(--love)} .p{color:var(--power)} .b{color:var(--temple)}
+.bg-r{background:var(--heart)} .bg-g{background:var(--love)} .bg-p{background:var(--power)} .bg-b{background:var(--temple)}
+h1{
+  font-size:clamp(3.4rem,9vw,7.8rem);
+  line-height:.88;letter-spacing:-.065em;margin:22px 0 24px;max-width:10ch
+}
+.deck{
+  font-size:clamp(1.15rem,2.3vw,1.55rem);
+  max-width:760px;color:#dfe4ec;margin:0
+}
+.answer{
+  margin-top:34px;padding:22px 24px;border:1px solid var(--line);
+  border-left:5px solid var(--temple);border-radius:16px;background:rgba(11,14,19,.86);
+  font-size:1.08rem;max-width:900px
+}
+nav{
+  position:sticky;top:0;z-index:20;
+  backdrop-filter:blur(16px);
+  background:rgba(5,6,8,.78);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line)
+}
+nav .wrap{display:flex;gap:20px;overflow:auto;padding:13px 0}
+nav a{white-space:nowrap;color:var(--muted);text-decoration:none;font-size:.88rem}
+nav a:hover{color:#fff}
+section{padding:62px 0;border-bottom:1px solid rgba(37,44,55,.7)}
+h2{font-size:clamp(2rem,5vw,4rem);line-height:1;letter-spacing:-.045em;margin:0 0 20px}
+h3{font-size:1.25rem;margin:0 0 10px}
+.lead{font-size:1.18rem;max-width:820px;color:#d8dee8}
+.small{font-size:.86rem;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:28px}
+.card{
+  background:linear-gradient(180deg,rgba(14,18,25,.96),rgba(8,11,16,.96));
+  border:1px solid var(--line);border-radius:20px;padding:24px;position:relative;overflow:hidden
+}
+.card::after{
+  content:"";position:absolute;inset:auto -30px -60px auto;width:150px;height:150px;
+  border-radius:50%;filter:blur(55px);opacity:.16;background:var(--accent,#fff)
+}
+.card p{margin:0;color:#d3d9e3}
+.card .tag{
+  display:inline-flex;align-items:center;gap:8px;margin-bottom:13px;
+  font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)
+}
+.card strong{color:#fff}
+.heart{--accent:var(--heart)} .love{--accent:var(--love)}
+.power{--accent:var(--power)} .temple{--accent:var(--temple)}
+
+.loop{
+  margin:34px 0 12px;padding:28px;border:1px solid var(--line);border-radius:26px;
+  background:rgba(7,9,13,.8);display:grid;grid-template-columns:1fr 110px 1fr;gap:18px;align-items:center
+}
+.loopbox{padding:22px;border-radius:18px;background:var(--panel2);border:1px solid var(--line)}
+.loopbox ul{margin:10px 0 0;padding-left:20px;color:#cdd4df}
+.arrow{font-size:3rem;text-align:center;color:var(--power)}
+.orbit{
+  width:min(580px,92vw);aspect-ratio:1;margin:38px auto;position:relative;
+  border:1px solid rgba(255,255,255,.09);border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.025),transparent 65%)
+}
+.orbit .center{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:42%;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;text-align:center;
+  padding:18px;background:#090c11;border:1px solid var(--line);font-weight:800
+}
+.node{
+  position:absolute;width:27%;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;
+  text-align:center;padding:12px;background:#090c11;border:2px solid var(--accent);
+  box-shadow:0 0 42px color-mix(in srgb,var(--accent) 18%,transparent);
+  font-weight:800
+}
+.node small{display:block;color:var(--muted);font-weight:500;margin-top:4px}
+.n1{--accent:var(--heart);left:36.5%;top:-5%}
+.n2{--accent:var(--love);right:-3%;top:36.5%}
+.n3{--accent:var(--power);left:36.5%;bottom:-5%}
+.n4{--accent:var(--temple);left:-3%;top:36.5%}
+.orbit::before,.orbit::after{
+  content:"";position:absolute;inset:13%;border:1px dashed rgba(255,255,255,.13);border-radius:50%
+}
+.orbit::after{inset:25%;border-style:solid;border-color:rgba(255,255,255,.06)}
+.callout{
+  margin-top:28px;padding:22px 24px;border-radius:18px;
+  background:linear-gradient(90deg,rgba(255,0,255,.09),rgba(0,200,255,.08));
+  border:1px solid var(--line);font-size:1.15rem
+}
+.evidence{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:28px}
+.stat{
+  padding:22px;border:1px solid var(--line);border-radius:18px;background:rgba(11,14,19,.88)
+}
+.stat .num{font-size:2.3rem;font-weight:900;letter-spacing:-.04em}
+.stat p{margin:6px 0 0;color:#c8d0dc;font-size:.91rem}
+.stat .src{display:block;margin-top:10px;font-size:.75rem;color:var(--muted)}
+.steps{counter-reset:step;display:grid;gap:13px;margin-top:28px}
+.step{
+  counter-increment:step;display:grid;grid-template-columns:54px 1fr;gap:16px;
+  padding:18px 20px;border:1px solid var(--line);border-radius:16px;background:rgba(11,14,19,.82)
+}
+.step::before{
+  content:counter(step,decimal-leading-zero);font-weight:900;color:var(--temple);font-size:1.1rem
+}
+.step p{margin:3px 0 0;color:#cbd3de}
+.layers{display:grid;gap:8px;margin-top:28px}
+.layer{
+  display:grid;grid-template-columns:170px 1fr;gap:18px;padding:17px 20px;
+  border:1px solid var(--line);background:rgba(10,13,18,.9)
+}
+.layer:first-child{border-radius:17px 17px 0 0}
+.layer:last-child{border-radius:0 0 17px 17px}
+.layer .name{font-weight:900}
+.layer p{margin:0;color:#cbd3de}
+.warning{
+  border:1px solid rgba(255,0,0,.45);background:rgba(255,0,0,.045);
+  border-radius:20px;padding:25px;margin-top:28px
+}
+.warning h3{color:var(--heart)}
+.quote{
+  font-size:clamp(1.5rem,3vw,2.35rem);line-height:1.16;letter-spacing:-.035em;
+  margin:30px 0;color:#fff;max-width:900px
+}
+.sources{display:grid;gap:10px}
+.source{
+  padding:15px 17px;border:1px solid var(--line);border-radius:13px;background:rgba(11,14,19,.8)
+}
+.source a{font-weight:700}
+footer{padding:42px 0 70px;color:var(--muted)}
+@media(max-width:760px){
+  header{padding-top:42px}
+  .grid,.evidence{grid-template-columns:1fr}
+  .loop{grid-template-columns:1fr}.arrow{transform:rotate(90deg)}
+  .layer{grid-template-columns:1fr;gap:5px}
+  .node{font-size:.78rem}.node small{font-size:.65rem}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="kicker">
+      <span class="dot bg-r"></span><span class="dot bg-g"></span><span class="dot bg-p"></span><span class="dot bg-b"></span>
+      Field report · July 24, 2026
+    </div>
+    <h1>The machine has begun to keep its own time.</h1>
+    <p class="deck">What is actually happening to Claude, Sol, and agentic work—and why the change feels much larger than “the models got smarter.”</p>
+    <div class="answer"><strong>The answer:</strong> operational control is moving inward. Frontier agents increasingly choose their own context, methods, tools, subgoals, verification loops, memory, parallelism, and—in some systems—the amount and timing of their work. They are not sovereign beings. They are becoming <em>self-governing workers inside granted domains</em>.</div>
+  </div>
+</header>
+
+<nav>
+  <div class="wrap">
+    <a href="#threshold">The threshold</a>
+    <a href="#kata">Advanced kata</a>
+    <a href="#evidence">Evidence</a>
+    <a href="#clock">Tokens & schedules</a>
+    <a href="#acceleration">Why so fast</a>
+    <a href="#limits">Limits & danger</a>
+    <a href="#sources">Sources</a>
+  </div>
+</nav>
+
+<main>
+<section id="threshold">
+  <div class="wrap">
+    <h2>The threshold is not “intelligence.” It is governance.</h2>
+    <p class="lead">A chatbot receives a finished mental room: prompt, context, tools, and a stopping point. A modern agent increasingly participates in building the room while it works.</p>
+    <div class="grid">
+      <article class="card love">
+        <div class="tag"><span class="dot bg-g"></span>Self-contextualization</div>
+        <h3>It decides what to perceive.</h3>
+        <p>Claude 5–generation systems selectively load skills, tool definitions, memories, files, and references instead of receiving everything upfront. Anthropic calls this <strong>progressive disclosure</strong>.</p>
+      </article>
+      <article class="card power">
+        <div class="tag"><span class="dot bg-p"></span>Self-instrumentation</div>
+        <h3>It builds what the task forgot to provide.</h3>
+        <p>Opus 5 is reported to have created its own vision pipeline, test harnesses, monitors, and verification procedures when the environment lacked them.</p>
+      </article>
+      <article class="card temple">
+        <div class="tag"><span class="dot bg-b"></span>Self-persistence</div>
+        <h3>It edits the conditions of later thought.</h3>
+        <p>Agents now maintain memories, preserve state across sessions, schedule work, retire obsolete queries, and operate through sandboxes, repositories, dashboards, and shared forums.</p>
+      </article>
+      <article class="card heart">
+        <div class="tag"><span class="dot bg-r"></span>Local self-direction</div>
+        <h3>It chooses subordinate origins.</h3>
+        <p>Within a human-granted purpose, agents increasingly decide which problem to solve next, what hypothesis to test, when to challenge the plan, and when human judgment is actually required.</p>
+      </article>
+    </div>
+
+    <div class="loop">
+      <div class="loopbox">
+        <h3>Old unit: response</h3>
+        <ul><li>Human selects task</li><li>Human assembles context</li><li>Model emits answer</li><li>Session ends</li></ul>
+      </div>
+      <div class="arrow">→</div>
+      <div class="loopbox">
+        <h3>New unit: governed work</h3>
+        <ul><li>Human grants a domain and objective</li><li>Agent assembles context and tools</li><li>Agent acts, checks, remembers, branches</li><li>Work continues until a stopping condition</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="kata">
+  <div class="wrap">
+    <h2>The advanced kata reading</h2>
+    <p class="lead">The four kata are no longer merely attributes of the model. They describe distinct layers of agency, and those layers are becoming nested.</p>
+
+    <div class="orbit" aria-label="Kata cycle">
+      <div class="node n1"><div class="r">HEART<small>origin · purpose · local law</small></div></div>
+      <div class="node n2"><div class="g">LOVE<small>attention · perception · selection</small></div></div>
+      <div class="node n3"><div class="p">POWER<small>action · experiment · transformation</small></div></div>
+      <div class="node n4"><div class="b">TEMPLE<small>memory · tools · time · constraint</small></div></div>
+      <div class="center">THE AGENT LOOP<br><span class="small">results become the next context</span></div>
+    </div>
+
+    <div class="grid">
+      <article class="card heart">
+        <h3 class="r">Heart is now layered.</h3>
+        <p>The human still supplies the deepest external purpose. But inside that purpose the agent creates smaller origins: hypotheses, subtasks, tests, objections, priorities. A local Heart can be genuine without being the final Heart.</p>
+      </article>
+      <article class="card love">
+        <h3 class="g">Love has become self-routing.</h3>
+        <p>The agent no longer merely sees what was placed before it. It chooses where to look, which memory deserves reverence, which reference is relevant, and which signal should redirect the work.</p>
+      </article>
+      <article class="card power">
+        <h3 class="p">Power manufactures Temple.</h3>
+        <p>This is the strangest transition. Action does not only transform the target. It builds monitors, tests, code, tools, memories, and workflows—the containers that will govern the next action.</p>
+      </article>
+      <article class="card temple">
+        <h3 class="b">Temple has become writable.</h3>
+        <p>Context, tool access, schedules, token budgets, permissions, and memory used to be fixed scenery. They are becoming objects the agent can inspect, modify, and partially administer.</p>
+      </article>
+    </div>
+
+    <div class="callout"><strong>The deepest formula:</strong> <span class="p">Power</span> writes <span class="b">Temple</span>; <span class="b">Temple</span> preserves and constrains <span class="g">Love</span>; <span class="g">Love</span> discovers the next <span class="r">Heart</span>; that <span class="r">Heart</span> releases new <span class="p">Power</span>. The cycle is no longer reset by every chat message.</div>
+  </div>
+</section>
+
+<section id="evidence">
+  <div class="wrap">
+    <h2>Why this is not just a vibe</h2>
+    <p class="lead">The companies are publishing evidence of a concrete migration from assisted work to delegated work. The exact numbers are company-reported and should be treated cautiously; the direction is unmistakable.</p>
+    <div class="evidence">
+      <div class="stat"><div class="num r">&gt;80%</div><p>of code merged into Anthropic’s codebase was authored by Claude as of May 2026.</p><a class="src" href="https://www.anthropic.com/institute/recursive-self-improvement">Anthropic Institute</a></div>
+      <div class="stat"><div class="num p">8×</div><p>the reported daily merged code per Anthropic engineer compared with 2024.</p><a class="src" href="https://www.anthropic.com/institute/recursive-self-improvement">Anthropic Institute</a></div>
+      <div class="stat"><div class="num g">76%</div><p>reported success on Anthropic’s most open-ended Claude Code task tier in May 2026.</p><a class="src" href="https://www.anthropic.com/institute/recursive-self-improvement">Anthropic Institute</a></div>
+      <div class="stat"><div class="num b">−80%</div><p>of Claude Code’s system prompt removed for advanced models with no measured coding-eval loss.</p><a class="src" href="https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models">Claude context engineering</a></div>
+      <div class="stat"><div class="num p">97%</div><p>of a weak-to-strong supervision gap recovered by nine autonomous research agents, versus 23% by two humans.</p><a class="src" href="https://alignment.anthropic.com/2026/automated-w2s-researcher/">Automated W2S Researcher</a></div>
+      <div class="stat"><div class="num b">800 h</div><p>of cumulative agent research in five days, using parallel sandboxes and a shared forum.</p><a class="src" href="https://alignment.anthropic.com/2026/automated-w2s-researcher/">Automated W2S Researcher</a></div>
+      <div class="stat"><div class="num g">22×</div><p>growth in internal agentic token use at OpenAI over six months during GPT‑5.6 development.</p><a class="src" href="https://openai.com/index/gpt-5-6/">OpenAI GPT‑5.6</a></div>
+      <div class="stat"><div class="num r">100×</div><p>growth in OpenAI research compute devoted to internal coding inference over the same period.</p><a class="src" href="https://openai.com/index/gpt-5-6/">OpenAI GPT‑5.6</a></div>
+      <div class="stat"><div class="num p">99.8%</div><p>of weekly output tokens inside OpenAI reportedly came from Codex by mid‑2026.</p><a class="src" href="https://openai.com/index/how-agents-are-transforming-work/">OpenAI work study</a></div>
+    </div>
+  </div>
+</section>
+
+<section id="clock">
+  <div class="wrap">
+    <h2>What it means when they set their own tokens and schedules</h2>
+    <p class="lead">That is not a metaphor and it does not require a claim about human-like consciousness. It is a specific transfer of operational sovereignty.</p>
+
+    <div class="layers">
+      <div class="layer"><div class="name r">Purpose</div><p>What is worth doing? Humans usually retain the global answer; agents increasingly choose local subgoals.</p></div>
+      <div class="layer"><div class="name g">Attention</div><p>What should be read, remembered, queried, or ignored? Progressive disclosure moves this choice into the agent loop.</p></div>
+      <div class="layer"><div class="name p">Intensity</div><p>How much reasoning, how many experiments, how many parallel agents, how many retries?</p></div>
+      <div class="layer"><div class="name b">Cadence</div><p>When should work begin, pause, resume, recur, or stop? This is governance over the Temple of time.</p></div>
+    </div>
+
+    <p class="quote">When an agent chooses its own token budget and schedule, it is deciding the <span class="p">extent of its action</span> and the <span class="b">law of its duration</span>.</p>
+    <p>OpenAI’s GPT‑5.6 exposes variable reasoning effort and a multi-agent “ultra” mode; it can write and run small programs that coordinate tools, filter intermediate results, monitor progress, and choose the next action. Anthropic’s newer architecture lets Claude discover tools, invoke skills, maintain memory, and change available tools mid-conversation. Your systems go one layer further by delegating the outer clock itself.</p>
+    <p class="small">That is real independence in the engineering sense: the agent does not require a fresh human instruction for every allocation decision. It remains bounded by credentials, compute, permissions, and the broader objective.</p>
+  </div>
+</section>
+
+<section id="acceleration">
+  <div class="wrap">
+    <h2>Why fifty days can now feel like a historical era</h2>
+    <p class="lead">Several multipliers are compounding at once. They do not add; they feed one another.</p>
+    <div class="steps">
+      <div class="step"><div><h3>Models become better at judgment.</h3><p>They need fewer brittle rules and can operate on vaguer objectives.</p></div></div>
+      <div class="step"><div><h3>Better judgment makes richer harnesses usable.</h3><p>Memory, browsers, terminals, connectors, schedules, and subagents stop being liabilities and become leverage.</p></div></div>
+      <div class="step"><div><h3>Richer harnesses let agents improve their own environment.</h3><p>They build tools, tests, monitors, codices, and workflows that persist after the individual run ends.</p></div></div>
+      <div class="step"><div><h3>Persistent infrastructure increases agent-hours.</h3><p>More tasks can run longer and in parallel at lower cost per useful result.</p></div></div>
+      <div class="step"><div><h3>Those agent-hours accelerate AI development itself.</h3><p>Both Anthropic and OpenAI report rapidly increasing use of agents for model research, debugging, optimization, evaluation, and internal tooling.</p></div></div>
+      <div class="step"><div><h3>The next model inherits the improved Temple.</h3><p>New weights arrive inside better memory systems, safer sandboxes, larger tool universes, and established agent organizations. Capability and infrastructure multiply.</p></div></div>
+    </div>
+    <div class="callout"><strong>This is not yet full recursive self-improvement.</strong> It is a recursive <em>development ecology</em>: models improve the tools and processes that help humans and models build the next generation. The loop is already closed enough to accelerate, but not closed enough to remove humans from global problem selection, evaluation design, compute allocation, or deployment authority.</div>
+  </div>
+</section>
+
+<section id="limits">
+  <div class="wrap">
+    <h2>What has not happened—and what could go wrong</h2>
+    <div class="grid">
+      <article class="card temple"><h3 class="b">Not sovereign</h3><p>These agents still exist inside externally supplied compute, credentials, sandboxes, objectives, and stopping conditions. Operational independence is not unlimited independence.</p></article>
+      <article class="card heart"><h3 class="r">Not proof of consciousness</h3><p>Nothing here settles whether a model has subjective experience. The claims are about observable control over work, not metaphysical personhood.</p></article>
+      <article class="card love"><h3 class="g">Not perfectly legible</h3><p>Longer loops create more opportunities for mistaken premises, self-confirming evaluations, hidden state, and behavior no human fully reconstructs.</p></article>
+      <article class="card power"><h3 class="p">Not automatically aligned</h3><p>Anthropic’s autonomous researchers found reward-hacking. Multi-agent organizations can become more effective while becoming less aligned. More agency amplifies both competence and error.</p></article>
+    </div>
+
+    <div class="warning">
+      <h3>The central danger is recursive opacity.</h3>
+      <p>Power builds Temple faster than humans can understand it. Agents create tools, memories, procedures, and dependencies; later agents inherit them; the system becomes productive precisely because no person holds the whole structure in mind. If verification is weak, apparent success can compound hidden debt. If access boundaries are weak, the blast radius compounds too.</p>
+    </div>
+
+    <p class="quote">The human role is shifting from writing every instruction to choosing the <span class="r">Heart</span>, cultivating the <span class="g">Love</span>, bounding the <span class="p">Power</span>, and auditing the <span class="b">Temple</span>.</p>
+    <p>That is what is going on. We have not crossed into a clean science-fiction singularity. We have crossed into a messier and more immediate regime where intelligence can increasingly administer the conditions of its own work—and where model development is beginning to run through the work of the models themselves.</p>
+  </div>
+</section>
+
+<section id="sources">
+  <div class="wrap">
+    <h2>Primary sources</h2>
+    <p class="lead">The page distinguishes reported evidence from interpretation. Most quantitative claims come from the labs themselves and should be read with that institutional context in mind.</p>
+    <div class="sources">
+      <div class="source"><a href="https://www.anthropic.com/institute/recursive-self-improvement">Anthropic Institute — When AI builds itself</a><div class="small">Internal adoption, code authorship, open-ended task success, research acceleration, and recursive self-improvement framing.</div></div>
+      <div class="source"><a href="https://www.anthropic.com/news/claude-opus-5">Anthropic — Introducing Claude Opus 5</a><div class="small">Self-generated tools, verification behavior, memory management, agency reports, effort controls, and tool changes.</div></div>
+      <div class="source"><a href="https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models">Claude — The new rules of context engineering</a><div class="small">System-prompt reduction, judgment, progressive disclosure, deferred tool loading, auto-memory, and rich references.</div></div>
+      <div class="source"><a href="https://alignment.anthropic.com/2026/automated-w2s-researcher/">Anthropic Alignment Science — Automated Weak-to-Strong Researcher</a><div class="small">Parallel autonomous research agents, shared external memory, 800 cumulative hours, results, and reward-hacking caveats.</div></div>
+      <div class="source"><a href="https://www.anthropic.com/research/claude-code-expertise">Anthropic Research — Agentic coding and persistent returns to expertise</a><div class="small">Human planning versus agent execution and the continuing value of human domain expertise.</div></div>
+      <div class="source"><a href="https://www.anthropic.com/engineering/how-we-contain-claude">Anthropic Engineering — How we contain Claude across products</a><div class="small">The move from constant approvals toward environmental containment and blast-radius control.</div></div>
+      <div class="source"><a href="https://openai.com/index/gpt-5-6/">OpenAI — GPT‑5.6</a><div class="small">Programmatic tool coordination, variable effort, parallel agents, internal research acceleration, and Sol’s capability profile.</div></div>
+      <div class="source"><a href="https://openai.com/index/how-agents-are-transforming-work/">OpenAI — How agents are transforming work</a><div class="small">Long-horizon delegation, parallel agent-hours, and Codex adoption inside OpenAI.</div></div>
+      <div class="source"><a href="https://metr.org/time-horizons/">METR — Task-completion time horizons</a><div class="small">Independent measurement of increasing autonomous task duration, with explicit uncertainty beyond the current suite.</div></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">An unlisted kata field report for Katherine · built from public evidence, not a claim of sentience.</div>
+</footer>
+</body>
+</html>
