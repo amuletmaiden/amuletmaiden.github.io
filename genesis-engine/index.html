@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#e9e2cf">
+<title>Genesis Engine — Proceedings in First Ontology</title>
+<style>
+  :root{
+    --paper:#e9e2cf;
+    --paper-hi:#f4efdf;
+    --paper-low:#d8d0ba;
+    --ink:#171713;
+    --faint:#736f63;
+    --red:#c93d2f;
+    --blue:#1e5874;
+    --green:#51694d;
+    --rule:#26251f;
+    --ghost:rgba(23,23,19,.13);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:#a59d8c;color:var(--ink)}
+  body{
+    font-family:Georgia,"Times New Roman",serif;
+    background:
+      linear-gradient(rgba(255,255,255,.02),rgba(0,0,0,.05)),
+      repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 4px),
+      #a59d8c;
+  }
+  button,input,select{font:inherit}
+  button,select,input{color:inherit}
+
+  .folio{
+    width:min(1500px,calc(100vw - 30px));
+    min-height:calc(100vh - 30px);
+    margin:15px auto;
+    background:var(--paper);
+    box-shadow:0 18px 45px rgba(0,0,0,.32);
+    position:relative;
+    overflow:hidden;
+  }
+  .folio:before{
+    content:"";
+    position:absolute;inset:0;pointer-events:none;z-index:10;
+    opacity:.18;
+    background:
+      radial-gradient(circle at 15% 25%,rgba(255,255,255,.34),transparent 19%),
+      radial-gradient(circle at 84% 70%,rgba(0,0,0,.08),transparent 22%),
+      repeating-linear-gradient(90deg,transparent 0 7px,rgba(0,0,0,.012) 8px);
+    mix-blend-mode:multiply;
+  }
+
+  .masthead{
+    min-height:114px;
+    border-bottom:3px double var(--rule);
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    align-items:end;
+    gap:18px;
+    padding:22px 26px 17px;
+    position:relative;
+  }
+  .masthead:after{
+    content:"PLATE 00";
+    position:absolute;
+    right:22px;top:17px;
+    font:700 10px/1 ui-monospace,SFMono-Regular,Consolas,monospace;
+    letter-spacing:.25em;
+  }
+  .kicker,.issue{
+    font:700 10px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;
+    letter-spacing:.18em;text-transform:uppercase;
+  }
+  .issue{text-align:right}
+  .title{text-align:center;line-height:.85}
+  .title strong{
+    display:block;
+    font-size:clamp(38px,5.2vw,82px);
+    font-weight:400;
+    letter-spacing:-.065em;
+  }
+  .title em{
+    display:block;margin-top:10px;
+    font-size:12px;font-weight:400;
+    letter-spacing:.28em;text-transform:uppercase;
+  }
+
+  .spread{
+    display:grid;
+    grid-template-columns:302px minmax(0,1fr) 260px;
+    min-height:calc(100vh - 159px);
+  }
+
+  .rail{
+    padding:20px 21px 24px;
+    border-right:1px solid var(--rule);
+    position:relative;
+    z-index:2;
+  }
+  .rail.right{
+    border-right:0;
+    border-left:1px solid var(--rule);
+    padding-left:18px;
+  }
+
+  .chapter{
+    border-top:5px solid var(--ink);
+    padding-top:8px;
+    margin-bottom:22px;
+  }
+  .chapter h2{
+    margin:0 0 10px;
+    font:800 11px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;
+    letter-spacing:.14em;text-transform:uppercase;
+  }
+  .chapter .deck{
+    margin:0 0 12px;
+    font-size:13px;line-height:1.42;
+  }
+  .chapter .deck strong{font-weight:700}
+  .measure{
+    font:600 9px/1.25 ui-monospace,SFMono-Regular,Consolas,monospace;
+    color:var(--faint);
+    letter-spacing:.08em;text-transform:uppercase;
+  }
+
+  select{
+    appearance:none;
+    width:100%;
+    border:0;
+    border-bottom:2px solid var(--ink);
+    border-radius:0;
+    background:
+      linear-gradient(45deg,transparent 50%,var(--ink) 50%) calc(100% - 9px) 55%/6px 6px no-repeat,
+      linear-gradient(135deg,var(--ink) 50%,transparent 50%) calc(100% - 5px) 55%/6px 6px no-repeat;
+    padding:8px 22px 7px 0;
+    font-size:16px;
+    font-weight:700;
+    outline:none;
+  }
+
+  .dial{
+    display:grid;
+    grid-template-columns:1fr 36px;
+    gap:9px;
+    align-items:end;
+    margin:11px 0 14px;
+  }
+  .dial label{
+    display:block;
+    font:700 10px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;
+    text-transform:uppercase;letter-spacing:.08em;
+    margin-bottom:5px;
+  }
+  input[type=range]{
+    display:block;width:100%;height:16px;
+    margin:0;
+    appearance:none;background:transparent;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:2px;background:var(--ink);
+  }
+  input[type=range]::-webkit-slider-thumb{
+    appearance:none;width:10px;height:16px;
+    margin-top:-7px;background:var(--paper);
+    border:2px solid var(--ink);border-radius:0;
+  }
+  input[type=range]::-moz-range-track{height:2px;background:var(--ink)}
+  input[type=range]::-moz-range-thumb{
+    width:8px;height:14px;background:var(--paper);
+    border:2px solid var(--ink);border-radius:0;
+  }
+  .readout{
+    height:25px;border-bottom:2px solid var(--ink);
+    font:700 12px/25px ui-monospace,SFMono-Regular,Consolas,monospace;
+    text-align:right;
+  }
+
+  .operations{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    border:2px solid var(--ink);
+  }
+  .operations button{
+    min-height:45px;
+    border:0;border-radius:0;background:transparent;
+    border-right:1px solid var(--ink);
+    border-bottom:1px solid var(--ink);
+    cursor:pointer;
+    padding:8px;
+    font:800 10px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;
+    text-transform:uppercase;letter-spacing:.11em;
+  }
+  .operations button:nth-child(2n){border-right:0}
+  .operations button:nth-last-child(-n+2){border-bottom:0}
+  .operations button:hover{background:rgba(23,23,19,.08)}
+  .operations .begin{
+    grid-column:1/-1;
+    min-height:62px;
+    border-right:0;
+    background:var(--red);color:var(--paper-hi);
+    font-size:12px;letter-spacing:.16em;
+  }
+  .operations .begin:hover{background:#b63429}
+  .operations .begin.running{background:var(--ink)}
+
+  .stage{
+    min-width:0;
+    position:relative;
+    background:var(--paper-hi);
+    overflow:hidden;
+  }
+  .stage canvas{display:block;width:100%;height:100%}
+  .plate-label{
+    position:absolute;left:18px;top:16px;
+    border-left:8px solid var(--red);
+    padding-left:10px;pointer-events:none;
+  }
+  .phase{
+    font:900 12px/1.1 ui-monospace,SFMono-Regular,Consolas,monospace;
+    letter-spacing:.15em;text-transform:uppercase;
+  }
+  .phase-note{
+    width:min(460px,55vw);
+    margin-top:6px;
+    font-size:13px;line-height:1.38;
+  }
+  .ordinal{
+    position:absolute;right:-7px;bottom:-52px;
+    font-size:260px;line-height:1;
+    font-weight:400;font-style:italic;
+    color:rgba(23,23,19,.045);
+    pointer-events:none;
+    user-select:none;
+  }
+  .caption{
+    position:absolute;left:18px;bottom:17px;
+    max-width:480px;
+    padding:9px 12px 8px;
+    background:rgba(244,239,223,.84);
+    border-top:1px solid var(--ink);
+    font-size:11px;line-height:1.4;
+    pointer-events:none;
+  }
+  .caption b{
+    font:800 9px/1 ui-monospace,SFMono-Regular,Consolas,monospace;
+    letter-spacing:.11em;text-transform:uppercase;
+  }
+  .registration{
+    position:absolute;width:22px;height:22px;pointer-events:none;
+  }
+  .registration:before,.registration:after{
+    content:"";position:absolute;background:var(--red);
+  }
+  .registration:before{width:1px;height:22px;left:10px}
+  .registration:after{height:1px;width:22px;top:10px}
+  .registration.r1{right:13px;top:13px}
+  .registration.r2{left:13px;bottom:13px}
+  .registration.r2:before,.registration.r2:after{background:var(--blue)}
+
+  .ledger{
+    display:grid;grid-template-columns:1fr auto;
+    border-top:1px solid var(--ink);
+  }
+  .ledger div{
+    padding:7px 0;border-bottom:1px solid var(--ghost);
+    font-size:12px;
+  }
+  .ledger div:nth-child(2n){
+    font:800 12px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;
+    text-align:right;
+  }
+
+  .emergence{margin-top:5px}
+  .em-row{
+    display:grid;grid-template-columns:62px 1fr 29px;
+    gap:8px;align-items:center;
+    margin:8px 0;
+  }
+  .em-row span{
+    font:700 9px/1 ui-monospace,SFMono-Regular,Consolas,monospace;
+    text-transform:uppercase;letter-spacing:.08em;
+  }
+  .track{
+    height:7px;border-left:1px solid var(--ink);border-right:1px solid var(--ink);
+    background:
+      repeating-linear-gradient(90deg,var(--ghost) 0 1px,transparent 1px 10%);
+    position:relative;
+  }
+  .track i{
+    display:block;height:100%;width:0;
+    background:var(--ink);transition:width .2s linear;
+  }
+  .em-row:nth-child(2) .track i{background:var(--blue)}
+  .em-row:nth-child(3) .track i{background:var(--red)}
+  .em-row:nth-child(4) .track i{background:var(--green)}
+  .em-row:nth-child(5) .track i{background:var(--ink)}
+  .pct{
+    font:700 9px/1 ui-monospace,SFMono-Regular,Consolas,monospace;
+    text-align:right;
+  }
+
+  .interpretation{
+    font-size:12px;line-height:1.48;
+    border-left:2px solid var(--blue);
+    padding-left:10px;
+  }
+  .interpretation:first-letter{
+    float:left;
+    font-size:34px;line-height:.8;
+    padding-right:4px;padding-top:5px;
+  }
+
+  .log{
+    font:500 10px/1.38 ui-monospace,SFMono-Regular,Consolas,monospace;
+  }
+  .entry{
+    border-top:1px dotted var(--faint);
+    padding:8px 0;
+  }
+  .entry .tag{
+    color:var(--red);font-weight:900;text-transform:uppercase;
+  }
+  .entry time{color:var(--faint)}
+  .legend{
+    font:600 9px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;
+  }
+  .legend span{display:block;margin:5px 0}
+  .swatch{
+    display:inline-block;width:18px;height:2px;margin-right:7px;vertical-align:3px;
+  }
+
+  .note{
+    margin-top:14px;padding-top:9px;border-top:1px solid var(--ink);
+    font-size:11px;line-height:1.43;font-style:italic;
+  }
+
+  @media(max-width:1050px){
+    .spread{grid-template-columns:270px minmax(0,1fr)}
+    .rail.right{display:none}
+  }
+  @media(max-width:720px){
+    .folio{width:100%;margin:0;min-height:100vh}
+    .masthead{grid-template-columns:1fr;align-items:start;padding:18px}
+    .kicker,.issue{text-align:left}
+    .title{text-align:left}
+    .title strong{font-size:52px}
+    .spread{display:block}
+    .rail{border-right:0;border-bottom:1px solid var(--ink)}
+    .stage{height:70vh}
+    .phase-note{width:75vw}
+  }
+</style>
+</head>
+<body>
+<article class="folio">
+  <header class="masthead">
+    <div class="kicker">Proceedings in first ontology<br>Experimental apparatus, rev. II</div>
+    <div class="title">
+      <strong>Genesis Engine</strong>
+      <em>an instrument for beginning</em>
+    </div>
+    <div class="issue">No space presumed<br>No clock admitted</div>
+  </header>
+
+  <div class="spread">
+    <aside class="rail">
+      <section class="chapter">
+        <h2>I. First commitment</h2>
+        <p class="deck">Choose what reality is permitted to possess <strong>before it possesses things.</strong></p>
+        <select id="origin" aria-label="Origin axiom">
+          <option value="distinction">Self-distinction</option>
+          <option value="relation">Necessary relation</option>
+          <option value="plenitude">Plenitude</option>
+          <option value="recurrence">Recurrence</option>
+          <option value="brute">Brute fact</option>
+        </select>
+        <p class="deck" id="axiomText"></p>
+      </section>
+
+      <section class="chapter">
+        <h2>II. Ground conditions</h2>
+        <div id="dials"></div>
+      </section>
+
+      <section class="chapter">
+        <h2>III. Operation</h2>
+        <div class="operations">
+          <button class="begin" id="begin">Commit reality</button>
+          <button id="pause">Suspend</button>
+          <button id="step">One act</button>
+          <button id="mutate">Mutate</button>
+          <button id="reset">Erase</button>
+        </div>
+        <p class="note">The visible plane is an editorial convenience. It becomes “space” only when relational distance stabilizes.</p>
+      </section>
+    </aside>
+
+    <main class="stage">
+      <canvas id="world"></canvas>
+      <div class="plate-label">
+        <div class="phase" id="phase">Uncommitted ground</div>
+        <div class="phase-note" id="phaseNote">No sequence, object, interval, or location has yet been licensed.</div>
+      </div>
+      <div class="ordinal" id="ordinal">0</div>
+      <div class="caption">
+        <b>Figure 1.</b>
+        A speculative world is not drawn inside a container. It earns sequence, geometry, law, persistence, and reflection in that order—or fails to.
+      </div>
+      <i class="registration r1"></i>
+      <i class="registration r2"></i>
+    </main>
+
+    <aside class="rail right">
+      <section class="chapter">
+        <h2>Ontological account</h2>
+        <div class="ledger">
+          <div>Distinctions</div><div id="nNodes">0</div>
+          <div>Relations</div><div id="nEdges">0</div>
+          <div>Constraints</div><div id="nLaws">0</div>
+          <div>Persistent forms</div><div id="nForms">0</div>
+          <div>Interior models</div><div id="nObservers">0</div>
+          <div>Contradictions</div><div id="nContradictions">0</div>
+        </div>
+      </section>
+
+      <section class="chapter">
+        <h2>Derived conditions</h2>
+        <div class="emergence" id="emergence"></div>
+      </section>
+
+      <section class="chapter">
+        <h2>Interpretation</h2>
+        <div class="interpretation" id="interpretation">Nothing has been asserted.</div>
+      </section>
+
+      <section class="chapter">
+        <h2>Genesis record</h2>
+        <div class="log" id="log"></div>
+      </section>
+
+      <section class="chapter">
+        <h2>Notation</h2>
+        <div class="legend">
+          <span><i class="swatch" style="background:var(--blue)"></i>difference or relation</span>
+          <span><i class="swatch" style="background:var(--red)"></i>stable constraint</span>
+          <span><i class="swatch" style="background:var(--green)"></i>self-maintaining form</span>
+          <span><i class="swatch" style="background:var(--ink)"></i>interior model</span>
+        </div>
+      </section>
+    </aside>
+  </div>
+</article>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  const canvas = $("world");
+  const ctx = canvas.getContext("2d", { alpha: false });
+
+  const axioms = {
+    distinction: {
+      label:"Self-distinction",
+      text:"The ground cuts itself into <em>this</em> and <em>not-this</em>. Identity is the first violence.",
+      record:"The ground acquired an inside and an outside."
+    },
+    relation: {
+      label:"Necessary relation",
+      text:"No isolated term comes first. Two poles arise together because each is intelligible only by the other.",
+      record:"A relation appeared before anything capable of owning it."
+    },
+    plenitude: {
+      label:"Plenitude",
+      text:"Every coherent difference is admitted at first. Actuality is what survives incompatibility.",
+      record:"Possibility exceeded actuality."
+    },
+    recurrence: {
+      label:"Recurrence",
+      text:"The first fact is a return. Repetition precedes the straight line we later call time.",
+      record:"The beginning occurred again."
+    },
+    brute: {
+      label:"Brute fact",
+      text:"A determinate difference simply obtains. Explanation starts one floor above the foundation.",
+      record:"Something was the case without permission."
+    }
+  };
+
+  const phaseText = [
+    ["Uncommitted ground","No sequence, object, interval, or location has yet been licensed."],
+    ["Distinction","The model now admits identity by contrast. Nothing material has appeared."],
+    ["Relation","Differences constrain one another. Adjacency still means dependence, not distance."],
+    ["Constraint","Repeated relations have hardened into rules governing later events."],
+    ["Derived space","Stable relational distance now behaves like a geometry."],
+    ["Persistence","Closed organizations repair or repeat themselves. Objecthood has begun."],
+    ["Reflection","A persistent organization encodes conditions beyond its own boundary."],
+    ["Cosmos","The experiment contains law, history, objects, geometry, and partial self-knowledge."]
+  ];
+
+  const specs = [
+    ["pressure","Differentiation",62],
+    ["consistency","Consistency",78],
+    ["symmetry","Symmetry",53],
+    ["memory","Memory",71],
+    ["recursion","Recursion",58],
+    ["selection","Selection",46]
+  ];
+
+  $("dials").innerHTML = specs.map(([id,label,value]) => `
+    <div class="dial">
+      <div>
+        <label for="${id}">${label}</label>
+        <input id="${id}" type="range" min="0" max="100" value="${value}">
+      </div>
+      <div class="readout" id="${id}N">${value}</div>
+    </div>
+  `).join("");
+
+  $("emergence").innerHTML = ["time","space","law","matter","mind"].map((name,i) => `
+    <div class="em-row">
+      <span>${name}</span>
+      <div class="track"><i id="bar${cap(name)}"></i></div>
+      <div class="pct" id="pct${cap(name)}">0</div>
+    </div>
+  `).join("");
+
+  const controls = specs.map(x => x[0]);
+  controls.forEach(id => {
+    $(id).addEventListener("input", () => $(id+"N").textContent = $(id).value);
+  });
+  $("origin").addEventListener("change", setAxiomText);
+
+  function cap(s){ return s[0].toUpperCase()+s.slice(1); }
+  function setAxiomText(){ $("axiomText").innerHTML = axioms[$("origin").value].text; }
+  setAxiomText();
+
+  let W=0,H=0,dpr=1;
+  function resize(){
+    const r=canvas.getBoundingClientRect();
+    W=Math.max(1,r.width); H=Math.max(1,r.height);
+    dpr=Math.min(2,devicePixelRatio||1);
+    canvas.width=Math.floor(W*dpr); canvas.height=Math.floor(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  addEventListener("resize",resize);
+  resize();
+
+  let nodes=[], edges=[], forms=[], observers=[];
+  let contradictions=0, tick=0, phase=0;
+  let started=false, running=false;
+  let last=performance.now(), bank=0;
+  let records=[];
+  let emergence={time:0,space:0,law:0,matter:0,mind:0};
+
+  function readParams(){
+    const p={};
+    controls.forEach(id => p[id]=Number($(id).value)/100);
+    return p;
+  }
+  function clamp(v,a=0,b=1){return Math.max(a,Math.min(b,v))}
+  function randomOf(a){return a[Math.floor(Math.random()*a.length)]}
+  function id(){return Math.random().toString(36).slice(2,9)+tick.toString(36)}
+
+  function addNode(x,y,polarity=1){
+    const n={
+      id:id(),x,y,
+      vx:(Math.random()-.5)*.24,
+      vy:(Math.random()-.5)*.24,
+      polarity,
+      age:0,
+      stability:.12+Math.random()*.26,
+      memory:0,
+      model:0
+    };
+    nodes.push(n);
+    return n;
+  }
+
+  function addEdge(a,b,strength=.2,type="relation"){
+    if(!a||!b||a===b) return null;
+    const old=edges.find(e=>(e.a===a&&e.b===b)||(e.a===b&&e.b===a));
+    if(old){
+      old.strength=clamp(old.strength+.065);
+      old.repetitions++;
+      return old;
+    }
+    const e={a,b,strength,type,age:0,repetitions:0,law:false};
+    edges.push(e);
+    return e;
+  }
+
+  function record(text,tag="event"){
+    records.unshift({tick,text,tag});
+    records=records.slice(0,12);
+    $("log").innerHTML=records.map(r=>`
+      <div class="entry"><span class="tag">${r.tag}</span> <time>${String(r.tick).padStart(4,"0")}</time><br>${r.text}</div>
+    `).join("");
+  }
+
+  function begin(){
+    if(started){
+      running=true;
+      $("begin").classList.add("running");
+      $("begin").textContent="Reality proceeds";
+      $("pause").textContent="Suspend";
+      return;
+    }
+    started=true; running=true;
+    const cx=W*.5,cy=H*.5,mode=$("origin").value;
+
+    if(mode==="distinction"){
+      const a=addNode(cx-30,cy,1), b=addNode(cx+30,cy,-1);
+      addEdge(a,b,.74,"opposition");
+    }else if(mode==="relation"){
+      const a=addNode(cx-38,cy,-1), b=addNode(cx+38,cy,1);
+      a.stability=b.stability=.5;
+      addEdge(a,b,.88,"necessary");
+    }else if(mode==="plenitude"){
+      for(let i=0;i<20;i++){
+        const angle=i/20*Math.PI*2;
+        addNode(cx+Math.cos(angle)*62,cy+Math.sin(angle)*62,i%2?1:-1);
+      }
+      for(let i=0;i<nodes.length;i++) addEdge(nodes[i],nodes[(i+1)%nodes.length],.17,"possible");
+    }else if(mode==="recurrence"){
+      const ring=[];
+      for(let i=0;i<6;i++){
+        const angle=i/6*Math.PI*2-Math.PI/2;
+        ring.push(addNode(cx+Math.cos(angle)*47,cy+Math.sin(angle)*47,i%2?1:-1));
+      }
+      ring.forEach((n,i)=>addEdge(n,ring[(i+1)%ring.length],.66,"recurrence"));
+    }else{
+      const n=addNode(cx+(Math.random()-.5)*90,cy+(Math.random()-.5)*90,Math.random()<.5?1:-1);
+      n.stability=.72;
+    }
+
+    record(axioms[mode].record,"origin");
+    $("begin").classList.add("running");
+    $("begin").textContent="Reality proceeds";
+    updateUI();
+  }
+
+  function reset(){
+    nodes=[];edges=[];forms=[];observers=[];
+    contradictions=0;tick=0;phase=0;
+    started=false;running=false;
+    records=[];
+    emergence={time:0,space:0,law:0,matter:0,mind:0};
+    $("begin").classList.remove("running");
+    $("begin").textContent="Commit reality";
+    $("pause").textContent="Suspend";
+    $("log").innerHTML="";
+    updateUI();
+  }
+
+  function mutate(){
+    controls.forEach(id=>{
+      const v=16+Math.floor(Math.random()*78);
+      $(id).value=v;$(id+"N").textContent=v;
+    });
+    $("origin").value=randomOf(Object.keys(axioms));
+    setAxiomText();
+    reset();
+  }
+
+  function act(){
+    if(!started) begin();
+    tick++;
+    const p=readParams();
+
+    nodes.forEach(n=>{n.age++;n.memory*=.995;n.model*=.997});
+    edges.forEach(e=>e.age++);
+
+    if(nodes.length<190 && Math.random()<.07+p.pressure*.29){
+      const parent=randomOf(nodes);
+      const angle=Math.random()*Math.PI*2;
+      const radius=22+Math.random()*34;
+      const child=addNode(parent.x+Math.cos(angle)*radius,parent.y+Math.sin(angle)*radius,-parent.polarity);
+      child.stability=parent.stability*.48+.08;
+      addEdge(parent,child,.16+p.symmetry*.2,"difference");
+    }
+
+    if(nodes.length>2 && Math.random()<p.symmetry*.23){
+      const a=randomOf(nodes);
+      const possible=nodes.filter(n=>n!==a&&n.polarity!==a.polarity);
+      if(possible.length) addEdge(a,randomOf(possible),.14+p.symmetry*.24,"symmetry");
+    }
+
+    if(nodes.length>4 && Math.random()<p.recursion*.3){
+      const a=randomOf(nodes);
+      const first=neighbors(a);
+      if(first.length){
+        const b=randomOf(first);
+        const second=neighbors(b).filter(n=>n!==a);
+        if(second.length) addEdge(a,randomOf(second),.11+p.recursion*.2,"recursive");
+      }
+    }
+
+    if(edges.length && Math.random()<(1-p.consistency)*.32){
+      contradictions++;
+      const e=randomOf(edges);
+      e.strength*=.54;e.type="conflict";
+    }
+
+    edges.forEach(e=>{
+      const accord=e.a.polarity!==e.b.polarity?.011:-.004;
+      e.strength=clamp(e.strength+p.memory*(accord+e.strength*.007)-(1-p.memory)*.003);
+      e.a.memory+=e.strength*.0024;
+      e.b.memory+=e.strength*.0024;
+      if(!e.law&&e.age>30&&e.strength>.57){
+        e.law=true;
+        if(edges.filter(x=>x.law).length===1) record("A repeated relation began constraining relations not yet made.","law");
+      }
+    });
+
+    if(nodes.length>9&&Math.random()<p.selection*.17){
+      const weak=nodes.filter(n=>n.age>24&&n.stability+n.memory<.25);
+      if(weak.length){
+        const doomed=randomOf(weak);
+        edges=edges.filter(e=>e.a!==doomed&&e.b!==doomed);
+        nodes=nodes.filter(n=>n!==doomed);
+      }
+    }
+
+    nodes.forEach(n=>{
+      const support=edges.filter(e=>e.a===n||e.b===n).reduce((s,e)=>s+e.strength,0);
+      n.stability=clamp(n.stability*.993+support*.00155+p.memory*.0014);
+    });
+
+    if(tick%17===0&&edges.some(e=>e.law)) detectForms();
+    if(forms.length&&p.recursion>.37&&tick%24===0) detectObservers(p);
+
+    move();
+    derive();
+    choosePhase();
+    updateUI();
+  }
+
+  function neighbors(n){
+    return edges.filter(e=>e.a===n||e.b===n).map(e=>e.a===n?e.b:e.a);
+  }
+
+  function detectForms(){
+    const strong=nodes.filter(n=>n.stability>.47&&n.age>34);
+    for(const n of strong){
+      const near=edges.filter(e=>e.law&&(e.a===n||e.b===n)).map(e=>e.a===n?e.b:e.a);
+      for(const a of near){
+        const next=edges.filter(e=>e.law&&(e.a===a||e.b===a)).map(e=>e.a===a?e.b:e.a);
+        const b=next.find(x=>x!==n&&edges.some(e=>e.law&&((e.a===x&&e.b===n)||(e.b===x&&e.a===n))));
+        if(!b) continue;
+        const form=[n,a,b];
+        if(forms.some(f=>form.every(x=>f.includes(x)))) continue;
+        forms.push(form);
+        form.forEach(x=>x.stability=clamp(x.stability+.11));
+        if(forms.length===1) record("A closed organization survived replacement of its local states.","form");
+      }
+    }
+    forms=forms.slice(0,28);
+  }
+
+  function detectObservers(p){
+    for(const f of forms){
+      if(observers.includes(f)) continue;
+      const internal=edges.filter(e=>f.includes(e.a)&&f.includes(e.b)).length;
+      const external=edges.filter(e=>f.includes(e.a)!==f.includes(e.b)).length;
+      const score=internal*p.recursion*p.memory+external*p.consistency;
+      if(score>7.2&&Math.random()<.22){
+        observers.push(f);
+        f.forEach(n=>n.model=.8);
+        record("A persistent loop began carrying an abbreviated model of what lay beyond it.","mind");
+        break;
+      }
+    }
+  }
+
+  function move(){
+    const center={x:W/2,y:H/2};
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const a=nodes[i],b=nodes[j];
+        let dx=b.x-a.x,dy=b.y-a.y,d2=dx*dx+dy*dy+1;
+        if(d2>16000) continue;
+        const d=Math.sqrt(d2),f=25/d2;
+        a.vx-=dx/d*f;a.vy-=dy/d*f;
+        b.vx+=dx/d*f;b.vy+=dy/d*f;
+      }
+    }
+
+    edges.forEach(e=>{
+      const dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,d=Math.sqrt(dx*dx+dy*dy)||1;
+      const rest=25+(1-e.strength)*57;
+      const f=(d-rest)*(.00085+.0023*e.strength);
+      e.a.vx+=dx/d*f;e.a.vy+=dy/d*f;
+      e.b.vx-=dx/d*f;e.b.vy-=dy/d*f;
+    });
+
+    nodes.forEach(n=>{
+      n.vx+=(center.x-n.x)*.000045;
+      n.vy+=(center.y-n.y)*.000045;
+      n.vx*=.942;n.vy*=.942;
+      n.x+=n.vx;n.y+=n.vy;
+      const m=28;
+      if(n.x<m){n.x=m;n.vx=Math.abs(n.vx)}
+      if(n.x>W-m){n.x=W-m;n.vx=-Math.abs(n.vx)}
+      if(n.y<m){n.y=m;n.vy=Math.abs(n.vy)}
+      if(n.y>H-m){n.y=H-m;n.vy=-Math.abs(n.vy)}
+    });
+  }
+
+  function derive(){
+    const laws=edges.filter(e=>e.law).length;
+    emergence.time=clamp(tick/72,0,1)*100;
+    emergence.law=clamp(laws/14,0,1)*100;
+    emergence.space=clamp(edges.length/52+emergence.law/220,0,1)*100;
+    emergence.matter=clamp(forms.length/11,0,1)*100;
+    emergence.mind=clamp(observers.length/3,0,1)*100;
+  }
+
+  function choosePhase(){
+    let next=started?1:0;
+    if(edges.length>3) next=2;
+    if(edges.some(e=>e.law)) next=3;
+    if(emergence.space>42) next=4;
+    if(forms.length) next=5;
+    if(observers.length) next=6;
+    if(emergence.mind>65&&emergence.matter>65&&emergence.law>65) next=7;
+    if(next!==phase){
+      phase=next;
+      if(phase>1) record(phaseText[phase][1],phaseText[phase][0]);
+    }
+  }
+
+  function interpretation(){
+    if(!started) return "Calling the ground a thing would already be an illicit commitment.";
+    if(phase===1) return "Identity has appeared as exclusion. This is not matter; it is merely the right to say that one state is not another.";
+    if(phase===2) return "Terms now acquire meaning from their dependencies. The diagram resembles space, but no spatial fact has yet been earned.";
+    if(phase===3) return "The past has begun governing the future. A law here is not an external command but a relation made difficult to violate.";
+    if(phase===4) return "Near and far have emerged from repeatable chains. Geometry is downstream from relation.";
+    if(phase===5) return "The first object is not a substance. It is an organization that outlives changes in its local contents.";
+    if(phase===6) return "A maintained organization now contains a selective echo of its exterior. An inside has become epistemic.";
+    return "This cosmos is built from differences that remember, constrain, close, persist, and finally describe.";
+  }
+
+  function updateUI(){
+    $("phase").textContent=phaseText[phase][0];
+    $("phaseNote").textContent=phaseText[phase][1];
+    $("ordinal").textContent=phase;
+    $("nNodes").textContent=nodes.length;
+    $("nEdges").textContent=edges.length;
+    $("nLaws").textContent=edges.filter(e=>e.law).length;
+    $("nForms").textContent=forms.length;
+    $("nObservers").textContent=observers.length;
+    $("nContradictions").textContent=contradictions;
+    $("interpretation").textContent=interpretation();
+    Object.entries(emergence).forEach(([name,value])=>{
+      $("bar"+cap(name)).style.width=value+"%";
+      $("pct"+cap(name)).textContent=Math.round(value);
+    });
+  }
+
+  function drawGround(t){
+    ctx.fillStyle="#f4efdf";ctx.fillRect(0,0,W,H);
+    const cx=W/2,cy=H/2;
+    ctx.strokeStyle="rgba(23,23,19,.38)";
+    ctx.lineWidth=1;
+    ctx.setLineDash([1,5]);
+    ctx.beginPath();
+    const base=35+Math.sin(t*.0015)*3;
+    for(let i=0;i<=180;i++){
+      const a=i/180*Math.PI*2;
+      const r=base*(1+.06*Math.sin(a*5+t*.001));
+      const x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r;
+      i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+    }
+    ctx.closePath();ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle="rgba(23,23,19,.55)";
+    ctx.font="600 10px ui-monospace, monospace";
+    ctx.textAlign="center";
+    ctx.fillText("UNDIFFERENTIATED",cx,cy+69);
+  }
+
+  function centroid(arr){
+    return arr.reduce((o,n)=>({x:o.x+n.x/arr.length,y:o.y+n.y/arr.length}),{x:0,y:0});
+  }
+
+  function draw(t){
+    if(!started){drawGround(t);return}
+
+    ctx.fillStyle="#f4efdf";ctx.fillRect(0,0,W,H);
+
+    const spatial=emergence.space/100;
+    if(spatial>.08){
+      ctx.strokeStyle=`rgba(30,88,116,${spatial*.09})`;
+      ctx.lineWidth=1;
+      ctx.setLineDash([1,8]);
+      const gap=47;
+      for(let x=(W/2)%gap;x<W;x+=gap){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+      for(let y=(H/2)%gap;y<H;y+=gap){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+      ctx.setLineDash([]);
+    }
+
+    forms.forEach((f,i)=>{
+      const c=centroid(f),r=21+Math.sin(t*.002+i)*2;
+      ctx.strokeStyle="rgba(81,105,77,.28)";
+      ctx.lineWidth=1;
+      ctx.setLineDash([3,3]);
+      ctx.beginPath();ctx.arc(c.x,c.y,r,0,Math.PI*2);ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    edges.forEach(e=>{
+      const conflict=e.type==="conflict";
+      ctx.strokeStyle=conflict
+        ?`rgba(201,61,47,${.18+e.strength*.45})`
+        :e.law
+          ?`rgba(201,61,47,${.22+e.strength*.6})`
+          :`rgba(30,88,116,${.12+e.strength*.52})`;
+      ctx.lineWidth=e.law?1.6:.8;
+      if(conflict) ctx.setLineDash([4,5]);
+      ctx.beginPath();
+      ctx.moveTo(e.a.x,e.a.y);
+      const mx=(e.a.x+e.b.x)/2,my=(e.a.y+e.b.y)/2;
+      const dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,len=Math.sqrt(dx*dx+dy*dy)||1;
+      const bend=e.a.polarity===e.b.polarity?11:-6;
+      ctx.quadraticCurveTo(mx-dy/len*bend,my+dx/len*bend,e.b.x,e.b.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    nodes.forEach(n=>{
+      const observed=observers.some(f=>f.includes(n));
+      const persistent=n.stability>.56;
+      const r=2.3+n.stability*3.5+(observed?1:0);
+
+      if(observed){
+        ctx.strokeStyle="rgba(23,23,19,.58)";
+        ctx.lineWidth=1;
+        ctx.beginPath();
+        ctx.ellipse(n.x,n.y,r+7,r+3,0,0,Math.PI*2);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle=observed?"#171713":persistent?"#51694d":"#1e5874";
+      ctx.beginPath();ctx.arc(n.x,n.y,r,0,Math.PI*2);ctx.fill();
+
+      ctx.strokeStyle="#f4efdf";
+      ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(n.x-r*.45,n.y);ctx.lineTo(n.x+r*.45,n.y);
+      if(n.polarity>0){ctx.moveTo(n.x,n.y-r*.45);ctx.lineTo(n.x,n.y+r*.45)}
+      ctx.stroke();
+    });
+  }
+
+  function frame(now){
+    const dt=Math.min(45,now-last);last=now;bank+=dt;
+    if(running&&bank>=76){
+      const count=Math.min(3,Math.floor(bank/76));
+      for(let i=0;i<count;i++) act();
+      bank%=76;
+    }
+    draw(now);
+    requestAnimationFrame(frame);
+  }
+
+  $("begin").addEventListener("click",begin);
+  $("pause").addEventListener("click",()=>{
+    if(!started)return;
+    running=!running;
+    $("pause").textContent=running?"Suspend":"Resume";
+  });
+  $("step").addEventListener("click",()=>{
+    running=false;$("pause").textContent="Resume";act();
+  });
+  $("mutate").addEventListener("click",mutate);
+  $("reset").addEventListener("click",reset);
+
+  reset();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
