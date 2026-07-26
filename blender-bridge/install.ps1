@@ -20,6 +20,13 @@ function Require-Command {
     }
 }
 
+function Test-GitHubAuthentication {
+    # Run through cmd.exe so gh's expected "not logged in" stderr output does
+    # not become a terminating NativeCommandError under Windows PowerShell.
+    & cmd.exe /d /c 'gh auth status --hostname github.com >nul 2>nul'
+    return ($LASTEXITCODE -eq 0)
+}
+
 Write-Host ''
 Write-Host 'Installing the Katherine Blender chat bridge...' -ForegroundColor Cyan
 
@@ -29,14 +36,15 @@ if (-not (Get-Command 'py' -ErrorAction SilentlyContinue) -and
     throw 'Python is required. Install Python 3, then run this command again.'
 }
 
-& gh auth status --hostname github.com *> $null
-if ($LASTEXITCODE -ne 0) {
+if (-not (Test-GitHubAuthentication)) {
     Write-Host 'GitHub needs one-time authorization. A browser window will open.' -ForegroundColor Yellow
     & gh auth login --hostname github.com --git-protocol https --web
+    if ($LASTEXITCODE -ne 0) {
+        throw 'GitHub authorization was cancelled or failed.'
+    }
 }
 
-& gh auth status --hostname github.com *> $null
-if ($LASTEXITCODE -ne 0) {
+if (-not (Test-GitHubAuthentication)) {
     throw 'GitHub authorization did not complete.'
 }
 
