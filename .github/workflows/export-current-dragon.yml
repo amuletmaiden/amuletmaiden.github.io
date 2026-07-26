@@ -1,4 +1,4 @@
-name: Export v31 rig review
+name: Export v32 rig review
 
 on:
   pull_request:
@@ -9,12 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Upload exact Blender rig renders
+      - name: Upload exact Blender v32 rig renders
         uses: actions/upload-artifact@v4
         with:
-          name: v31-fullbody-rig-review
+          name: v32-rig-review
           path: |
-            dragon-review/v31_rig_fullbody_rest.jpg
-            dragon-review/v31_rig_fullbody_pose.jpg
+            dragon-review/v32_game_rig_rest.jpg
+            dragon-review/v32_rig_pose_validation.jpg
           if-no-files-found: error
           retention-days: 1
