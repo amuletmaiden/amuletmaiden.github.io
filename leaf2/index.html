@@ -6,63 +6,18 @@
 <meta name="theme-color" content="#000000">
 <title>leaf²</title>
 <style>
-:root{
-  --r:#ff0000;--g:#00ff00;--p:#ff00ff;--b:#00c8ff;--y:#ffff00;--ice:#c8f7ff;
-  --ink:#aec3cb;--dim:#5e747d;--panel:rgba(0,5,8,.88)
-}
-*{box-sizing:border-box}
-html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#000;font-family:"Courier New",monospace}
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#000}
 #world{position:fixed;inset:0;width:100%;height:100%;border:0;background:#000}
-#name{position:fixed;z-index:20;left:16px;top:13px;font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:#58707a;pointer-events:none;opacity:.66;text-shadow:0 0 12px rgba(180,235,255,.18);transition:opacity 2s}
-#name.sleep{opacity:.12}
-#tools{position:fixed;z-index:30;left:12px;bottom:12px;display:flex;gap:3px;padding:5px;border:1px solid rgba(100,190,225,.13);background:rgba(0,3,5,.74);backdrop-filter:blur(9px);opacity:.17;transition:opacity .18s}
-#tools:hover,#tools:focus-within{opacity:.96}
-#tools a,#tools button{border:0;background:transparent;color:#78909a;text-decoration:none;padding:6px 8px;font:10px "Courier New",monospace;cursor:pointer}
-#tools a:hover,#tools button:hover{color:#fff}
-#tools button[data-on="0"]{text-decoration:line-through;color:#425159}
-#status{position:fixed;z-index:25;right:14px;bottom:14px;color:#60757e;font-size:10px;letter-spacing:.04em;text-align:right;pointer-events:none;white-space:pre;line-height:1.55;opacity:.75}
-#metrics{position:fixed;z-index:40;right:12px;bottom:48px;width:min(390px,calc(100vw - 24px));max-height:58vh;overflow:auto;display:none;padding:13px 15px;border:1px solid rgba(100,200,235,.18);background:var(--panel);backdrop-filter:blur(12px);color:#8da5ae;font-size:10px;line-height:1.7;box-shadow:0 0 40px rgba(0,0,0,.65)}
-#metrics.open{display:block}
-#metrics h2{margin:0 0 8px;color:#d8f6ff;font-size:11px;letter-spacing:.18em;text-transform:uppercase}
-#metrics .grid{display:grid;grid-template-columns:1fr auto;gap:1px 14px}
-#metrics .v{color:#d9edf2;text-align:right}
-#metrics .r{color:var(--r)}#metrics .g{color:var(--g)}#metrics .p{color:var(--p)}#metrics .b{color:var(--b)}#metrics .y{color:var(--y)}
-#codex{position:fixed;z-index:50;inset:0;display:none;background:rgba(0,0,0,.88);backdrop-filter:blur(8px)}
-#codex.open{display:block}
-#codex iframe{position:absolute;inset:3vh 3vw;width:94vw;height:94vh;border:1px solid rgba(110,210,240,.18);background:#050607}
-#codexClose{position:absolute;z-index:2;right:calc(3vw + 9px);top:calc(3vh + 8px);border:0;background:#000;color:#79909a;font:11px "Courier New",monospace;padding:7px 9px;cursor:pointer}
-#failure{position:fixed;z-index:100;inset:0;display:none;place-items:center;background:#000;color:#77909b;font-size:12px;line-height:1.8;text-align:center}
-@media(max-width:640px){#status{display:none}#tools{opacity:.72}}
+#failure{position:fixed;inset:0;display:none;background:#000}
 </style>
 </head>
 <body>
 <iframe id="world" title="Leaf two"></iframe>
-<div id="name"><span style="color:var(--r)">le</span><span style="color:var(--g)">af</span><span style="color:var(--b)">²</span></div>
-<nav id="tools">
-  <a href="/leaf/">main</a>
-  <button id="codexButton" type="button">alphabet</button>
-  <button id="metricsButton" type="button">measure</button>
-  <button id="trailsButton" type="button" data-on="1">gyre silk</button>
-  <button id="burnButton" type="button" data-on="1">burning sight</button>
-</nav>
-<div id="status">opening leaf²</div>
-<section id="metrics" aria-label="Leaf two measurements">
-  <h2>world instrument</h2>
-  <div class="grid" id="metricGrid"></div>
-</section>
-<section id="codex" aria-label="Alphabet">
-  <button id="codexClose" type="button">close</button>
-  <iframe src="/leaf2/codex.html" title="Leaf alphabet and codex"></iframe>
-</section>
-<div id="failure">Leaf² could not enter the source world.<br>Reload once. Main Leaf has not been changed.</div>
+<div id="failure"></div>
 <script>
 (function(){
 'use strict';
-const world=document.getElementById('world'),status=document.getElementById('status'),failure=document.getElementById('failure');
-const metrics=document.getElementById('metrics'),metricGrid=document.getElementById('metricGrid');
-const trailsButton=document.getElementById('trailsButton'),burnButton=document.getElementById('burnButton');
-let child=null;
-
+const world=document.getElementById('world'),failure=document.getElementById('failure');
 const systemScripts=[
   '/leaf/leaf-hearth.js',
   '/leaf/leaf-slots.js',
@@ -72,16 +27,16 @@ const systemScripts=[
   '/leaf/leaf-round-horizon.js',
   '/leaf/leaf-jurisprudential-drift.js',
   '/leaf/leaf-star-temperance.js',
-  '/leaf2/leaf2-new-goddesses.js',
+  '/leaf/leaf-new-goddesses.js',
   '/leaf/leaf-temporal-concord.js',
   '/leaf/leaf-chronicle.js',
-  '/leaf/leaf-render-rework.js',
+  '/leaf2/leaf2-visual-ancestry.js',
   '/leaf2/leaf2.js',
+  '/leaf2/leaf2-visual-reset.js',
   '/leaf/leaf-clock-of-power.js',
   '/leaf/leaf-crown.js',
   '/leaf/leaf-veil.js'
 ];
-
 const namespaceScript=`<script>
 (function(){
   'use strict';
@@ -105,7 +60,6 @@ const namespaceScript=`<script>
   }catch(_){}
 })();
 <\/script>`;
-
 async function boot(){
   try{
     const response=await fetch('/leaf/index.html?leaf2-source='+Date.now(),{cache:'no-store'});
@@ -113,81 +67,15 @@ async function boot(){
     let html=await response.text();
     html=html.replace(/<!-- LEAF NAMED SYSTEMS -->[\s\S]*?<!-- \/LEAF NAMED SYSTEMS -->/i,'');
     html=html.replace(/<script>\s*\/\* leaf PWA hooks[\s\S]*?<\/script>/i,'');
-    const base='<base href="/leaf/">';
-    html=html.replace(/<head([^>]*)>/i,(m,a)=>'<head'+a+'>'+base+namespaceScript);
-    const scripts=systemScripts.map(src=>'<script src="'+src+'"><\/script>').join('\n');
-    html=html.replace(/<\/body>/i,scripts+'\n</body>');
+    html=html.replace(/<head([^>]*)>/i,(m,a)=>'<head'+a+'><base href="/leaf/">'+namespaceScript);
+    html=html.replace(/<\/body>/i,systemScripts.map(src=>'<script src="'+src+'"><\\/script>').join('\n')+'\n</body>');
     world.srcdoc=html;
-  }catch(error){
-    console.error(error);failure.style.display='grid';
-  }
+  }catch(error){console.error(error);failure.style.display='block'}
 }
-
-function attach(){
-  try{
-    child=world.contentWindow;
-    if(!child)throw 0;
-    status.textContent='leaf² is alive';
-    setTimeout(()=>document.getElementById('name').classList.add('sleep'),4500);
-  }catch(_){failure.style.display='grid'}
-}
-
-function call(name,value){
-  try{
-    if(!child||!child.LEAF2)return false;
-    const fn=child.LEAF2[name];
-    if(typeof fn!=='function')return false;
-    return fn(value);
-  }catch(_){return false}
-}
-
-function line(label,value,cls){return '<div class="'+(cls||'')+'">'+label+'</div><div class="v '+(cls||'')+'">'+value+'</div>'}
-function fmt(n,d){n=Number(n);return Number.isFinite(n)?n.toFixed(d==null?2:d):'—'}
-function renderMetrics(s){
-  if(!s)return;
-  const c=s.starClasses||{};
-  metricGrid.innerHTML=
-    line('world step',fmt(s.frameMs)+' ms')+
-    line('star physics',fmt(s.starUpdateMs)+' ms','y')+
-    line('star rendering',fmt(s.starDrawMs)+' ms','y')+
-    line('gyre update',fmt(s.gyreUpdateMs)+' ms','p')+
-    line('gyre silk build',fmt(s.trailBuildMs)+' ms','p')+
-    line('gyre silk composite',fmt(s.trailCompositeMs)+' ms','p')+
-    line('temple rendering',fmt(s.templeMs)+' ms','b')+
-    line('sight charge',Math.round((s.sightCharge||0)*100)+'%','g')+
-    line('stars',s.stars||0,'y')+
-    line('red dwarfs',c.red||0,'r')+
-    line('gold stars',c.gold||0,'y')+
-    line('white stars',c.white||0)+
-    line('blue giants',c.blue||0,'b')+
-    line('remnants',c.remnant||0,'b')+
-    line('protostars',c.proto||0,'g')+
-    line('stellar clusters',s.clusters||0,'y')+
-    line('binary systems',s.binaries||0,'y')+
-    line('nebulae',s.nebulae||0,'p')+
-    line('law districts',s.lawDistricts||0,'b')+
-    line('minds with skirts',s.minds||0,'y');
-}
-addEventListener('message',event=>{
-  if(event.source!==world.contentWindow||!event.data||event.data.type!=='leaf2-stats')return;
-  const s=event.data.stats;renderMetrics(s);
-  const beings=[];
-  if(s.hunger)beings.push('retrograde hunger');
-  if(s.scavenger)beings.push("scavenger's hem");
-  if(s.minds)beings.push('mind '+s.minds);
-  status.textContent=beings.length?beings.join('\n'):'leaf² · '+(s.stars||0)+' stars · '+(s.lawDistricts||0)+' law districts';
-});
-
-document.getElementById('metricsButton').onclick=()=>metrics.classList.toggle('open');
-document.getElementById('codexButton').onclick=()=>document.getElementById('codex').classList.add('open');
-document.getElementById('codexClose').onclick=()=>document.getElementById('codex').classList.remove('open');
-trailsButton.onclick=()=>{const on=trailsButton.dataset.on!=='1';trailsButton.dataset.on=on?'1':'0';call('setTrails',on)};
-burnButton.onclick=()=>{const on=burnButton.dataset.on!=='1';burnButton.dataset.on=on?'1':'0';call('setBurningSight',on)};
-addEventListener('keydown',event=>{
-  if(event.key==='Escape'){metrics.classList.remove('open');document.getElementById('codex').classList.remove('open')}
-  if(event.key==='d'||event.key==='D')metrics.classList.toggle('open');
-});
-world.addEventListener('load',attach);
+function focusWorld(){try{world.focus();world.contentWindow.focus()}catch(_){}}
+world.addEventListener('load',()=>{focusWorld();setTimeout(focusWorld,80)});
+world.addEventListener('pointerdown',focusWorld);
+addEventListener('focus',focusWorld);
 boot();
 })();
 </script>
