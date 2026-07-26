@@ -20,11 +20,29 @@ function Require-Command {
     }
 }
 
-function Test-GitHubAuthentication {
-    # Run through cmd.exe so gh's expected "not logged in" stderr output does
-    # not become a terminating NativeCommandError under Windows PowerShell.
-    & cmd.exe /d /c 'gh auth status --hostname github.com >nul 2>nul'
-    return ($LASTEXITCODE -eq 0)
+function Invoke-CapturedProcess {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [Parameter(Mandatory = $true)][string[]]$Arguments
+    )
+
+    $stdoutPath = [IO.Path]::GetTempFileName()
+    $stderrPath = [IO.Path]::GetTempFileName()
+    try {
+        $process = Start-Process -FilePath $FilePath `
+            -ArgumentList $Arguments `
+            -Wait -PassThru -NoNewWindow `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath
+
+        return [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            StdOut = [IO.File]::ReadAllText($stdoutPath)
+            StdErr = [IO.File]::ReadAllText($stderrPath)
+        }
+    } finally {
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host ''
@@ -36,29 +54,60 @@ if (-not (Get-Command 'py' -ErrorAction SilentlyContinue) -and
     throw 'Python is required. Install Python 3, then run this command again.'
 }
 
-if (-not (Test-GitHubAuthentication)) {
+$ghExe = (Get-Command 'gh').Source
+$auth = Invoke-CapturedProcess -FilePath $ghExe -Arguments @(
+    'auth', 'status', '--hostname', 'github.com'
+)
+
+if ($auth.ExitCode -ne 0) {
     Write-Host 'GitHub needs one-time authorization. A browser window will open.' -ForegroundColor Yellow
-    & gh auth login --hostname github.com --git-protocol https --web
-    if ($LASTEXITCODE -ne 0) {
-        throw 'GitHub authorization was cancelled or failed.'
+    Write-Host 'Approve the amuletmaiden account, then return to this window.' -ForegroundColor Yellow
+
+    $login = Start-Process -FilePath $ghExe -ArgumentList @(
+        'auth', 'login',
+        '--hostname', 'github.com',
+        '--git-protocol', 'https',
+        '--web'
+    ) -Wait -PassThru -NoNewWindow
+
+    if ($login.ExitCode -ne 0) {
+        throw 'GitHub authorization did not complete.'
     }
 }
 
-if (-not (Test-GitHubAuthentication)) {
-    throw 'GitHub authorization did not complete.'
+$auth = Invoke-CapturedProcess -FilePath $ghExe -Arguments @(
+    'auth', 'status', '--hostname', 'github.com'
+)
+if ($auth.ExitCode -ne 0) {
+    throw "GitHub authorization did not complete.`n$($auth.StdErr.Trim())"
+}
+
+# Make HTTPS git operations use the same durable GitHub CLI login.
+$setupGit = Invoke-CapturedProcess -FilePath $ghExe -Arguments @('auth', 'setup-git')
+if ($setupGit.ExitCode -ne 0) {
+    Write-Host 'Warning: Git credential helper setup failed, but the bridge can still run.' -ForegroundColor Yellow
 }
 
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 
-$encoded = & gh api $bridgeApiPath --jq '.content'
-if ($LASTEXITCODE -ne 0 -or -not $encoded) {
-    throw "Could not retrieve the bridge from the private repository $repo."
+$download = Invoke-CapturedProcess -FilePath $ghExe -Arguments @(
+    'api', $bridgeApiPath, '--jq', '.content'
+)
+if ($download.ExitCode -ne 0 -or -not $download.StdOut.Trim()) {
+    throw "Could not retrieve the bridge from the private repository $repo.`n$($download.StdErr.Trim())"
 }
-$bytes = [Convert]::FromBase64String((($encoded -join '') -replace '\s', ''))
+$bytes = [Convert]::FromBase64String(($download.StdOut -replace '\s', ''))
 [IO.File]::WriteAllBytes($bridgePath, $bytes)
 
 if (Get-Command 'py' -ErrorAction SilentlyContinue) {
-    $pythonExe = (& py -3 -c 'import sys; print(sys.executable)').Trim()
+    $pyExe = (Get-Command 'py').Source
+    $pythonResult = Invoke-CapturedProcess -FilePath $pyExe -Arguments @(
+        '-3', '-c', 'import sys; print(sys.executable)'
+    )
+    if ($pythonResult.ExitCode -ne 0) {
+        throw "Could not locate Python 3.`n$($pythonResult.StdErr.Trim())"
+    }
+    $pythonExe = $pythonResult.StdOut.Trim()
 } else {
     $pythonExe = (Get-Command 'python').Source
 }
@@ -76,6 +125,7 @@ $bridgeEsc = Escape-SingleQuotedPowerShellString $bridgePath
 $pythonEsc = Escape-SingleQuotedPowerShellString $pythonExe
 $logEsc = Escape-SingleQuotedPowerShellString $logPath
 $apiEsc = Escape-SingleQuotedPowerShellString $bridgeApiPath
+$ghEsc = Escape-SingleQuotedPowerShellString $ghExe
 
 $launcher = @"
 `$ErrorActionPreference = 'Continue'
@@ -84,26 +134,30 @@ $launcher = @"
 `$pythonExe = '$pythonEsc'
 `$logPath = '$logEsc'
 `$bridgeApiPath = '$apiEsc'
+`$ghExe = '$ghEsc'
 
 New-Item -ItemType Directory -Path `$installDir -Force | Out-Null
 `$mutex = New-Object System.Threading.Mutex(`$false, 'Local\KatherineBlenderChatBridge')
 if (-not `$mutex.WaitOne(0, `$false)) { exit 0 }
 
 try {
-    # Refresh the bridge from the private repository when possible.
-    `$encoded = & gh api `$bridgeApiPath --jq '.content' 2>> `$logPath
-    if (`$LASTEXITCODE -eq 0 -and `$encoded) {
-        try {
-            `$bytes = [Convert]::FromBase64String(((`$encoded -join '') -replace '\s', ''))
-            [IO.File]::WriteAllBytes(`$bridgePath, `$bytes)
-        } catch {
-            "[`$(Get-Date -Format s)] Bridge update failed: `$_" | Add-Content `$logPath
+    while (`$true) {
+        # Refresh the bridge from the private repository when possible.
+        `$encoded = & `$ghExe api `$bridgeApiPath --jq '.content' 2>> `$logPath
+        if (`$LASTEXITCODE -eq 0 -and `$encoded) {
+            try {
+                `$bytes = [Convert]::FromBase64String(((`$encoded -join '') -replace '\s', ''))
+                [IO.File]::WriteAllBytes(`$bridgePath, `$bytes)
+            } catch {
+                "[`$(Get-Date -Format s)] Bridge update failed: `$_" | Add-Content `$logPath
+            }
         }
-    }
 
-    "[`$(Get-Date -Format s)] Starting bridge" | Add-Content `$logPath
-    & `$pythonExe `$bridgePath *>> `$logPath
-    "[`$(Get-Date -Format s)] Bridge stopped with exit code `$LASTEXITCODE" | Add-Content `$logPath
+        "[`$(Get-Date -Format s)] Starting bridge" | Add-Content `$logPath
+        & `$pythonExe `$bridgePath *>> `$logPath
+        "[`$(Get-Date -Format s)] Bridge stopped with exit code `$LASTEXITCODE; restarting in 10 seconds" | Add-Content `$logPath
+        Start-Sleep -Seconds 10
+    }
 } finally {
     try { `$mutex.ReleaseMutex() } catch {}
     `$mutex.Dispose()
@@ -115,21 +169,26 @@ $escapedLauncherForVbs = $launcherPath.Replace('"', '""')
 $vbs = 'CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ""' + $escapedLauncherForVbs + '""", 0, False'
 Set-Content -LiteralPath $startupPath -Value $vbs -Encoding ASCII
 
+# Stop an older bridge instance so this installation starts the newest launcher.
+$bridgeRegex = [Regex]::Escape($bridgePath)
+Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -and $_.CommandLine -match $bridgeRegex } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
 # Start it immediately. The Startup entry handles future Windows logins.
 Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @(
     '-NoProfile',
     '-ExecutionPolicy', 'Bypass',
     '-File', $launcherPath
 )
-Start-Sleep -Seconds 2
+Start-Sleep -Seconds 3
 
-$bridgeRegex = [Regex]::Escape($bridgePath)
 $running = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     Where-Object { $_.CommandLine -and $_.CommandLine -match $bridgeRegex }
 
 Write-Host ''
 if ($running) {
-    Write-Host 'Installed and running.' -ForegroundColor Green
+    Write-Host 'Installed, authenticated, and running.' -ForegroundColor Green
 } else {
     Write-Host 'Installed, but the process was not detected yet.' -ForegroundColor Yellow
     Write-Host "Check the log: $logPath"
