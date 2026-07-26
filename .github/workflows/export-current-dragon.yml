@@ -1,4 +1,4 @@
-name: Export v33 animator review
+name: Export v34 stable IK review
 
 on:
   pull_request:
@@ -9,12 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Upload exact Blender v33 animator renders
+      - name: Upload exact Blender v34 stable IK renders
         uses: actions/upload-artifact@v4
         with:
-          name: v33-animator-review
+          name: v34-stable-ik-review
           path: |
-            dragon-review/v33_controls_rest.jpg
-            dragon-review/v33_animation_pose.jpg
+            dragon-review/v34_stable_ik_rest.jpg
+            dragon-review/v34_stable_ik_pose.jpg
           if-no-files-found: error
           retention-days: 1
