@@ -1,5 +1,5 @@
 # One-time installer for Katherine's normal-chat Blender bridge.
-# It installs the bridge under LocalAppData, starts it now, and starts it at login.
+# Installs under LocalAppData, starts now, and starts silently at Windows login.
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -45,14 +45,27 @@ function Invoke-CapturedProcess {
     }
 }
 
+function Escape-SingleQuotedPowerShellString {
+    param([string]$Value)
+    return $Value.Replace("'", "''")
+}
+
+function ConvertTo-PowerShellArrayLiteral {
+    param([string[]]$Values)
+    if (-not $Values -or $Values.Count -eq 0) {
+        return '@()'
+    }
+
+    $quoted = foreach ($value in $Values) {
+        "'$(Escape-SingleQuotedPowerShellString $value)'"
+    }
+    return '@(' + ($quoted -join ', ') + ')'
+}
+
 Write-Host ''
 Write-Host 'Installing the Katherine Blender chat bridge...' -ForegroundColor Cyan
 
 Require-Command 'gh' 'Install GitHub CLI, then run this command again.'
-if (-not (Get-Command 'py' -ErrorAction SilentlyContinue) -and
-    -not (Get-Command 'python' -ErrorAction SilentlyContinue)) {
-    throw 'Python is required. Install Python 3, then run this command again.'
-}
 
 $ghExe = (Get-Command 'gh').Source
 $auth = Invoke-CapturedProcess -FilePath $ghExe -Arguments @(
@@ -82,10 +95,28 @@ if ($auth.ExitCode -ne 0) {
     throw "GitHub authorization did not complete.`n$($auth.StdErr.Trim())"
 }
 
-# Make HTTPS git operations use the same durable GitHub CLI login.
+# Make HTTPS git operations use the same durable GitHub CLI credential.
 $setupGit = Invoke-CapturedProcess -FilePath $ghExe -Arguments @('auth', 'setup-git')
 if ($setupGit.ExitCode -ne 0) {
     Write-Host 'Warning: Git credential helper setup failed, but the bridge can still run.' -ForegroundColor Yellow
+}
+
+# Use the Windows Python launcher when available. Do not use `py -c` here:
+# Start-Process quoting can split the Python code string on older PowerShell versions.
+if (Get-Command 'py' -ErrorAction SilentlyContinue) {
+    $pythonExe = (Get-Command 'py').Source
+    $pythonArgs = @('-3')
+    $pythonCheck = Invoke-CapturedProcess -FilePath $pythonExe -Arguments @('-3', '--version')
+} elseif (Get-Command 'python' -ErrorAction SilentlyContinue) {
+    $pythonExe = (Get-Command 'python').Source
+    $pythonArgs = @()
+    $pythonCheck = Invoke-CapturedProcess -FilePath $pythonExe -Arguments @('--version')
+} else {
+    throw 'Python 3 is required. Install Python 3, then run this installer again.'
+}
+
+if ($pythonCheck.ExitCode -ne 0) {
+    throw "Could not start Python 3.`n$($pythonCheck.StdErr.Trim())"
 }
 
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
@@ -96,33 +127,14 @@ $download = Invoke-CapturedProcess -FilePath $ghExe -Arguments @(
 if ($download.ExitCode -ne 0 -or -not $download.StdOut.Trim()) {
     throw "Could not retrieve the bridge from the private repository $repo.`n$($download.StdErr.Trim())"
 }
+
 $bytes = [Convert]::FromBase64String(($download.StdOut -replace '\s', ''))
 [IO.File]::WriteAllBytes($bridgePath, $bytes)
-
-if (Get-Command 'py' -ErrorAction SilentlyContinue) {
-    $pyExe = (Get-Command 'py').Source
-    $pythonResult = Invoke-CapturedProcess -FilePath $pyExe -Arguments @(
-        '-3', '-c', 'import sys; print(sys.executable)'
-    )
-    if ($pythonResult.ExitCode -ne 0) {
-        throw "Could not locate Python 3.`n$($pythonResult.StdErr.Trim())"
-    }
-    $pythonExe = $pythonResult.StdOut.Trim()
-} else {
-    $pythonExe = (Get-Command 'python').Source
-}
-if (-not $pythonExe) {
-    throw 'Could not locate the Python executable.'
-}
-
-function Escape-SingleQuotedPowerShellString {
-    param([string]$Value)
-    return $Value.Replace("'", "''")
-}
 
 $installEsc = Escape-SingleQuotedPowerShellString $installDir
 $bridgeEsc = Escape-SingleQuotedPowerShellString $bridgePath
 $pythonEsc = Escape-SingleQuotedPowerShellString $pythonExe
+$pythonArgsLiteral = ConvertTo-PowerShellArrayLiteral $pythonArgs
 $logEsc = Escape-SingleQuotedPowerShellString $logPath
 $apiEsc = Escape-SingleQuotedPowerShellString $bridgeApiPath
 $ghEsc = Escape-SingleQuotedPowerShellString $ghExe
@@ -132,6 +144,7 @@ $launcher = @"
 `$installDir = '$installEsc'
 `$bridgePath = '$bridgeEsc'
 `$pythonExe = '$pythonEsc'
+`$pythonArgs = $pythonArgsLiteral
 `$logPath = '$logEsc'
 `$bridgeApiPath = '$apiEsc'
 `$ghExe = '$ghEsc'
@@ -142,7 +155,7 @@ if (-not `$mutex.WaitOne(0, `$false)) { exit 0 }
 
 try {
     while (`$true) {
-        # Refresh the bridge from the private repository when possible.
+        # Refresh the bridge from the private repository whenever possible.
         `$encoded = & `$ghExe api `$bridgeApiPath --jq '.content' 2>> `$logPath
         if (`$LASTEXITCODE -eq 0 -and `$encoded) {
             try {
@@ -154,7 +167,7 @@ try {
         }
 
         "[`$(Get-Date -Format s)] Starting bridge" | Add-Content `$logPath
-        & `$pythonExe `$bridgePath *>> `$logPath
+        & `$pythonExe @pythonArgs `$bridgePath *>> `$logPath
         "[`$(Get-Date -Format s)] Bridge stopped with exit code `$LASTEXITCODE; restarting in 10 seconds" | Add-Content `$logPath
         Start-Sleep -Seconds 10
     }
@@ -175,7 +188,7 @@ Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     Where-Object { $_.CommandLine -and $_.CommandLine -match $bridgeRegex } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
-# Start it immediately. The Startup entry handles future Windows logins.
+# Start immediately. The Startup entry handles future Windows logins.
 Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @(
     '-NoProfile',
     '-ExecutionPolicy', 'Bypass',
