@@ -1,0 +1,16 @@
+name: Export v32 safe articulation 2
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v32-safe-articulation-2
+          path: |
+            dragon-review/v32_safe_articulation_full34.jpg
+            dragon-review/v32_safe_articulation_profile.jpg
+          if-no-files-found: error
