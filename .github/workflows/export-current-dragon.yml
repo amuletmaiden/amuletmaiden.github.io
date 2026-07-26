@@ -1,4 +1,4 @@
-name: Export current dragon render
+name: Export v31 rig review
 
 on:
   pull_request:
@@ -9,10 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Upload exact Blender render
+      - name: Upload exact Blender rig renders
         uses: actions/upload-artifact@v4
         with:
-          name: current-dragon-render
-          path: current-dragon.jpg
+          name: v31-rig-review
+          path: |
+            dragon-review/v31_game_rig_rest.jpg
+            dragon-review/v31_rig_pose_validation.jpg
           if-no-files-found: error
           retention-days: 1
