@@ -1,1 +1,0 @@
-Trigger GitHub Pages deployment after Pages source was set to GitHub Actions.
