@@ -1,0 +1,16 @@
+name: Export v18 parametric renders
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact v18 parametric renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: v18-parametric-renders
+          path: dragon-review/v18_parametric_*.jpg
+          if-no-files-found: error
+          retention-days: 1
