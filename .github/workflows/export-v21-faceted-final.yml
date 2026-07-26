@@ -1,0 +1,16 @@
+name: Export v21 faceted final renders
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact v21 faceted final renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: v21-faceted-final-renders
+          path: dragon-review/v21_faceted_*.jpg
+          if-no-files-found: error
+          retention-days: 1
