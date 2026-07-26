@@ -12,9 +12,9 @@ jobs:
       - name: Upload exact Blender rig renders
         uses: actions/upload-artifact@v4
         with:
-          name: v31-rig-review
+          name: v31-fullbody-rig-review
           path: |
-            dragon-review/v31_game_rig_rest.jpg
-            dragon-review/v31_rig_pose_validation.jpg
+            dragon-review/v31_rig_fullbody_rest.jpg
+            dragon-review/v31_rig_fullbody_pose.jpg
           if-no-files-found: error
           retention-days: 1
