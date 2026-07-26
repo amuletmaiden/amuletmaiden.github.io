@@ -1,0 +1,15 @@
+name: Export v31 animation review
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact Blender review render
+        uses: actions/upload-artifact@v4
+        with:
+          name: v31-animation-review
+          path: dragon-review/v31_animation_scaffold_test_full.jpg
+          if-no-files-found: error
