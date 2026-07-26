@@ -1,0 +1,18 @@
+name: Export v27 review
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload v27 renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: v27-review-renders
+          path: |
+            current-dragon.jpg
+            dragon-review/v27_profile.jpg
+            dragon-review/v27_front.jpg
+          retention-days: 1
