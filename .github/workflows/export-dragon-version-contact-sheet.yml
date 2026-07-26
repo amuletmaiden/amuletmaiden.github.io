@@ -1,0 +1,16 @@
+name: Export dragon version contact sheet
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact contact sheet
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-version-contact-sheet
+          path: dragon-version-contact-sheet.jpg
+          if-no-files-found: error
+          retention-days: 1
