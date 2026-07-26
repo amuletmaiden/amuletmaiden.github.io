@@ -1,0 +1,16 @@
+name: Export v10 heroic renders
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact v10 heroic renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: v10-heroic-renders
+          path: dragon-review/v10_heroic_*.jpg
+          if-no-files-found: error
+          retention-days: 1
