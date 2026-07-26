@@ -68,7 +68,7 @@ async function boot(){
     html=html.replace(/<!-- LEAF NAMED SYSTEMS -->[\s\S]*?<!-- \/LEAF NAMED SYSTEMS -->/i,'');
     html=html.replace(/<script>\s*\/\* leaf PWA hooks[\s\S]*?<\/script>/i,'');
     html=html.replace(/<head([^>]*)>/i,(m,a)=>'<head'+a+'><base href="/leaf/">'+namespaceScript);
-    html=html.replace(/<\/body>/i,systemScripts.map(src=>'<script src="'+src+'"><\\/script>').join('\n')+'\n</body>');
+    html=html.replace(/<\/body>/i,systemScripts.map(src=>'<script src="'+src+'"><\/script>').join('\n')+'\n</body>');
     world.srcdoc=html;
   }catch(error){console.error(error);failure.style.display='block'}
 }
