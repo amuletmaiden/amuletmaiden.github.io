@@ -1,0 +1,16 @@
+name: Export v19 lofted renders
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact v19 lofted renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: v19-lofted-renders
+          path: dragon-review/v19_lofted_*.jpg
+          if-no-files-found: error
+          retention-days: 1
