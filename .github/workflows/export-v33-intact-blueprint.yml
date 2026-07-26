@@ -1,0 +1,16 @@
+name: Export v33 intact blueprint
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v33-intact-blueprint
+          path: |
+            dragon-review/v33_intact_blueprint_full34.jpg
+            dragon-review/v33_intact_blueprint_profile.jpg
+          if-no-files-found: error
