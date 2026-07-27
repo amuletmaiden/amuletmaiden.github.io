@@ -11,8 +11,10 @@ jobs:
       - name: Upload exact Blender material-lane review
         uses: actions/upload-artifact@v4
         with:
-          name: v45-material-lane-review
+          name: v45-material-lane-after-review
           path: |
             kt-bus-review/dragon-v45-materials/before_rest.jpg
-            kt-bus-review/dragon-v45-materials/before_idle_mid.jpg
+            kt-bus-review/dragon-v45-materials/after_rest.jpg
+            kt-bus-review/dragon-v45-materials/after_idle_mid.jpg
+            kt-bus-review/dragon-v45-materials/after_head.jpg
           retention-days: 1
