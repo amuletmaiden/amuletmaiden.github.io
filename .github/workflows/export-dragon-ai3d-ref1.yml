@@ -1,4 +1,4 @@
-name: Export dragon AI3D ref1 review
+name: Export dragon AI3D ref3 review
 
 on:
   workflow_dispatch:
@@ -10,6 +10,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/upload-artifact@v4
         with:
-          name: dragon-ai3d-ref1-review
-          path: kt-bus-review/dragon-ai3d-ref1/*.jpg
+          name: dragon-ai3d-ref3-review
+          path: kt-bus-review/dragon-ai3d-ref3/*.jpg
           retention-days: 1
