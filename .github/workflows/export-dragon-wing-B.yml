@@ -1,4 +1,4 @@
-name: Export dragon wing rebuild B review
+name: Export dragon wing rebuild B2 review
 
 on:
   workflow_dispatch:
@@ -8,9 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Upload exact Blender wing rebuild renders
+      - name: Upload exact Blender wing rebuild B2 renders
         uses: actions/upload-artifact@v4
         with:
-          name: dragon-wing-rebuild-B-review
-          path: kt-bus-review/dragon-wing-rebuild-B/*.jpg
+          name: dragon-wing-rebuild-B2-review
+          path: kt-bus-review/dragon-wing-rebuild-B2/*.jpg
           retention-days: 1
