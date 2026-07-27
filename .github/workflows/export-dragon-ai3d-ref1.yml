@@ -1,0 +1,15 @@
+name: Export dragon AI3D ref1 review
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dragon-ai3d-ref1-review
+          path: kt-bus-review/dragon-ai3d-ref1/*.jpg
+          retention-days: 1
