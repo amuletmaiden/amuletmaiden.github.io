@@ -1,0 +1,17 @@
+name: Export packaged dragon candidate reviews
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload packaged candidate review ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-candidate-review-zip
+          path: kt-bus-review/dragon_candidate_reviews_2.zip
+          retention-days: 1
+          if-no-files-found: error
