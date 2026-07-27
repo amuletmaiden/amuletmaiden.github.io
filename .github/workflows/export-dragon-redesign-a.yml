@@ -1,0 +1,16 @@
+name: Export dragon redesign A
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact redesign renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-redesign-A-review
+          path: kt-bus-review/dragon-redesign-A/*.jpg
+          retention-days: 1
