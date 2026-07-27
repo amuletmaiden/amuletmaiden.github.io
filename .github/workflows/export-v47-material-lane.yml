@@ -1,0 +1,20 @@
+name: Export v47 material lane review
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact Blender v47 material review
+        uses: actions/upload-artifact@v4
+        with:
+          name: v47-material-lane-review
+          path: |
+            kt-bus-review/dragon-v47-materials/v47_rest.jpg
+            kt-bus-review/dragon-v47-materials/v47_idle_mid.jpg
+            kt-bus-review/dragon-v47-materials/v47_profile.jpg
+            kt-bus-review/dragon-v47-materials/v47_head.jpg
+          retention-days: 1
