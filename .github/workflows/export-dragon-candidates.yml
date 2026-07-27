@@ -1,0 +1,18 @@
+name: Export dragon candidate reviews
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload candidate clay renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-candidate-reviews
+          path: |
+            kt-bus-review/candidate-cethiel-tight/*.jpg
+            kt-bus-review/candidate-mazo/*.jpg
+          retention-days: 1
