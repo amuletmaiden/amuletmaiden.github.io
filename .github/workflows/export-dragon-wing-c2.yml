@@ -1,0 +1,20 @@
+name: Export dragon wing C2 review
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact Blender C2 renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-wing-c2-review
+          path: |
+            kt-bus-review/dragon-wing-rebuild-C2/wingC2_neutral_34.jpg
+            kt-bus-review/dragon-wing-rebuild-C2/wingC2_idle_mid_34.jpg
+            kt-bus-review/dragon-wing-rebuild-C2/wingC2_neutral_close.jpg
+            kt-bus-review/dragon-wing-rebuild-C2/wingC2_idle_mid_close.jpg
+          retention-days: 1
