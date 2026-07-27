@@ -1,0 +1,16 @@
+name: Export dragon head neck D review
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact Blender head-neck D renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-head-neck-D-review
+          path: kt-bus-review/dragon-head-neck-D/*.jpg
+          retention-days: 1
