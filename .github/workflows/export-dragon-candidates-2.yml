@@ -1,0 +1,18 @@
+name: Export dragon candidate reviews two
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload GuieA and BlueMonk reviews
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-candidate-reviews-2
+          path: |
+            kt-bus-review/candidate-guiea/*.jpg
+            kt-bus-review/candidate-bluemonk/*.jpg
+          retention-days: 1
