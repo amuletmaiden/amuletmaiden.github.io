@@ -1,0 +1,18 @@
+name: Export v45 material lane review
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact Blender material-lane review
+        uses: actions/upload-artifact@v4
+        with:
+          name: v45-material-lane-review
+          path: |
+            kt-bus-review/dragon-v45-materials/before_rest.jpg
+            kt-bus-review/dragon-v45-materials/before_idle_mid.jpg
+          retention-days: 1
