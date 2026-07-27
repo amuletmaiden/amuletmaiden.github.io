@@ -1,0 +1,16 @@
+name: Export dragon B0 review
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact B0 renders
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-B0-review
+          path: kt-bus-review/dragon-B0/*.jpg
+          retention-days: 1
