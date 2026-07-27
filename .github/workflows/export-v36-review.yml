@@ -1,4 +1,4 @@
-name: Export v36 dragon review
+name: Export current dragon review
 
 on:
   workflow_dispatch:
@@ -8,9 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Upload exact Blender v36 review
+      - name: Upload exact Blender v37 review
         uses: actions/upload-artifact@v4
         with:
-          name: v36-dragon-review
-          path: dragon-review/v36_review_small.jpg
+          name: v37-dragon-review
+          path: dragon-review/v37_review_small.jpg
           retention-days: 1
