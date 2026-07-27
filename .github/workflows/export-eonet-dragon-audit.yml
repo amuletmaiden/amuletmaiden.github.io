@@ -1,0 +1,17 @@
+name: Export EOneT dragon audit
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload EOneT audit ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: eonet-dragon-audit
+          path: kt-bus-review/eonet_audit.zip
+          retention-days: 1
+          if-no-files-found: error
