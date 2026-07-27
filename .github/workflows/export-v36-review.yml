@@ -8,9 +8,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Upload exact Blender v37 review
+      - name: Upload exact Blender v38 review
         uses: actions/upload-artifact@v4
         with:
-          name: v37-dragon-review
-          path: dragon-review/v37_review_small.jpg
+          name: v38-dragon-review
+          path: dragon-review/v38_review_small.jpg
           retention-days: 1
