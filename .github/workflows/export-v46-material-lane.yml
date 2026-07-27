@@ -1,0 +1,20 @@
+name: Export v46 material lane review
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload exact Blender v46 material review
+        uses: actions/upload-artifact@v4
+        with:
+          name: v46-material-lane-review
+          path: |
+            kt-bus-review/dragon-v46-materials/v46_rest.jpg
+            kt-bus-review/dragon-v46-materials/v46_idle_mid.jpg
+            kt-bus-review/dragon-v46-materials/v46_profile.jpg
+            kt-bus-review/dragon-v46-materials/v46_head.jpg
+          retention-days: 1
