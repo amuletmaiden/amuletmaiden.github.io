@@ -32,7 +32,6 @@ island.traverse((object) => {
     object.castShadow = true;
   }
 });
-drag­on?.traverse?.(() => {});
 dragon.traverse((object) => {
   if (object.isMesh) object.castShadow = true;
 });
