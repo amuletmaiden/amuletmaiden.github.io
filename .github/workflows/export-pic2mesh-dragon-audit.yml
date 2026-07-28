@@ -1,0 +1,17 @@
+name: Export Pic2Mesh Dragon Audit
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload Pic2Mesh dragon audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: pic2mesh-dragon-audit
+          path: kt-bus-review/pic2mesh_dragon_audit.zip
+          if-no-files-found: error
+          retention-days: 1
