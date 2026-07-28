@@ -1,0 +1,17 @@
+name: Export Fab Game-Ready Dragon Audit
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload Fab game-ready dragon audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: fab-game-ready-dragon-audit
+          path: kt-bus-review/fab-game-ready-dragon-audit.jpg
+          if-no-files-found: error
+          retention-days: 1
