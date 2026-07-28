@@ -1,0 +1,17 @@
+name: Export D1 Dragon Review
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload D1 dragon review
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-dragon-review
+          path: kt-bus-review/D1_anatomy_scaffold_review.zip
+          if-no-files-found: error
+          retention-days: 1
