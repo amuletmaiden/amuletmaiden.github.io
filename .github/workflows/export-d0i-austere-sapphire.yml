@@ -1,0 +1,17 @@
+name: Export D0I austere sapphire review
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload D0I review
+        uses: actions/upload-artifact@v4
+        with:
+          name: d0i-austere-sapphire
+          path: kt-bus-review/D0I_austere_sapphire_review.zip
+          if-no-files-found: error
+          retention-days: 1
