@@ -1,0 +1,17 @@
+name: Export accepted dragon tight audit
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload tight accepted dragon audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-tight-audit
+          path: kt-bus-review/dragon_tight_audit_v2.zip
+          if-no-files-found: error
+          retention-days: 1
