@@ -1,0 +1,17 @@
+name: Export dragon E1 review
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload E1 review ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-E1-review
+          path: kt-bus-review/dragon_E1_review.zip
+          if-no-files-found: error
+          retention-days: 1
