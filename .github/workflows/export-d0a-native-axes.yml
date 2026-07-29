@@ -1,0 +1,17 @@
+name: Export D0A native and axis audit
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload D0A native audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: d0a-native-axes
+          path: kt-bus-review/D0A_native_axes_review.zip
+          if-no-files-found: error
+          retention-days: 1
