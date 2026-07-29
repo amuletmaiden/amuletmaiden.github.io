@@ -1,0 +1,17 @@
+name: Export hybrid anatomy audit
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload audit ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-anatomy-audit
+          path: kt-bus-review/hybrid_anatomy_audit.zip
+          if-no-files-found: error
+          retention-days: 1
