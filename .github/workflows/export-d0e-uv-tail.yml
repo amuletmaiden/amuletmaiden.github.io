@@ -1,0 +1,17 @@
+name: Export D0E UV tail sealed review
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload D0E review
+        uses: actions/upload-artifact@v4
+        with:
+          name: d0e-uv-tail
+          path: kt-bus-review/D0E_uv_tail_sealed_review.zip
+          if-no-files-found: error
+          retention-days: 1
