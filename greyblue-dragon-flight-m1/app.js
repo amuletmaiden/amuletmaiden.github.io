@@ -36,13 +36,16 @@ dragon.traverse((object) => {
   if (object.isMesh) object.castShadow = true;
 });
 
-const islandBounds = new THREE.Box3().setFromObject(island);
+const initialIslandBounds = new THREE.Box3().setFromObject(island);
 const dragonBounds = new THREE.Box3().setFromObject(dragon);
-const islandCenter = islandBounds.getCenter(new THREE.Vector3());
-const islandSize = islandBounds.getSize(new THREE.Vector3());
+const islandCenter = initialIslandBounds.getCenter(new THREE.Vector3());
+const islandSize = initialIslandBounds.getSize(new THREE.Vector3());
 const dragonSize = dragonBounds.getSize(new THREE.Vector3());
 
 island.position.sub(islandCenter);
+island.updateMatrixWorld(true);
+const islandBounds = new THREE.Box3().setFromObject(island);
+
 const dragonScale = Math.max(
   1,
   Math.min(islandSize.x, islandSize.y, islandSize.z) /
@@ -73,16 +76,58 @@ let yaw = 0;
 let speed = 0;
 let verticalSpeed = 0;
 let airborne = true;
+let landingRequested = false;
+let cameraObstructed = false;
+let collisionCount = 0;
 const status = document.querySelector('#state');
+
+function terrainHitAt(x, z) {
+  raycaster.set(
+    new THREE.Vector3(x, islandBounds.max.y + 2000, z),
+    new THREE.Vector3(0, -1, 0),
+  );
+  return raycaster.intersectObject(island, true)[0] || null;
+}
+
+function terrainYAt(x, z) {
+  return terrainHitAt(x, z)?.point.y ?? 0;
+}
+
+function terrainY() {
+  return terrainYAt(dragon.position.x, dragon.position.z);
+}
+
+function takeoff() {
+  const ground = terrainY() + 2.2;
+  airborne = true;
+  landingRequested = false;
+  dragon.position.y = Math.max(dragon.position.y, ground) + 3;
+  verticalSpeed = Math.max(verticalSpeed, 7);
+  speed = Math.max(speed, 12);
+}
+
+function requestLanding() {
+  landingRequested = !landingRequested;
+}
+
+function recover() {
+  dragon.position.set(0, Math.max(12, islandSize.y * 0.08), Math.max(35, islandSize.z * 0.1));
+  speed = 0;
+  verticalSpeed = 0;
+  airborne = true;
+  landingRequested = false;
+  yaw = 0;
+}
 
 addEventListener('keydown', (event) => {
   if (controlledKeys.has(event.code)) event.preventDefault();
   keys.add(event.code);
-  if (event.code === 'KeyR') recover();
+  if (event.code === 'KeyR' && !event.repeat) recover();
   if (event.code === 'KeyE' && !event.repeat) {
-    airborne = !airborne;
-    if (airborne) dragon.position.y += 3;
+    if (airborne) requestLanding();
+    else takeoff();
   }
+  if (event.code === 'Space') landingRequested = false;
 });
 
 addEventListener('keyup', (event) => {
@@ -97,22 +142,6 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-function recover() {
-  dragon.position.set(0, Math.max(12, islandSize.y * 0.08), Math.max(35, islandSize.z * 0.1));
-  speed = 0;
-  verticalSpeed = 0;
-  airborne = true;
-}
-
-function terrainY() {
-  raycaster.set(
-    new THREE.Vector3(dragon.position.x, islandBounds.max.y + 2000, dragon.position.z),
-    new THREE.Vector3(0, -1, 0),
-  );
-  const hit = raycaster.intersectObject(island, true)[0];
-  return hit ? hit.point.y : 0;
-}
-
 const clock = new THREE.Clock();
 
 function loop() {
@@ -121,7 +150,7 @@ function loop() {
 
   if (keys.has('KeyW')) speed += 42 * dt;
   if (keys.has('KeyS')) speed -= 34 * dt;
-  speed *= Math.pow(0.985, dt * 60);
+  speed *= Math.pow(landingRequested ? 0.955 : 0.985, dt * 60);
   speed = THREE.MathUtils.clamp(speed, -14, 78);
 
   const turnInput = (keys.has('KeyA') ? 1 : 0) - (keys.has('KeyD') ? 1 : 0);
@@ -129,22 +158,48 @@ function loop() {
 
   if (keys.has('Space')) verticalSpeed += 28 * dt;
   if (keys.has('ShiftLeft') || keys.has('ShiftRight')) verticalSpeed -= 28 * dt;
-  verticalSpeed *= Math.pow(0.94, dt * 60);
+  if (landingRequested) {
+    const landingBlend = 1 - Math.exp(-3.2 * dt);
+    verticalSpeed = THREE.MathUtils.lerp(verticalSpeed, -5.5, landingBlend);
+  } else {
+    verticalSpeed *= Math.pow(0.94, dt * 60);
+  }
   verticalSpeed = THREE.MathUtils.clamp(verticalSpeed, -20, 20);
 
   const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+  const ground = terrainY() + 2.2;
+
   if (airborne) {
     dragon.position.addScaledVector(forward, speed * dt);
     dragon.position.y += verticalSpeed * dt;
-    const ground = terrainY() + 2.2;
-    if (dragon.position.y < ground) {
-      dragon.position.y = ground;
-      verticalSpeed = Math.max(0, verticalSpeed);
-      if (Math.abs(speed) < 7) airborne = false;
+
+    const aheadDistance = Math.max(3, Math.abs(speed) * dt * 2.5);
+    const ahead = dragon.position.clone().addScaledVector(forward, aheadDistance);
+    const aheadHit = terrainHitAt(ahead.x, ahead.z);
+    if (aheadHit && aheadHit.point.y > dragon.position.y - 0.5) {
+      dragon.position.addScaledVector(forward, -Math.max(1, Math.abs(speed) * dt));
+      speed *= -0.18;
+      verticalSpeed = Math.max(verticalSpeed, 4);
+      collisionCount += 1;
+    }
+
+    const currentGround = terrainY() + 2.2;
+    if (dragon.position.y <= currentGround) {
+      dragon.position.y = currentGround;
+      if (landingRequested || (Math.abs(speed) < 7 && Math.abs(verticalSpeed) < 5)) {
+        airborne = false;
+        landingRequested = false;
+        speed = 0;
+        verticalSpeed = 0;
+      } else {
+        verticalSpeed = Math.max(3.5, -verticalSpeed * 0.25);
+        speed *= 0.72;
+        collisionCount += 1;
+      }
     }
   } else {
     dragon.position.addScaledVector(forward, speed * 0.22 * dt);
-    dragon.position.y = terrainY() + 2.2;
+    dragon.position.y = ground;
     verticalSpeed = 0;
   }
 
@@ -155,23 +210,49 @@ function loop() {
     0.08,
   );
 
-  const chase = dragon.position.clone().addScaledVector(forward, -18).add(new THREE.Vector3(0, 8, 0));
-  camera.position.lerp(chase, 1 - Math.pow(0.002, dt));
-  camera.lookAt(dragon.position.clone().addScaledVector(forward, 8).add(new THREE.Vector3(0, 3, 0)));
+  const focus = dragon.position.clone().addScaledVector(forward, 8).add(new THREE.Vector3(0, 3, 0));
+  let chase = dragon.position.clone().addScaledVector(forward, -18).add(new THREE.Vector3(0, 8, 0));
+  const cameraVector = chase.clone().sub(focus);
+  const desiredCameraDistance = cameraVector.length();
+  raycaster.set(focus, cameraVector.clone().normalize());
+  const obstruction = raycaster
+    .intersectObject(island, true)
+    .find((hit) => hit.distance < desiredCameraDistance - 0.5);
+  cameraObstructed = Boolean(obstruction);
+  if (obstruction) {
+    chase = obstruction.point.clone().addScaledVector(cameraVector.normalize(), -1.5);
+  }
+  chase.y = Math.max(chase.y, terrainYAt(chase.x, chase.z) + 1.5);
+  camera.position.lerp(chase, 1 - Math.pow(0.015, dt));
+  camera.lookAt(focus);
 
   if (mixer) mixer.update(dt);
 
+  const sampledGround = terrainY() + 2.2;
+  globalThis.__flightReady = true;
   globalThis.__flightState = {
     airborne,
+    landingRequested,
     speed,
     verticalSpeed,
     yaw,
     x: dragon.position.x,
     y: dragon.position.y,
     z: dragon.position.z,
+    ground: sampledGround,
+    clearance: dragon.position.y - sampledGround,
+    cameraDistance: camera.position.distanceTo(dragon.position),
+    cameraObstructed,
+    collisionCount,
+    dragonLoaded: Boolean(dragon),
+    isleLoaded: Boolean(island),
+    animationCount: dragonAsset.animations.length,
+    canvasWidth: renderer.domElement.width,
+    canvasHeight: renderer.domElement.height,
   };
 
-  status.textContent = `${airborne ? 'FLIGHT' : 'LANDED'} · ${Math.round(Math.abs(speed))} speed · ${Math.round(dragon.position.y)} altitude`;
+  const mode = airborne ? (landingRequested ? 'LANDING' : 'FLIGHT') : 'LANDED';
+  status.textContent = `${mode} · ${Math.round(Math.abs(speed))} speed · ${Math.round(dragon.position.y)} altitude`;
   renderer.render(scene, camera);
 }
 
