@@ -1,0 +1,17 @@
+name: Export D0A white region diagnostic
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload D0A white region review
+        uses: actions/upload-artifact@v4
+        with:
+          name: d0a-white-regions
+          path: kt-bus-review/D0A_white_regions_review.zip
+          if-no-files-found: error
+          retention-days: 1
