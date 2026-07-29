@@ -1,0 +1,17 @@
+name: Export accepted dragon runtime audit
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload accepted dragon audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: dragon-runtime-audit
+          path: kt-bus-review/dragon_runtime_audit.zip
+          if-no-files-found: error
+          retention-days: 1
