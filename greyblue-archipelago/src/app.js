@@ -174,10 +174,9 @@ async function boot() {
   const dragonScale = Math.max(1, Math.min(isleSize.x, isleSize.y, isleSize.z) / Math.max(dragonSize.x, dragonSize.y, dragonSize.z) * 0.018);
   dragon.scale.setScalar(dragonScale);
 
-  dragonRuntime = new DragonRuntime(dragon);
-  dragonRuntime.bindClips(dragonGltf.animations);
   mixer = dragonGltf.animations.length ? new THREE.AnimationMixer(dragon) : null;
-  if (mixer && dragonGltf.animations[0]) mixer.clipAction(dragonGltf.animations[0]).play();
+  dragonRuntime = new DragonRuntime(dragon, mixer);
+  dragonRuntime.bindClips(dragonGltf.animations);
 
   stateLine.textContent = "FLIGHT · Greyblue Archipelago";
   requestAnimationFrame(frame);
@@ -221,7 +220,7 @@ function frame(now) {
   const chase = position.clone().addScaledVector(forward, -24).add(new THREE.Vector3(0, 10, 0));
   camera.position.lerp(chase, 1 - Math.pow(0.002, dt));
   camera.lookAt(position.clone().addScaledVector(forward, 10).add(new THREE.Vector3(0, 3.5, 0)));
-  mixer?.update(dt);
+  dragonRuntime?.update(dt);
 
   if (now - lastSaveAt > 12000) persist();
   const speed = Math.hypot(controller.velocity.x, controller.velocity.z);
