@@ -1,0 +1,251 @@
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { FlightController } from "./flight/controller.js";
+import { DragonRuntime } from "./dragon/runtime.js";
+import { buildArchipelago, activeIslands } from "./world/archipelago.js";
+import { loadGame, saveGame, safeRespawn } from "./core/save.js";
+
+const ASSETS = Object.freeze({
+  dragon: "../greyblue-dragon-flight-m1/dragon.glb",
+  isle: "../greyblue-dragon-flight-m1/isle.glb",
+});
+
+const stateLine = document.querySelector("#state");
+const errorLine = document.querySelector("#error");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x71848b);
+scene.fog = new THREE.FogExp2(0x71848b, 0.00042);
+
+const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 24000);
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xbfd8df, 0x202a28, 2.4));
+const sun = new THREE.DirectionalLight(0xffefd0, 3.2);
+sun.position.set(500, 900, -350);
+sun.castShadow = true;
+scene.add(sun);
+
+const save = loadGame();
+const seed = Number.isInteger(save?.seed) ? save.seed : 1337;
+const world = buildArchipelago({ seed, count: 64, radius: 11000, minGap: 390 });
+const discovered = new Set(save?.discovered || []);
+const position = new THREE.Vector3(
+  save?.position?.x ?? 0,
+  save?.position?.y ?? 140,
+  save?.position?.z ?? 180,
+);
+
+const controller = new FlightController();
+controller.airborne = true;
+const keys = new Set();
+let toggleFlight = false;
+let dragon = null;
+let dragonRuntime = null;
+let mixer = null;
+let heroIsle = null;
+let heroBounds = null;
+let lastSaveAt = performance.now();
+let lastFrameAt = performance.now();
+const islandMeshes = new Map();
+const loader = new GLTFLoader();
+
+function loadGltf(url) {
+  return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
+}
+
+function makeIslandMesh(island) {
+  const geometry = new THREE.ConeGeometry(110 * island.scale, island.height, 9, 3);
+  geometry.translate(0, -island.height * 0.42, 0);
+  const material = new THREE.MeshStandardMaterial({
+    color: island.landmark ? 0x607f74 : 0x536e64,
+    roughness: 0.96,
+    metalness: 0,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(island.x, 0, island.z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.island = island;
+  return mesh;
+}
+
+function updateStreaming() {
+  const active = activeIslands(world, position, 2400);
+  const wanted = new Set(active.map((island) => island.id));
+  for (const island of active) {
+    if (!islandMeshes.has(island.id)) {
+      const mesh = makeIslandMesh(island);
+      islandMeshes.set(island.id, mesh);
+      scene.add(mesh);
+    }
+  }
+  for (const [id, mesh] of islandMeshes) {
+    if (!wanted.has(id)) {
+      scene.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+      islandMeshes.delete(id);
+    }
+  }
+}
+
+function terrainHeightAt(x, z) {
+  let height = 0;
+  for (const island of world.islands) {
+    const distance = Math.hypot(x - island.x, z - island.z);
+    const radius = 110 * island.scale;
+    if (distance < radius) {
+      const normalized = 1 - distance / radius;
+      height = Math.max(height, island.height * normalized * normalized * 0.58);
+    }
+  }
+  if (heroBounds && x >= heroBounds.min.x && x <= heroBounds.max.x && z >= heroBounds.min.z && z <= heroBounds.max.z) {
+    height = Math.max(height, heroBounds.min.y + 4);
+  }
+  return height;
+}
+
+function recover() {
+  const recovered = safeRespawn({
+    seed,
+    position: { x: position.x, y: position.y, z: position.z },
+    velocity: { ...controller.velocity },
+    airborne: controller.airborne,
+    landingRequested: controller.landingRequested,
+    discovered,
+  }, { x: 0, y: 160, z: 220 });
+  position.set(recovered.position.x, recovered.position.y, recovered.position.z);
+  Object.assign(controller.velocity, recovered.velocity);
+  controller.airborne = recovered.airborne;
+  controller.landingRequested = recovered.landingRequested;
+}
+
+function persist() {
+  saveGame({
+    seed,
+    position: { x: position.x, y: position.y, z: position.z },
+    discovered,
+    settings: { cameraDistance: 24 },
+  });
+  lastSaveAt = performance.now();
+}
+
+addEventListener("keydown", (event) => {
+  keys.add(event.code);
+  if (event.code === "KeyE" && !event.repeat) toggleFlight = true;
+  if (event.code === "KeyR" && !event.repeat) recover();
+});
+addEventListener("keyup", (event) => keys.delete(event.code));
+addEventListener("beforeunload", persist);
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+async function boot() {
+  const [dragonGltf, isleGltf] = await Promise.all([loadGltf(ASSETS.dragon), loadGltf(ASSETS.isle)]);
+  dragon = dragonGltf.scene;
+  heroIsle = isleGltf.scene;
+  scene.add(heroIsle, dragon);
+
+  heroIsle.traverse((object) => {
+    if (object.isMesh) {
+      object.castShadow = true;
+      object.receiveShadow = true;
+    }
+  });
+  dragon.traverse((object) => {
+    if (object.isMesh) object.castShadow = true;
+  });
+
+  const isleBox = new THREE.Box3().setFromObject(heroIsle);
+  const isleCenter = isleBox.getCenter(new THREE.Vector3());
+  heroIsle.position.sub(isleCenter);
+  heroBounds = new THREE.Box3().setFromObject(heroIsle);
+
+  const dragonBox = new THREE.Box3().setFromObject(dragon);
+  const isleSize = heroBounds.getSize(new THREE.Vector3());
+  const dragonSize = dragonBox.getSize(new THREE.Vector3());
+  const dragonScale = Math.max(1, Math.min(isleSize.x, isleSize.y, isleSize.z) / Math.max(dragonSize.x, dragonSize.y, dragonSize.z) * 0.018);
+  dragon.scale.setScalar(dragonScale);
+
+  dragonRuntime = new DragonRuntime(dragon);
+  dragonRuntime.bindClips(dragonGltf.animations);
+  mixer = dragonGltf.animations.length ? new THREE.AnimationMixer(dragon) : null;
+  if (mixer && dragonGltf.animations[0]) mixer.clipAction(dragonGltf.animations[0]).play();
+
+  stateLine.textContent = "FLIGHT · Greyblue Archipelago";
+  requestAnimationFrame(frame);
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - lastFrameAt) / 1000, 0.05);
+  lastFrameAt = now;
+
+  const input = {
+    throttle: (keys.has("KeyW") ? 1 : 0) - (keys.has("KeyS") ? 1 : 0),
+    steer: (keys.has("KeyA") ? 1 : 0) - (keys.has("KeyD") ? 1 : 0),
+    climb: (keys.has("Space") ? 1 : 0) - (keys.has("ShiftLeft") || keys.has("ShiftRight") ? 1 : 0),
+    toggleFlight,
+  };
+  toggleFlight = false;
+
+  const flight = controller.step(input, dt);
+  position.x += flight.velocity.x * dt;
+  position.y += flight.velocity.y * dt;
+  position.z += flight.velocity.z * dt;
+  controller.resolveGround(position, terrainHeightAt(position.x, position.z) + 2.5);
+
+  if (position.y < -20 || !Number.isFinite(position.lengthSq())) recover();
+  updateStreaming();
+
+  for (const island of world.islands) {
+    if (!discovered.has(island.id) && Math.hypot(position.x - island.x, position.z - island.z) < 260) {
+      discovered.add(island.id);
+    }
+  }
+
+  if (dragon) {
+    dragon.position.copy(position);
+    dragon.rotation.set(controller.pitch, controller.yaw + Math.PI, -controller.bank, "YXZ");
+  }
+  const clip = dragonRuntime?.updateFromFlight(controller.snapshot()) || null;
+
+  const forward = new THREE.Vector3(Math.sin(controller.yaw), 0, Math.cos(controller.yaw));
+  const chase = position.clone().addScaledVector(forward, -24).add(new THREE.Vector3(0, 10, 0));
+  camera.position.lerp(chase, 1 - Math.pow(0.002, dt));
+  camera.lookAt(position.clone().addScaledVector(forward, 10).add(new THREE.Vector3(0, 3.5, 0)));
+  mixer?.update(dt);
+
+  if (now - lastSaveAt > 12000) persist();
+  const speed = Math.hypot(controller.velocity.x, controller.velocity.z);
+  stateLine.textContent = `${controller.airborne ? "FLIGHT" : "LANDED"} · ${Math.round(speed)} speed · ${Math.round(position.y)} altitude · ${discovered.size} discovered`;
+
+  globalThis.__greyblueState = {
+    ready: Boolean(dragon && heroIsle),
+    dragonLoaded: Boolean(dragon),
+    isleLoaded: Boolean(heroIsle),
+    seed,
+    position: { x: position.x, y: position.y, z: position.z },
+    flight: controller.snapshot(),
+    animation: dragonRuntime?.telemetry || null,
+    activeIslandCount: islandMeshes.size,
+    discoveredCount: discovered.size,
+    clip,
+  };
+
+  renderer.render(scene, camera);
+}
+
+boot().catch((error) => {
+  console.error(error);
+  stateLine.textContent = "BOOT FAILED";
+  errorLine.textContent = error instanceof Error ? error.message : String(error);
+  globalThis.__greyblueState = { ready: false, error: errorLine.textContent };
+});
