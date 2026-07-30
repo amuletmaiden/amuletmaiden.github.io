@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>amulet integra · __VERSION__</title>
+<style>
+:root{color-scheme:dark;--g:#00cf35;--p:#ff62ce;--b:#00b8ff;--bg:#05070a;--panel:#0a0e14;--line:#23313c;--muted:#a8b3bf}*{box-sizing:border-box}html,body{height:100%;margin:0;background:var(--bg);color:#f7fafc;font-family:"Favorit Tumblr 85","Segoe UI",sans-serif}body{display:grid;grid-template-rows:auto 1fr;overflow:hidden}nav{display:flex;align-items:center;gap:7px;padding:8px 10px;border-bottom:1px solid var(--line);background:#05070af5}button,a,input,select{font:inherit}nav button,nav a{border:1px solid var(--line);border-radius:999px;background:#080d12;padding:7px 12px;text-decoration:none;cursor:pointer}nav button[aria-current="page"]{border-color:currentColor}[data-mode=face]{color:var(--g)}[data-mode=archive]{color:var(--b)}[data-mode=find]{color:var(--p)}nav .versions{margin-left:auto;color:var(--muted)}iframe{width:100%;height:100%;border:0;background:white}#search{display:none;overflow:auto;padding:clamp(14px,3vw,34px)}#search.active{display:block}.searchbar{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:minmax(220px,1fr) 220px 160px;gap:8px;padding:10px 0 16px;background:linear-gradient(var(--bg) 82%,transparent)}input,select{width:100%;border:1px solid var(--line);border-radius:12px;background:#090e14;color:white;padding:11px}#status{color:var(--muted);padding:4px 0 16px}#results{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px}article{border:1px solid var(--line);border-radius:18px;background:var(--panel);padding:18px}article h2{font-size:1.05rem;margin:0 0 8px}article p{color:#cbd4dc}.meta{font-size:.78rem;color:var(--muted)}.tags{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0}.tag{border:1px solid #244657;border-radius:999px;background:#07151c;color:var(--b);padding:3px 7px}.open{color:var(--p)}@media(max-width:720px){.searchbar{grid-template-columns:1fr}.versions{font-size:0}.versions:after{content:"versions";font-size:12px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<nav aria-label="Amulet Integra">
+<button type="button" data-mode="face">face</button><button type="button" data-mode="archive">archive</button><button type="button" data-mode="find">find</button><a class="versions" href="../../index.html">all versions</a>
+</nav>
+<iframe id="site" title="Amulet site"></iframe>
+<section id="search" aria-label="Archive search">
+<div class="searchbar"><input id="q" type="search" placeholder="search the archive" aria-label="Search archive" autocomplete="off"><select id="tag" aria-label="Filter by exact tag"><option value="">every tag</option></select><select id="sort" aria-label="Sort archive"><option value="old">oldest first</option><option value="new">newest first</option></select></div>
+<div id="status" role="status" aria-live="polite">loading…</div><div id="results"></div>
+</section>
+<script>
+const frame=document.querySelector('#site'),search=document.querySelector('#search'),buttons=[...document.querySelectorAll('[data-mode]')],q=document.querySelector('#q'),tag=document.querySelector('#tag'),sort=document.querySelector('#sort'),status=document.querySelector('#status'),results=document.querySelector('#results'),state={posts:[],tags:[],loaded:false};
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function currentMode(){const value=location.hash.slice(1).split('?')[0];return ['face','archive','find'].includes(value)?value:'face'}
+function show(mode,push=true){buttons.forEach(b=>b.setAttribute('aria-current',b.dataset.mode===mode?'page':'false'));if(mode==='find'){frame.hidden=true;search.classList.add('active');if(!state.loaded)loadIndex();q.focus()}else{search.classList.remove('active');frame.hidden=false;const next=mode+'/index.html';if(!frame.src.endsWith(next))frame.src=next}const hash='#'+mode;if(push&&location.hash!==hash)history.pushState(null,'',hash)}
+function render(){const needle=q.value.trim().toLocaleLowerCase(),wanted=tag.value;const filtered=state.posts.filter(p=>(!needle||[p.id,p.title,p.text,...(p.tags||[])].join(' ').toLocaleLowerCase().includes(needle))&&(!wanted||(p.tags||[]).includes(wanted))).sort((a,b)=>String(a.published||'9999').localeCompare(String(b.published||'9999'))*(sort.value==='new'?-1:1));status.textContent=filtered.length+' matching posts'+(filtered.length>240?' · showing first 240':'');results.innerHTML=filtered.slice(0,240).map(p=>{const relative=String(p.path||'').replace(/^amuletarchive-site\//,'');return '<article><h2>'+esc(p.title||p.id)+'</h2><p>'+esc(p.excerpt||'')+'</p><div class="meta">'+esc(p.published||'date unknown')+' · '+esc(p.id)+'</div><div class="tags">'+(p.tags||[]).map(t=>'<button class="tag" type="button" data-tag="'+esc(t)+'">#'+esc(t)+'</button>').join('')+'</div><a class="open" href="archive/'+esc(relative)+'">open preserved post →</a></article>'}).join('')}
+async function loadIndex(){state.loaded=true;try{const response=await fetch('archive-index.json');if(!response.ok)throw new Error('archive index unavailable');const data=await response.json();state.posts=data.posts||[];state.tags=data.tags||[];state.tags.forEach(t=>tag.insertAdjacentHTML('beforeend','<option value="'+esc(t)+'">'+esc(t)+'</option>'));render()}catch(error){status.textContent=error.message}}
+buttons.forEach(b=>b.addEventListener('click',()=>show(b.dataset.mode)));addEventListener('popstate',()=>show(currentMode(),false));addEventListener('hashchange',()=>show(currentMode(),false));q.addEventListener('input',render);tag.addEventListener('change',render);sort.addEventListener('change',render);results.addEventListener('click',event=>{const b=event.target.closest('[data-tag]');if(b){tag.value=b.dataset.tag;render();scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth'})}});addEventListener('keydown',event=>{if(event.key==='/'&&!/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(document.activeElement.tagName)){event.preventDefault();show('find');q.focus()}});show(currentMode(),false);
+</script>
+</body>
+</html>
