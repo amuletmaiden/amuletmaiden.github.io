@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { FlightController } from "./flight/controller.js";
+import { FlightInput } from "./flight/input.js";
 import { ChaseCameraRig } from "./flight/chase-camera.js";
 import { DragonRuntime } from "./dragon/runtime.js";
 import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
@@ -43,9 +44,8 @@ const position = new THREE.Vector3(
 
 const controller = new FlightController();
 controller.airborne = true;
+const flightInput = new FlightInput();
 const chaseCamera = new ChaseCameraRig({ distance: save?.settings?.cameraDistance ?? 24 });
-const keys = new Set();
-let toggleFlight = false;
 let dragon = null;
 let dragonRuntime = null;
 let mixer = null;
@@ -170,11 +170,10 @@ function persist() {
 }
 
 addEventListener("keydown", (event) => {
-  keys.add(event.code);
-  if (event.code === "KeyE" && !event.repeat) toggleFlight = true;
-  if (event.code === "KeyR" && !event.repeat) recover();
+  flightInput.keyDown(event.code, event.repeat);
 });
-addEventListener("keyup", (event) => keys.delete(event.code));
+addEventListener("keyup", (event) => flightInput.keyUp(event.code));
+addEventListener("blur", () => flightInput.clear());
 addEventListener("beforeunload", persist);
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
@@ -222,13 +221,12 @@ function frame(now) {
   const dt = Math.min((now - lastFrameAt) / 1000, 0.05);
   lastFrameAt = now;
 
-  const input = {
-    throttle: (keys.has("KeyW") ? 1 : 0) - (keys.has("KeyS") ? 1 : 0),
-    steer: (keys.has("KeyA") ? 1 : 0) - (keys.has("KeyD") ? 1 : 0),
-    climb: (keys.has("Space") ? 1 : 0) - (keys.has("ShiftLeft") || keys.has("ShiftRight") ? 1 : 0),
-    toggleFlight,
-  };
-  toggleFlight = false;
+  const gamepads = typeof navigator.getGamepads === "function"
+    ? Array.from(navigator.getGamepads())
+    : [];
+  flightInput.setGamepad(gamepads.find(Boolean) || null);
+  const input = flightInput.sample();
+  if (input.recover) recover();
 
   const flight = controller.step(input, dt);
   position.x += flight.velocity.x * dt;
@@ -286,6 +284,12 @@ function frame(now) {
     seed,
     position: { x: position.x, y: position.y, z: position.z },
     flight: controller.snapshot(),
+    input: {
+      source: input.source,
+      throttle: input.throttle,
+      steer: input.steer,
+      climb: input.climb,
+    },
     animation: dragonRuntime?.telemetry || null,
     camera: cameraState,
     activeIslandCount: islandMeshes.size,
