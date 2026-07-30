@@ -19,6 +19,7 @@ assert.deepEqual(first, second, "the same seed must produce byte-stable world da
 assert.notDeepEqual(first.islands.slice(0, 4), different.islands.slice(0, 4), "different seeds should change geography");
 assert.equal(first.islands.length, options.count, "requested island count should be met");
 assert.equal(first.regions.length, REGION_DEFINITIONS.length, "all named regions should be represented in metadata");
+assert.doesNotThrow(() => JSON.stringify(first), "world metadata must remain serialization-safe");
 
 const ids = new Set();
 const names = new Set();
@@ -37,6 +38,14 @@ for (const island of first.islands) {
   assert(zone.radius > 0 && Number.isFinite(zone.heading));
   assert(corridor.width > 0 && corridor.maximumDescentRate > 0);
   assert(Number.isFinite(corridor.entry.x) && Number.isFinite(corridor.touchdown.z));
+  if (island.landmarkRecord) {
+    const encounter = island.landmarkRecord.encounter;
+    assert(encounter && encounter.id.endsWith(":encounter"));
+    assert(["resonance", "instrument", "relic", "threshold"].includes(encounter.class));
+    assert(encounter.triggerRadius >= 150 && encounter.triggerRadius <= 260);
+    assert(Number.isFinite(encounter.approachBearing));
+    assert.equal(encounter.repeatable, false);
+  }
 }
 
 for (let a = 0; a < first.islands.length; a += 1) {
@@ -55,10 +64,19 @@ for (const route of first.routes) {
   assert(islandById.has(route.fromIslandId), `${route.id} has unknown origin`);
   assert(islandById.has(route.toIslandId), `${route.id} has unknown destination`);
   assert.notEqual(route.fromIslandId, route.toIslandId, `${route.id} loops to itself`);
+  assert.equal(route.discovery.endpointIslandIds[0], route.fromIslandId);
+  assert.equal(route.discovery.endpointIslandIds[1], route.toIslandId);
+  assert(route.discovery.revealRadius >= 360 && route.discovery.revealRadius <= 520);
+  assert(Number.isFinite(route.discovery.midpoint.x) && Number.isFinite(route.discovery.midpoint.z));
 }
 for (const region of first.regions) {
   assert(region.islandIds.every((id) => islandById.get(id)?.regionId === region.id));
   if (region.islandIds.length) assert(region.anchorIslandId);
+  const fog = region.fogProfile;
+  assert(/^#[0-9a-f]{6}$/i.test(fog.color));
+  assert(fog.near > 0 && fog.far > fog.near);
+  assert(fog.density > 0 && fog.density < 0.001);
+  assert(fog.altitudeThinning > 0 && fog.transitionDistance > 0);
 }
 
 const target = first.islands[0];

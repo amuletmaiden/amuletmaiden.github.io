@@ -8,6 +8,7 @@ export const REGION_DEFINITIONS = Object.freeze([
     adjectives: ["Hushed", "Veiled", "Pale", "Listening", "Rainbound"],
     nouns: ["Bell", "Shoal", "Lantern", "Needle", "Hollow"],
     landmarkKinds: ["listening stone", "drowned bell", "wind aperture"],
+    fogProfile: { color: "#91a6ad", near: 110, far: 1750, density: 0.00042, altitudeThinning: 920, transitionDistance: 720 },
   },
   {
     id: "drowned-crown",
@@ -16,6 +17,7 @@ export const REGION_DEFINITIONS = Object.freeze([
     adjectives: ["Drowned", "Crowned", "Broken", "Black", "Tidal"],
     nouns: ["Diadem", "Spire", "Throne", "Gate", "Cairn"],
     landmarkKinds: ["crown stair", "tide throne", "split observatory"],
+    fogProfile: { color: "#748b94", near: 145, far: 2200, density: 0.00031, altitudeThinning: 1180, transitionDistance: 860 },
   },
   {
     id: "blueglass-wake",
@@ -24,6 +26,7 @@ export const REGION_DEFINITIONS = Object.freeze([
     adjectives: ["Blueglass", "Cold", "Lucent", "Cerulean", "Waking"],
     nouns: ["Lens", "Wake", "Mirror", "Beacon", "Vault"],
     landmarkKinds: ["signal lens", "glass reef", "weather engine"],
+    fogProfile: { color: "#739ead", near: 170, far: 2550, density: 0.00025, altitudeThinning: 1360, transitionDistance: 940 },
   },
   {
     id: "widow-current",
@@ -32,6 +35,7 @@ export const REGION_DEFINITIONS = Object.freeze([
     adjectives: ["Widow", "Long", "Ashen", "Sable", "Forsaken"],
     nouns: ["Jetty", "Pass", "Mast", "House", "Anchor"],
     landmarkKinds: ["empty jetty", "stone mast", "anchor shrine"],
+    fogProfile: { color: "#82949a", near: 125, far: 1950, density: 0.00038, altitudeThinning: 1040, transitionDistance: 780 },
   },
   {
     id: "mothwater",
@@ -40,6 +44,7 @@ export const REGION_DEFINITIONS = Object.freeze([
     adjectives: ["Mothlit", "Amber", "Soft", "Sleepless", "Fallow"],
     nouns: ["Window", "Garden", "Archive", "Porch", "Furnace"],
     landmarkKinds: ["lamp archive", "sealed garden", "ember cistern"],
+    fogProfile: { color: "#9ba09a", near: 135, far: 2050, density: 0.00034, altitudeThinning: 980, transitionDistance: 800 },
   },
   {
     id: "far-choir",
@@ -48,6 +53,7 @@ export const REGION_DEFINITIONS = Object.freeze([
     adjectives: ["Far", "Choral", "Resonant", "Last", "Vigilant"],
     nouns: ["Choir", "Pillar", "Organ", "Watch", "Reliquary"],
     landmarkKinds: ["resonance pillar", "choir bridge", "vigil reliquary"],
+    fogProfile: { color: "#8497a3", near: 190, far: 2850, density: 0.00021, altitudeThinning: 1500, transitionDistance: 1100 },
   },
 ]);
 
@@ -118,6 +124,26 @@ function makeLandingMetadata(island, bearing, random) {
   return { landingZones: [zone], approachCorridors: [corridor] };
 }
 
+function encounterClass(kind) {
+  if (/bell|choir|resonance|organ/.test(kind)) return "resonance";
+  if (/lens|observatory|engine|aperture/.test(kind)) return "instrument";
+  if (/garden|archive|cistern|shrine|reliquary|throne/.test(kind)) return "relic";
+  return "threshold";
+}
+
+function makeLandmarkEncounter(island, region, kind) {
+  const corridor = island.approachCorridors[0];
+  return {
+    id: `${island.id}:encounter`,
+    class: encounterClass(kind),
+    triggerRadius: clamp(island.discovery.threshold * 0.72, 150, 260),
+    approachBearing: corridor?.heading ?? 0,
+    minimumAltitude: Math.max(18, island.height * 0.1),
+    revealText: `${kind} answers the weather of ${region.name}.`,
+    repeatable: false,
+  };
+}
+
 function buildRegionAndRouteRecords(islands) {
   const regions = REGION_DEFINITIONS.map((definition) => {
     const members = islands
@@ -127,6 +153,7 @@ function buildRegionAndRouteRecords(islands) {
       id: definition.id,
       name: definition.name,
       mood: definition.mood,
+      fogProfile: { ...definition.fogProfile },
       islandIds: members.map((island) => island.id),
       anchorIslandId: members.find((island) => island.landmark)?.id ?? members[0]?.id ?? null,
     };
@@ -159,13 +186,31 @@ function buildRegionAndRouteRecords(islands) {
     }
   }
 
+  const islandById = new Map(islands.map((island) => [island.id, island]));
+  for (const route of routes) {
+    const from = islandById.get(route.fromIslandId);
+    const to = islandById.get(route.toIslandId);
+    route.discovery = {
+      id: `${route.id}:discovery`,
+      title: `${from?.name ?? route.fromIslandId} → ${to?.name ?? route.toIslandId}`,
+      summary: route.kind === "far-ring"
+        ? "A long crossing joins two distant regional anchors through open mist."
+        : `A remembered passage through ${from?.regionName ?? "the archipelago"}.`,
+      revealRadius: route.kind === "far-ring" ? 520 : 360,
+      endpointIslandIds: [route.fromIslandId, route.toIslandId],
+      midpoint: {
+        x: ((from?.x ?? 0) + (to?.x ?? 0)) * 0.5,
+        z: ((from?.z ?? 0) + (to?.z ?? 0)) * 0.5,
+      },
+    };
+  }
+
   const routeIdsByIsland = new Map(islands.map((island) => [island.id, []]));
   for (const route of routes) {
     routeIdsByIsland.get(route.fromIslandId)?.push(route.id);
     routeIdsByIsland.get(route.toIslandId)?.push(route.id);
   }
   for (const island of islands) island.routeIds = routeIdsByIsland.get(island.id) ?? [];
-
   return { regions, routes };
 }
 
@@ -196,12 +241,19 @@ export function buildArchipelago({ seed = 1337, count = 48, radius = 9000, minGa
       Math.hypot(other.x - island.x, other.z - island.z) >=
       minGap * (other.scale + island.scale) * 0.5,
     );
-
     if (!separated) continue;
 
     island.name = makeUniqueName(region, random, usedNames);
     const bearing = wrapAngle(angle + Math.PI + (random() - 0.5) * 0.8);
     Object.assign(island, makeLandingMetadata(island, bearing, random));
+    island.discovery = {
+      id: `${island.id}:discovery`,
+      title: island.name,
+      regionId: region.id,
+      regionName: region.name,
+      summary: region.mood,
+      threshold: clamp(island.landingRadius * 1.5, 180, 330),
+    };
     const landmarkKind = island.landmark ? choose(region.landmarkKinds, random) : null;
     island.landmarkRecord = landmarkKind
       ? {
@@ -209,16 +261,10 @@ export function buildArchipelago({ seed = 1337, count = 48, radius = 9000, minGa
           title: `${island.name} · ${landmarkKind}`,
           kind: landmarkKind,
           clue: region.mood,
+          encounter: makeLandmarkEncounter(island, region, landmarkKind),
         }
       : null;
-    island.discovery = {
-      id: `${island.id}:discovery`,
-      title: island.name,
-      regionId: region.id,
-      regionName: region.name,
-      summary: island.landmarkRecord?.clue ?? region.mood,
-      threshold: clamp(island.landingRadius * 1.5, 180, 330),
-    };
+    if (island.landmarkRecord) island.discovery.summary = island.landmarkRecord.clue;
     islands.push(island);
   }
 
