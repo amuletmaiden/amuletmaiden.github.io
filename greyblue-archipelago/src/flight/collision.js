@@ -34,6 +34,7 @@ export class FlightCollisionResolver {
     velocity,
     sampleSurface,
     landingRequested = false,
+    airborne = true,
   }) {
     if (typeof sampleSurface !== "function") {
       throw new TypeError("sampleSurface must be a function");
@@ -79,6 +80,7 @@ export class FlightCollisionResolver {
     this.consecutiveContacts += 1;
     const horizontalSpeed = Math.hypot(motion.x, motion.z);
     const descentSpeed = Math.max(0, -motion.y);
+    const settledGround = contact.surface.surface !== "water" && !airborne;
     const touchdown = contact.surface.surface !== "water"
       && Boolean(landingRequested)
       && descentSpeed <= this.options.touchdownMaximumDescent
@@ -88,16 +90,18 @@ export class FlightCollisionResolver {
       return this.#recoveryResult("water-contact", contact);
     }
 
-    if (touchdown) {
+    if (settledGround || touchdown) {
+      const reason = settledGround ? "grounded-contact" : "touchdown";
+      const retention = settledGround ? 1 : this.options.touchdownHorizontalRetention;
       const position = {
         x: contact.point.x,
         y: contact.surface.height + this.options.clearance,
         z: contact.point.z,
       };
       const resolvedVelocity = {
-        x: motion.x * this.options.touchdownHorizontalRetention,
+        x: motion.x * retention,
         y: 0,
-        z: motion.z * this.options.touchdownHorizontalRetention,
+        z: motion.z * retention,
       };
       this.lastSafePosition = cloneVector(position);
       this.consecutiveContacts = 0;
@@ -105,7 +109,7 @@ export class FlightCollisionResolver {
         collided: true,
         grounded: true,
         requiresRecovery: false,
-        reason: "touchdown",
+        reason,
         surface: contact.surface.surface,
         consecutiveContacts: 0,
         sweptSteps: contact.step,
@@ -116,7 +120,7 @@ export class FlightCollisionResolver {
         collided: true,
         grounded: true,
         requiresRecovery: false,
-        reason: "touchdown",
+        reason,
         surface: contact.surface.surface,
         contact,
         telemetry: { ...this.telemetry },
