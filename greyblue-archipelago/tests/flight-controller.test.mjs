@@ -68,6 +68,37 @@ function finite(snapshot) {
 
 {
   const controller = new FlightController();
+  const position = { x: 0, y: 265, z: 0 };
+  controller.airborne = true;
+  controller.velocity = { x: 8, y: 1, z: 25 };
+  controller.step({ toggleFlight: true }, 1 / 60);
+  assert.equal(controller.landingRequested, true);
+  let elapsed = 0;
+  for (let i = 0; i < 60 * 25; i += 1) {
+    const snapshot = controller.step({}, 1 / 60);
+    position.x += snapshot.velocity.x / 60;
+    position.y += snapshot.velocity.y / 60;
+    position.z += snapshot.velocity.z / 60;
+    elapsed += 1 / 60;
+    controller.resolveGround(position, 2.5);
+    if (!controller.airborne) break;
+  }
+  assert.equal(controller.airborne, false, "high-altitude landing completes");
+  assert.ok(elapsed < 22, `high-altitude landing remains responsive (${elapsed}s)`);
+}
+
+{
+  const controller = new FlightController();
+  controller.airborne = true;
+  controller.step({ toggleFlight: true }, 1 / 60);
+  assert.equal(controller.landingRequested, true);
+  controller.step({ toggleFlight: true }, 1 / 60);
+  assert.equal(controller.landingRequested, false, "second airborne toggle cancels landing");
+  assert.equal(controller.airborne, true);
+}
+
+{
+  const controller = new FlightController();
   controller.airborne = true;
   controller.velocity = { x: Number.POSITIVE_INFINITY, y: NaN, z: 1 };
   const recovered = controller.step({}, 1 / 60);
