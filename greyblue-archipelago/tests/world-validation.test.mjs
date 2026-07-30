@@ -31,7 +31,7 @@ broken.islands.push({ ...broken.islands[0] });
 broken.islands[1].regionId = "missing-region";
 broken.routes[0].toIslandId = "missing-island";
 broken.routes[0].navigation.distance = Number.NaN;
-broken.routes[0].navigation.bearingFrom = Math.PI + 0.1;
+broken.routes[0].navigation.bearingFrom = Math.PI * 2 + 0.1;
 broken.routes[0].navigation.cruiseAltitude = broken.routes[0].navigation.minimumAltitude;
 broken.routes[0].navigation.fogRisk.score = 1.5;
 broken.routes[0].discovery.endpointIslandIds = [broken.routes[0].toIslandId, broken.routes[0].fromIslandId];
