@@ -47,6 +47,7 @@ const seed = Number.isInteger(save?.seed) ? save.seed : 1337;
 const world = buildArchipelago({ seed, count: 64, radius: 11000, minGap: 390 });
 const discovered = new Set(save?.discovered || []);
 const discoveredRoutes = new Set(save?.discoveredRoutes || []);
+const islandById = new Map(world.islands.map((island) => [island.id, island]));
 const position = new THREE.Vector3(
   save?.position?.x ?? FALLBACK_SPAWN.x,
   save?.position?.y ?? FALLBACK_SPAWN.y,
@@ -70,6 +71,7 @@ let lastFrameAt = performance.now();
 let latestDiscovery = null;
 let currentRegion = null;
 let currentFogProfile = { ...DEFAULT_FOG };
+let currentRouteGuidance = null;
 const islandMeshes = new Map();
 const loader = new GLTFLoader();
 
@@ -231,6 +233,50 @@ function discoverRoutes() {
   }
 }
 
+function updateRouteGuidance(proximity) {
+  if (!proximity || proximity.distance > 760) {
+    currentRouteGuidance = null;
+    return null;
+  }
+
+  let best = null;
+  for (const routeId of proximity.island.routeIds || []) {
+    if (!discoveredRoutes.has(routeId)) continue;
+    const route = world.routes.find((candidate) => candidate.id === routeId);
+    if (!route?.navigation) continue;
+    const forward = route.fromIslandId === proximity.island.id;
+    const destinationId = forward ? route.toIslandId : route.fromIslandId;
+    const destination = islandById.get(destinationId);
+    if (!destination) continue;
+    const remainingDistance = Math.hypot(position.x - destination.x, position.z - destination.z);
+    if (!best || remainingDistance < best.remainingDistance) {
+      const bearing = forward ? route.navigation.bearingFrom : route.navigation.bearingTo;
+      const headingError = normalizeAngle(bearing - controller.yaw);
+      best = {
+        routeId: route.id,
+        kind: route.kind,
+        destinationId,
+        destinationName: destination.name,
+        destinationRegionId: destination.regionId,
+        bearing,
+        headingError,
+        turn: Math.abs(headingError) < 0.12 ? "ahead" : headingError > 0 ? "right" : "left",
+        remainingDistance,
+        minimumAltitude: route.navigation.minimumAltitude,
+        cruiseAltitude: route.navigation.cruiseAltitude,
+        altitudeMargin: position.y - route.navigation.minimumAltitude,
+        fogRisk: route.navigation.fogRisk,
+      };
+    }
+  }
+  currentRouteGuidance = best;
+  return best;
+}
+
+function normalizeAngle(angle) {
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
@@ -348,6 +394,7 @@ function frame(now) {
     }
   }
   discoverRoutes();
+  const routeGuidance = updateRouteGuidance(proximity);
 
   if (dragon) {
     dragon.position.copy(position);
@@ -371,7 +418,10 @@ function frame(now) {
   if (now - lastSaveAt > 12000) persist();
   const speed = flightState.speed;
   const regionLabel = currentRegion?.name ? ` · ${currentRegion.name}` : "";
-  stateLine.textContent = `${controller.airborne ? "FLIGHT" : "LANDED"} · ${Math.round(speed)} speed · ${Math.round(position.y)} altitude · ${discovered.size} isles · ${discoveredRoutes.size} routes${regionLabel}`;
+  const routeLabel = routeGuidance
+    ? ` · ${routeGuidance.destinationName} ${routeGuidance.turn} · ${routeGuidance.fogRisk.level} fog`
+    : "";
+  stateLine.textContent = `${controller.airborne ? "FLIGHT" : "LANDED"} · ${Math.round(speed)} speed · ${Math.round(position.y)} altitude · ${discovered.size} isles · ${discoveredRoutes.size} routes${regionLabel}${routeLabel}`;
 
   globalThis.__greyblueState = {
     ready: Boolean(dragon && heroIsle),
@@ -390,6 +440,7 @@ function frame(now) {
     animation: dragonRuntime?.telemetry || null,
     camera: cameraState,
     fog: currentFogProfile,
+    routeGuidance: currentRouteGuidance,
     activeIslandCount: islandMeshes.size,
     activeIslandIds: active.map((island) => island.id),
     discoveredCount: discovered.size,
