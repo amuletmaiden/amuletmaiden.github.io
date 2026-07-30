@@ -31,8 +31,8 @@ export function validateWorldContract(world) {
     }
     if (Number.isFinite(navigation?.distance) && navigation.distance <= 0) issues.push(issue("route-navigation", id, "distance must be positive", "route-distance-positive"));
     for (const field of ["bearingFrom", "bearingTo"]) {
-      if (Number.isFinite(navigation?.[field]) && Math.abs(navigation[field]) > Math.PI) {
-        issues.push(issue("route-navigation", id, `${field} must be within [-pi, pi]`, `route-${field}-bounded`));
+      if (Number.isFinite(navigation?.[field]) && (navigation[field] < 0 || navigation[field] >= Math.PI * 2)) {
+        issues.push(issue("route-navigation", id, `${field} must be within [0, 2pi)`, `route-${field}-bounded`));
       }
     }
     if (Number.isFinite(navigation?.minimumAltitude) && Number.isFinite(navigation?.cruiseAltitude)
