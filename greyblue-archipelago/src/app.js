@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { FlightController } from "./flight/controller.js";
 import { FlightInput } from "./flight/input.js";
 import { ChaseCameraRig } from "./flight/chase-camera.js";
+import { FlightCollisionResolver } from "./flight/collision.js";
 import { DragonRuntime } from "./dragon/runtime.js";
 import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
 import { loadGame, saveGame, safeRespawn } from "./core/save.js";
@@ -46,6 +47,9 @@ const controller = new FlightController();
 controller.airborne = true;
 const flightInput = new FlightInput();
 const chaseCamera = new ChaseCameraRig({ distance: save?.settings?.cameraDistance ?? 24 });
+const collisionResolver = new FlightCollisionResolver();
+collisionResolver.reset(position);
+let lastCollision = { ...collisionResolver.telemetry };
 let dragon = null;
 let dragonRuntime = null;
 let mixer = null;
@@ -127,20 +131,30 @@ function nearestLandingZone(island) {
   return nearest ? { ...nearest, distance: nearestDistance } : null;
 }
 
-function terrainHeightAt(x, z) {
-  let height = 0;
+function sampleSurfaceAt(x, z) {
+  let result = { height: 0, surface: "water", id: "greyblue-ocean" };
   for (const island of world.islands) {
     const distance = Math.hypot(x - island.x, z - island.z);
     const radius = 110 * island.scale;
     if (distance < radius) {
       const normalized = 1 - distance / radius;
-      height = Math.max(height, island.height * normalized * normalized * 0.58);
+      const height = island.height * normalized * normalized * 0.58;
+      if (result.surface === "water" || height > result.height) {
+        result = { height, surface: "terrain", id: island.id };
+      }
     }
   }
   if (heroBounds && x >= heroBounds.min.x && x <= heroBounds.max.x && z >= heroBounds.min.z && z <= heroBounds.max.z) {
-    height = Math.max(height, heroBounds.min.y + 4);
+    const height = heroBounds.min.y + 4;
+    if (result.surface === "water" || height > result.height) {
+      result = { height, surface: "terrain", id: "greyblue-isle" };
+    }
   }
-  return height;
+  return result;
+}
+
+function terrainHeightAt(x, z) {
+  return sampleSurfaceAt(x, z).height;
 }
 
 function recover() {
@@ -156,6 +170,8 @@ function recover() {
   Object.assign(controller.velocity, recovered.velocity);
   controller.airborne = recovered.airborne;
   controller.landingRequested = recovered.landingRequested;
+  collisionResolver.reset(recovered.position);
+  lastCollision = { ...collisionResolver.telemetry };
   chaseCamera.snapTo(position, controller.yaw);
 }
 
@@ -211,6 +227,8 @@ async function boot() {
   mixer = dragonGltf.animations.length ? new THREE.AnimationMixer(dragon) : null;
   dragonRuntime = new DragonRuntime(dragon, mixer);
   dragonRuntime.bindClips(dragonGltf.animations);
+  collisionResolver.reset(position);
+  lastCollision = { ...collisionResolver.telemetry };
 
   stateLine.textContent = "FLIGHT · Greyblue Archipelago";
   requestAnimationFrame(frame);
@@ -228,11 +246,36 @@ function frame(now) {
   const input = flightInput.sample();
   if (input.recover) recover();
 
+  const previous = { x: position.x, y: position.y, z: position.z };
   const flight = controller.step(input, dt);
-  position.x += flight.velocity.x * dt;
-  position.y += flight.velocity.y * dt;
-  position.z += flight.velocity.z * dt;
-  controller.resolveGround(position, terrainHeightAt(position.x, position.z) + 2.5);
+  const proposed = {
+    x: previous.x + flight.velocity.x * dt,
+    y: previous.y + flight.velocity.y * dt,
+    z: previous.z + flight.velocity.z * dt,
+  };
+  const collision = collisionResolver.resolve({
+    previous,
+    proposed,
+    velocity: flight.velocity,
+    sampleSurface: sampleSurfaceAt,
+    landingRequested: controller.landingRequested,
+    airborne: controller.airborne,
+  });
+  position.set(collision.position.x, collision.position.y, collision.position.z);
+  Object.assign(controller.velocity, collision.velocity);
+  lastCollision = { ...collision.telemetry };
+
+  if (collision.requiresRecovery) {
+    recover();
+  } else if (collision.grounded) {
+    controller.airborne = false;
+    controller.landingRequested = false;
+    controller.velocity.y = 0;
+    controller.stallFactor = 0;
+  } else if (collision.collided) {
+    controller.airborne = true;
+    controller.landingRequested = false;
+  }
 
   if (position.y < -20 || !Number.isFinite(position.lengthSq())) recover();
   const active = updateStreaming();
@@ -258,13 +301,14 @@ function frame(now) {
     dragon.position.copy(position);
     dragon.rotation.set(controller.pitch, controller.yaw + Math.PI, -controller.bank, "YXZ");
   }
-  const clip = dragonRuntime?.updateFromFlight(controller.snapshot()) || null;
+  const flightState = controller.snapshot();
+  const clip = dragonRuntime?.updateFromFlight(flightState) || null;
 
   const cameraState = chaseCamera.update({
     target: position,
     yaw: controller.yaw,
     bank: controller.bank,
-    speed: flight.speed,
+    speed: flightState.speed,
     dt,
     sampleHeight: terrainHeightAt,
   });
@@ -273,7 +317,7 @@ function frame(now) {
   dragonRuntime?.update(dt);
 
   if (now - lastSaveAt > 12000) persist();
-  const speed = Math.hypot(controller.velocity.x, controller.velocity.z);
+  const speed = flightState.speed;
   const regionLabel = currentRegion?.name ? ` · ${currentRegion.name}` : "";
   stateLine.textContent = `${controller.airborne ? "FLIGHT" : "LANDED"} · ${Math.round(speed)} speed · ${Math.round(position.y)} altitude · ${discovered.size} discovered${regionLabel}`;
 
@@ -283,7 +327,8 @@ function frame(now) {
     isleLoaded: Boolean(heroIsle),
     seed,
     position: { x: position.x, y: position.y, z: position.z },
-    flight: controller.snapshot(),
+    flight: flightState,
+    collision: lastCollision,
     input: {
       source: input.source,
       throttle: input.throttle,
