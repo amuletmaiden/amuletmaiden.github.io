@@ -2,13 +2,14 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { FlightController } from "./flight/controller.js";
 import { DragonRuntime } from "./dragon/runtime.js";
-import { buildArchipelago, activeIslands } from "./world/archipelago.js";
+import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
 import { loadGame, saveGame, safeRespawn } from "./core/save.js";
 
 const ASSETS = Object.freeze({
   dragon: "../greyblue-dragon-flight-m1/dragon.glb",
   isle: "../greyblue-dragon-flight-m1/isle.glb",
 });
+const STREAMING_RANGES = Object.freeze({ activateRange: 2400, deactivateRange: 3000 });
 
 const stateLine = document.querySelector("#state");
 const errorLine = document.querySelector("#error");
@@ -50,6 +51,8 @@ let heroIsle = null;
 let heroBounds = null;
 let lastSaveAt = performance.now();
 let lastFrameAt = performance.now();
+let latestDiscovery = null;
+let currentRegion = null;
 const islandMeshes = new Map();
 const loader = new GLTFLoader();
 
@@ -74,7 +77,8 @@ function makeIslandMesh(island) {
 }
 
 function updateStreaming() {
-  const active = activeIslands(world, position, 2400);
+  const activeIds = new Set(islandMeshes.keys());
+  const active = updateActiveIslands(world, position, activeIds, STREAMING_RANGES);
   const wanted = new Set(active.map((island) => island.id));
   for (const island of active) {
     if (!islandMeshes.has(island.id)) {
@@ -91,6 +95,34 @@ function updateStreaming() {
       islandMeshes.delete(id);
     }
   }
+  return active;
+}
+
+function nearestIsland() {
+  let nearest = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const island of world.islands) {
+    const distance = Math.hypot(position.x - island.x, position.z - island.z);
+    if (distance < nearestDistance) {
+      nearest = island;
+      nearestDistance = distance;
+    }
+  }
+  return nearest ? { island: nearest, distance: nearestDistance } : null;
+}
+
+function nearestLandingZone(island) {
+  if (!island?.landingZones?.length) return null;
+  let nearest = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const zone of island.landingZones) {
+    const distance = Math.hypot(position.x - zone.x, position.z - zone.z);
+    if (distance < nearestDistance) {
+      nearest = zone;
+      nearestDistance = distance;
+    }
+  }
+  return nearest ? { ...nearest, distance: nearestDistance } : null;
 }
 
 function terrainHeightAt(x, z) {
@@ -202,11 +234,22 @@ function frame(now) {
   controller.resolveGround(position, terrainHeightAt(position.x, position.z) + 2.5);
 
   if (position.y < -20 || !Number.isFinite(position.lengthSq())) recover();
-  updateStreaming();
+  const active = updateStreaming();
+  const proximity = nearestIsland();
+  currentRegion = proximity
+    ? world.regions.find((region) => region.id === proximity.island.regionId) || null
+    : null;
 
   for (const island of world.islands) {
-    if (!discovered.has(island.id) && Math.hypot(position.x - island.x, position.z - island.z) < 260) {
+    const threshold = island.discovery?.threshold ?? 260;
+    if (!discovered.has(island.id) && Math.hypot(position.x - island.x, position.z - island.z) < threshold) {
       discovered.add(island.id);
+      latestDiscovery = {
+        ...island.discovery,
+        islandId: island.id,
+        landmark: island.landmarkRecord,
+        discoveredAt: Date.now(),
+      };
     }
   }
 
@@ -224,7 +267,8 @@ function frame(now) {
 
   if (now - lastSaveAt > 12000) persist();
   const speed = Math.hypot(controller.velocity.x, controller.velocity.z);
-  stateLine.textContent = `${controller.airborne ? "FLIGHT" : "LANDED"} · ${Math.round(speed)} speed · ${Math.round(position.y)} altitude · ${discovered.size} discovered`;
+  const regionLabel = currentRegion?.name ? ` · ${currentRegion.name}` : "";
+  stateLine.textContent = `${controller.airborne ? "FLIGHT" : "LANDED"} · ${Math.round(speed)} speed · ${Math.round(position.y)} altitude · ${discovered.size} discovered${regionLabel}`;
 
   globalThis.__greyblueState = {
     ready: Boolean(dragon && heroIsle),
@@ -235,7 +279,27 @@ function frame(now) {
     flight: controller.snapshot(),
     animation: dragonRuntime?.telemetry || null,
     activeIslandCount: islandMeshes.size,
+    activeIslandIds: active.map((island) => island.id),
     discoveredCount: discovered.size,
+    discovered: [...discovered],
+    latestDiscovery,
+    currentRegion,
+    nearestIsland: proximity
+      ? {
+          id: proximity.island.id,
+          name: proximity.island.name,
+          regionId: proximity.island.regionId,
+          distance: proximity.distance,
+          landingZone: nearestLandingZone(proximity.island),
+          approachCorridors: proximity.island.approachCorridors,
+        }
+      : null,
+    world: {
+      regionCount: world.regions.length,
+      routeCount: world.routes.length,
+      islandCount: world.islands.length,
+      streaming: STREAMING_RANGES,
+    },
     clip,
   };
 
