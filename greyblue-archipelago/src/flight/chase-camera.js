@@ -129,8 +129,7 @@ export function resolveRecoveryAltitude(
   if (!finiteHorizontal(target) || typeof sampleHeight !== "function") {
     return Math.max(baseAltitude, floorAltitude);
   }
-  const sampled = sampleHeight(Number(target.x), Number(target.z));
-  const terrainHeight = normalizeHeight(sampled);
+  const terrainHeight = normalizeTerrainHeight(sampleHeight(Number(target.x), Number(target.z)));
   return Number.isFinite(terrainHeight)
     ? Math.max(baseAltitude, floorAltitude, terrainHeight + clearance)
     : Math.max(baseAltitude, floorAltitude);
@@ -146,15 +145,22 @@ export function maximumFiniteHeightAlongSegment(start, end, sampleHeight, sample
     const amount = index / (count - 1);
     const x = start.x + (end.x - start.x) * amount;
     const z = start.z + (end.z - start.z) * amount;
-    const height = normalizeHeight(sampleHeight(x, z));
+    const height = normalizeTerrainHeight(sampleHeight(x, z));
     if (Number.isFinite(height)) maximum = Math.max(maximum, height);
   }
   return maximum;
 }
 
-function normalizeHeight(sampled) {
+export function normalizeTerrainHeight(sampled) {
   if (sampled === null || sampled === undefined) return Number.NEGATIVE_INFINITY;
   if (typeof sampled === "object") {
+    const validity = typeof sampled.validity === "string" ? sampled.validity.toLowerCase() : "";
+    if (sampled.valid === false
+      || sampled.outOfBounds === true
+      || sampled.missing === true
+      || ["missing", "non-finite", "out-of-bounds"].includes(validity)) {
+      return Number.NEGATIVE_INFINITY;
+    }
     const height = Number(sampled.height);
     return Number.isFinite(height) ? height : Number.NEGATIVE_INFINITY;
   }
