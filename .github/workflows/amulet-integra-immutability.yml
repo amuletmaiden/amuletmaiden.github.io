@@ -1,0 +1,57 @@
+name: Protect Amulet Integra history
+
+on:
+  pull_request:
+    paths:
+      - "amulet_integra/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "amulet_integra/**"
+
+permissions:
+  contents: read
+
+jobs:
+  immutable-history:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out complete history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve comparison base
+        id: base
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Reject edits to published versions
+        shell: bash
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: |
+          if [[ -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
+            exit 0
+          fi
+          failed=0
+          while IFS=$'\t' read -r status first second; do
+            [[ -z "$status" ]] && continue
+            if [[ "$status" == A* ]]; then
+              continue
+            fi
+            target="$first"
+            [[ -n "$second" ]] && target="$first -> $second"
+            echo "::error file=$first::Published Amulet Integra versions are immutable. Create a new versions/YYYY-MM-DD-slug directory instead of $status $target."
+            failed=1
+          done < <(git diff --name-status "$BASE_SHA" "$GITHUB_SHA" -- amulet_integra/versions/)
+          exit "$failed"
+
+      - name: Validate catalogue and manifests
+        run: node amulet_integra/tools/validate-release.js
