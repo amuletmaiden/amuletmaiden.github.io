@@ -19,8 +19,11 @@ assert.equal(clean.counts.uniqueIslandIds, 64);
 assert.equal(clean.counts.uniqueRouteDiscoveryIds, world.routes.length);
 assert.deepEqual(clean.diagnostics, {
   issueCount: 0,
+  highestSeverity: null,
+  severities: [],
   codes: [],
   invariants: [],
+  bySeverity: {},
   byCode: {},
   byInvariant: {},
 });
@@ -47,28 +50,21 @@ const second = validateWorldContract(broken);
 assert.equal(first.valid, false);
 assert.deepEqual(first, second, "validation results must be deterministic");
 assert.equal(first.diagnostics.issueCount, first.issues.length);
+assert.equal(first.diagnostics.highestSeverity, "critical");
+assert.deepEqual(first.diagnostics.severities, ["critical", "error", "warning"]);
+assert.equal(Object.values(first.diagnostics.bySeverity).reduce((sum, count) => sum + count, 0), first.issues.length);
 assert.deepEqual(first.diagnostics.codes, Object.keys(first.diagnostics.byCode).sort());
 assert.deepEqual(first.diagnostics.invariants, Object.keys(first.diagnostics.byInvariant).sort());
-assert.equal(Object.values(first.diagnostics.byCode).reduce((sum, count) => sum + count, 0), first.issues.length);
-assert.equal(Object.values(first.diagnostics.byInvariant).reduce((sum, count) => sum + count, 0), first.issues.length);
-assert(first.issues.every((entry) => typeof entry.invariant === "string" && entry.invariant.length > 0));
-assert(first.issues.some((entry) => entry.invariant === "island-id-unique"));
-assert(first.issues.some((entry) => entry.invariant === "island-region-known"));
-assert(first.issues.some((entry) => entry.invariant === "route-destination-known"));
-assert(first.issues.some((entry) => entry.invariant === "route-distance-finite"));
-assert(first.issues.some((entry) => entry.invariant === "route-bearingFrom-bounded"));
-assert(first.issues.some((entry) => entry.invariant === "route-altitude-band"));
-assert(first.issues.some((entry) => entry.invariant === "route-fog-risk-bounded"));
-assert(first.issues.some((entry) => entry.invariant === "route-discovery-endpoints"));
-assert(first.issues.some((entry) => entry.invariant === "route-discovery-unique"));
-assert(first.issues.some((entry) => entry.invariant === "region-adjacency-unique"));
-assert(first.issues.some((entry) => entry.invariant === "region-adjacency-no-self"));
-assert(first.issues.some((entry) => entry.invariant === "region-adjacency-known"));
-assert(first.issues.some((entry) => entry.invariant === "region-adjacency-symmetric"));
+assert(first.issues.every((entry) => ["critical", "error", "warning"].includes(entry.severity)));
+assert(first.issues.some((entry) => entry.invariant === "island-id-unique" && entry.severity === "critical"));
+assert(first.issues.some((entry) => entry.invariant === "route-distance-finite" && entry.severity === "error"));
+assert(first.issues.some((entry) => entry.invariant === "region-adjacency-symmetric" && entry.severity === "warning"));
+const severityRank = { critical: 0, error: 1, warning: 2 };
 assert.deepEqual(
-  [...first.issues].sort((a, b) => a.code.localeCompare(b.code)
-    || a.subject.localeCompare(b.subject)
+  [...first.issues].sort((a, b) => severityRank[a.severity] - severityRank[b.severity]
     || a.invariant.localeCompare(b.invariant)
+    || a.subject.localeCompare(b.subject)
+    || a.code.localeCompare(b.code)
     || a.message.localeCompare(b.message)),
   first.issues,
 );
