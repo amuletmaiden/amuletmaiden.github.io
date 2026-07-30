@@ -14,12 +14,20 @@ const ASSETS = Object.freeze({
 });
 const STREAMING_RANGES = Object.freeze({ activateRange: 2400, deactivateRange: 3000 });
 const FALLBACK_SPAWN = Object.freeze({ x: 0, y: 160, z: 0 });
+const DEFAULT_FOG = Object.freeze({
+  color: "#71848b",
+  near: 120,
+  far: 2100,
+  density: 0.00042,
+  altitudeThinning: 1000,
+  transitionDistance: 800,
+});
 
 const stateLine = document.querySelector("#state");
 const errorLine = document.querySelector("#error");
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x71848b);
-scene.fog = new THREE.FogExp2(0x71848b, 0.00042);
+scene.background = new THREE.Color(DEFAULT_FOG.color);
+scene.fog = new THREE.FogExp2(DEFAULT_FOG.color, DEFAULT_FOG.density);
 
 const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 24000);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -38,6 +46,7 @@ const save = loadGame();
 const seed = Number.isInteger(save?.seed) ? save.seed : 1337;
 const world = buildArchipelago({ seed, count: 64, radius: 11000, minGap: 390 });
 const discovered = new Set(save?.discovered || []);
+const discoveredRoutes = new Set(save?.discoveredRoutes || []);
 const position = new THREE.Vector3(
   save?.position?.x ?? FALLBACK_SPAWN.x,
   save?.position?.y ?? FALLBACK_SPAWN.y,
@@ -60,6 +69,7 @@ let lastSaveAt = performance.now();
 let lastFrameAt = performance.now();
 let latestDiscovery = null;
 let currentRegion = null;
+let currentFogProfile = { ...DEFAULT_FOG };
 const islandMeshes = new Map();
 const loader = new GLTFLoader();
 
@@ -166,6 +176,7 @@ function recover() {
     airborne: controller.airborne,
     landingRequested: controller.landingRequested,
     discovered,
+    discoveredRoutes,
   }, FALLBACK_SPAWN);
   position.set(recovered.position.x, recovered.position.y, recovered.position.z);
   Object.assign(controller.velocity, recovered.velocity);
@@ -181,9 +192,47 @@ function persist() {
     seed,
     position: { x: position.x, y: position.y, z: position.z },
     discovered,
+    discoveredRoutes,
     settings: { cameraDistance: chaseCamera.distance },
   });
   lastSaveAt = performance.now();
+}
+
+function updateFog(dt) {
+  const target = currentRegion?.fogProfile || DEFAULT_FOG;
+  const targetColor = new THREE.Color(target.color || DEFAULT_FOG.color);
+  const altitudeScale = clamp(1 - Math.max(0, position.y) / Math.max(1, target.altitudeThinning || 1000) * 0.58, 0.34, 1);
+  const targetDensity = (target.density || DEFAULT_FOG.density) * altitudeScale;
+  const transitionSeconds = clamp((target.transitionDistance || 800) / 1400, 0.35, 1.8);
+  const blend = 1 - Math.exp(-Math.max(0, dt) / transitionSeconds);
+  scene.fog.color.lerp(targetColor, blend);
+  scene.background.lerp(targetColor, blend * 0.65);
+  scene.fog.density += (targetDensity - scene.fog.density) * blend;
+  currentFogProfile = {
+    ...target,
+    effectiveDensity: scene.fog.density,
+    altitudeScale,
+  };
+}
+
+function discoverRoutes() {
+  for (const route of world.routes) {
+    const discovery = route.discovery;
+    if (!discovery || discoveredRoutes.has(route.id)) continue;
+    const distance = Math.hypot(position.x - discovery.midpoint.x, position.z - discovery.midpoint.z);
+    if (distance >= discovery.revealRadius) continue;
+    discoveredRoutes.add(route.id);
+    latestDiscovery = {
+      ...discovery,
+      routeId: route.id,
+      kind: route.kind,
+      discoveredAt: Date.now(),
+    };
+  }
+}
+
+function clamp(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, value));
 }
 
 addEventListener("keydown", (event) => {
@@ -284,6 +333,7 @@ function frame(now) {
   currentRegion = proximity
     ? world.regions.find((region) => region.id === proximity.island.regionId) || null
     : null;
+  updateFog(dt);
 
   for (const island of world.islands) {
     const threshold = island.discovery?.threshold ?? 260;
@@ -297,6 +347,7 @@ function frame(now) {
       };
     }
   }
+  discoverRoutes();
 
   if (dragon) {
     dragon.position.copy(position);
@@ -320,7 +371,7 @@ function frame(now) {
   if (now - lastSaveAt > 12000) persist();
   const speed = flightState.speed;
   const regionLabel = currentRegion?.name ? ` · ${currentRegion.name}` : "";
-  stateLine.textContent = `${controller.airborne ? "FLIGHT" : "LANDED"} · ${Math.round(speed)} speed · ${Math.round(position.y)} altitude · ${discovered.size} discovered${regionLabel}`;
+  stateLine.textContent = `${controller.airborne ? "FLIGHT" : "LANDED"} · ${Math.round(speed)} speed · ${Math.round(position.y)} altitude · ${discovered.size} isles · ${discoveredRoutes.size} routes${regionLabel}`;
 
   globalThis.__greyblueState = {
     ready: Boolean(dragon && heroIsle),
@@ -338,10 +389,13 @@ function frame(now) {
     },
     animation: dragonRuntime?.telemetry || null,
     camera: cameraState,
+    fog: currentFogProfile,
     activeIslandCount: islandMeshes.size,
     activeIslandIds: active.map((island) => island.id),
     discoveredCount: discovered.size,
     discovered: [...discovered],
+    discoveredRouteCount: discoveredRoutes.size,
+    discoveredRoutes: [...discoveredRoutes],
     latestDiscovery,
     currentRegion,
     nearestIsland: proximity
