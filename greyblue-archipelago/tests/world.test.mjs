@@ -104,6 +104,30 @@ const crossRegionRoutes = first.routes.filter((route) => route.fromRegionId !== 
 assert(crossRegionRoutes.length > 0, "far-ring routes should create cross-region guidance");
 assert(first.regions.every((region) => region.adjacentRegionIds.length >= 2), "the regional ring should expose both neighboring regions");
 
+for (let seed = 1; seed <= 48; seed += 1) {
+  const world = buildArchipelago({ ...options, seed });
+  const islands = new Map(world.islands.map((island) => [island.id, island]));
+  const regions = new Map(world.regions.map((region) => [region.id, region]));
+  assert.equal(world.islands.length, options.count, `seed ${seed} did not produce the requested island count`);
+  for (const route of world.routes) {
+    const from = islands.get(route.fromIslandId);
+    const to = islands.get(route.toIslandId);
+    assert(from && to, `seed ${seed} route ${route.id} has a missing endpoint`);
+    assert(Number.isFinite(route.navigation.distance) && route.navigation.distance > 0);
+    assert(route.navigation.minimumAltitude >= Math.max(90, from.height * 0.28, to.height * 0.28));
+    assert(route.navigation.cruiseAltitude > route.navigation.minimumAltitude);
+    assert(route.navigation.fogRisk.score >= 0 && route.navigation.fogRisk.score <= 1);
+    const expectedBack = (route.navigation.bearingFrom + Math.PI) % (Math.PI * 2);
+    assert(Math.abs(route.navigation.bearingTo - expectedBack) < 1e-10, `seed ${seed} route ${route.id} lost reciprocal bearing`);
+  }
+  for (const region of world.regions) {
+    assert.deepEqual(region.adjacentRegionIds, [...region.adjacentRegionIds].sort());
+    for (const neighborId of region.adjacentRegionIds) {
+      assert(regions.get(neighborId)?.adjacentRegionIds.includes(region.id), `seed ${seed} adjacency ${region.id}/${neighborId} is asymmetric`);
+    }
+  }
+}
+
 const target = first.islands[0];
 assert.deepEqual(activeIslands(first, { x: target.x, z: target.z }, 1).map((island) => island.id), [target.id]);
 const hysteresisPosition = { x: target.x + 2000, z: target.z };
@@ -124,5 +148,6 @@ console.log(JSON.stringify({
   regions: first.regions.length,
   routes: first.routes.length,
   landmarks: first.islands.filter((island) => island.landmarkRecord).length,
+  stressSeeds: 48,
   status: "pass",
 }));
