@@ -52,7 +52,8 @@ export class FlightCollisionResolver {
     if (!contact) {
       this.consecutiveContacts = 0;
       const destinationSurface = normalizeSurface(sampleSurface(destination.x, destination.z));
-      if (destination.y >= destinationSurface.height + this.options.clearance + this.options.safeMargin) {
+      if (destinationSurface.valid
+        && destination.y >= destinationSurface.height + this.options.clearance + this.options.safeMargin) {
         this.lastSafePosition = cloneVector(destination);
       }
       this.telemetry = {
@@ -60,7 +61,8 @@ export class FlightCollisionResolver {
         grounded: false,
         requiresRecovery: false,
         reason: "clear",
-        surface: destinationSurface.surface,
+        surface: destinationSurface.valid ? destinationSurface.surface : "unknown",
+        terrainValidity: destinationSurface.validity,
         consecutiveContacts: 0,
         sweptSteps: 0,
       };
@@ -71,7 +73,7 @@ export class FlightCollisionResolver {
         grounded: false,
         requiresRecovery: false,
         reason: "clear",
-        surface: destinationSurface.surface,
+        surface: this.telemetry.surface,
         contact: null,
         telemetry: { ...this.telemetry },
       };
@@ -111,6 +113,7 @@ export class FlightCollisionResolver {
         requiresRecovery: false,
         reason,
         surface: contact.surface.surface,
+        terrainValidity: contact.surface.validity,
         consecutiveContacts: 0,
         sweptSteps: contact.step,
       };
@@ -154,6 +157,7 @@ export class FlightCollisionResolver {
       requiresRecovery: false,
       reason: snagging ? "snag-escape" : "terrain-impact",
       surface: contact.surface.surface,
+      terrainValidity: contact.surface.validity,
       consecutiveContacts: this.consecutiveContacts,
       sweptSteps: contact.step,
     };
@@ -179,6 +183,7 @@ export class FlightCollisionResolver {
       requiresRecovery: true,
       reason,
       surface: contact?.surface?.surface || "unknown",
+      terrainValidity: contact?.surface?.validity || "missing",
       consecutiveContacts: 0,
       sweptSteps: contact?.step || 0,
     };
@@ -219,6 +224,7 @@ export function sweepSurfaceContact(previous, proposed, sampleSurface, options =
       z: lerp(previous.z, proposed.z, t),
     };
     const surface = normalizeSurface(sampleSurface(point.x, point.z));
+    if (!surface.valid) continue;
     if (point.y <= surface.height + settings.clearance) {
       return { point, surface, t, step, steps };
     }
@@ -227,14 +233,27 @@ export function sweepSurfaceContact(previous, proposed, sampleSurface, options =
 }
 
 export function normalizeSurface(value) {
-  if (Number.isFinite(Number(value))) {
+  if (value === null || value === undefined) return invalidSurface("missing");
+
+  if (typeof value !== "object") {
     const height = Number(value);
-    return { height, surface: height > 0 ? "terrain" : "water", id: null };
+    if (!Number.isFinite(height)) return invalidSurface("non-finite");
+    return {
+      height,
+      surface: height > 0 ? "terrain" : "water",
+      id: null,
+      valid: true,
+      validity: "valid",
+    };
   }
-  if (!value || typeof value !== "object") {
-    return { height: 0, surface: "water", id: null };
+
+  const declaredValidity = normalizeValidity(value);
+  if (declaredValidity === "missing" || declaredValidity === "non-finite" || declaredValidity === "out-of-bounds") {
+    return invalidSurface(declaredValidity, value.id ?? null);
   }
-  const height = Number.isFinite(Number(value.height)) ? Number(value.height) : 0;
+
+  const height = Number(value.height);
+  if (!Number.isFinite(height)) return invalidSurface("non-finite", value.id ?? null);
   const surface = typeof value.surface === "string" && value.surface
     ? value.surface
     : height > 0 ? "terrain" : "water";
@@ -242,6 +261,27 @@ export function normalizeSurface(value) {
     height,
     surface,
     id: value.id ?? null,
+    valid: true,
+    validity: declaredValidity,
+  };
+}
+
+function normalizeValidity(value) {
+  if (value.valid === false || value.outOfBounds === true) return "out-of-bounds";
+  if (value.missing === true) return "missing";
+  const label = typeof value.validity === "string" ? value.validity.toLowerCase() : "";
+  if (["missing", "non-finite", "out-of-bounds"].includes(label)) return label;
+  if (label === "sparse" || value.sparse === true) return "sparse";
+  return "valid";
+}
+
+function invalidSurface(validity, id = null) {
+  return {
+    height: 0,
+    surface: "unknown",
+    id,
+    valid: false,
+    validity,
   };
 }
 
@@ -252,6 +292,7 @@ function neutralTelemetry() {
     requiresRecovery: false,
     reason: "clear",
     surface: "unknown",
+    terrainValidity: "missing",
     consecutiveContacts: 0,
     sweptSteps: 0,
   };
