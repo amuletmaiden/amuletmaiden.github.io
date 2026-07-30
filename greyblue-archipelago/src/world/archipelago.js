@@ -144,6 +144,16 @@ function makeLandmarkEncounter(island, region, kind) {
   };
 }
 
+function routeFogRisk(fromRegion, toRegion, distance) {
+  const averageDensity = ((fromRegion?.fogProfile.density ?? 0.00032) + (toRegion?.fogProfile.density ?? 0.00032)) * 0.5;
+  const distancePressure = clamp(distance / 5200, 0, 1) * 0.22;
+  const score = clamp((averageDensity - 0.0002) / 0.00024 + distancePressure, 0, 1);
+  return {
+    score,
+    level: score >= 0.72 ? "high" : score >= 0.42 ? "moderate" : "low",
+  };
+}
+
 function buildRegionAndRouteRecords(islands) {
   const regions = REGION_DEFINITIONS.map((definition) => {
     const members = islands
@@ -156,6 +166,7 @@ function buildRegionAndRouteRecords(islands) {
       fogProfile: { ...definition.fogProfile },
       islandIds: members.map((island) => island.id),
       anchorIslandId: members.find((island) => island.landmark)?.id ?? members[0]?.id ?? null,
+      adjacentRegionIds: [],
     };
   });
 
@@ -187,9 +198,32 @@ function buildRegionAndRouteRecords(islands) {
   }
 
   const islandById = new Map(islands.map((island) => [island.id, island]));
+  const regionById = new Map(regions.map((region) => [region.id, region]));
+  const adjacency = new Map(regions.map((region) => [region.id, new Set()]));
+
   for (const route of routes) {
     const from = islandById.get(route.fromIslandId);
     const to = islandById.get(route.toIslandId);
+    const dx = (to?.x ?? 0) - (from?.x ?? 0);
+    const dz = (to?.z ?? 0) - (from?.z ?? 0);
+    const distance = Math.hypot(dx, dz);
+    const fromRegionId = from?.regionId ?? route.regionId ?? null;
+    const toRegionId = to?.regionId ?? route.regionId ?? null;
+    const fromRegion = fromRegionId ? regionById.get(fromRegionId) : null;
+    const toRegion = toRegionId ? regionById.get(toRegionId) : null;
+    const minimumAltitude = Math.max(90, (from?.height ?? 0) * 0.28, (to?.height ?? 0) * 0.28);
+    const cruiseAltitude = minimumAltitude + (route.kind === "far-ring" ? 150 : 90);
+
+    route.fromRegionId = fromRegionId;
+    route.toRegionId = toRegionId;
+    route.navigation = {
+      distance,
+      bearingFrom: wrapAngle(Math.atan2(dx, dz)),
+      bearingTo: wrapAngle(Math.atan2(-dx, -dz)),
+      minimumAltitude,
+      cruiseAltitude,
+      fogRisk: routeFogRisk(fromRegion, toRegion, distance),
+    };
     route.discovery = {
       id: `${route.id}:discovery`,
       title: `${from?.name ?? route.fromIslandId} → ${to?.name ?? route.toIslandId}`,
@@ -203,6 +237,15 @@ function buildRegionAndRouteRecords(islands) {
         z: ((from?.z ?? 0) + (to?.z ?? 0)) * 0.5,
       },
     };
+
+    if (fromRegionId && toRegionId && fromRegionId !== toRegionId) {
+      adjacency.get(fromRegionId)?.add(toRegionId);
+      adjacency.get(toRegionId)?.add(fromRegionId);
+    }
+  }
+
+  for (const region of regions) {
+    region.adjacentRegionIds = [...(adjacency.get(region.id) ?? [])].sort();
   }
 
   const routeIdsByIsland = new Map(islands.map((island) => [island.id, []]));
