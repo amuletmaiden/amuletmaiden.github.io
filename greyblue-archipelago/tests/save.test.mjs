@@ -8,6 +8,7 @@ const {
   loadGame,
   safeRespawn,
   isValidWorldPosition,
+  isValidVelocity,
 } = await import(moduleUrl);
 
 class MemoryStorage {
@@ -22,14 +23,29 @@ class MemoryStorage {
   const saved = saveGame({
     seed: 77,
     position: { x: 12, y: 144, z: -31 },
+    velocity: { x: 23, y: -4, z: 71 },
+    orientation: { yaw: 1.2, pitch: -0.25, bank: 0.4 },
+    airborne: false,
+    landingRequested: true,
     discovered: new Set(["isle-1", "isle-1", "isle-2"]),
     settings: { cameraDistance: 24 },
   }, storage);
+  assert.equal(saved.version, 2);
   assert.deepEqual(saved.position, { x: 12, y: 144, z: -31 });
+  assert.deepEqual(saved.velocity, { x: 23, y: -4, z: 71 });
+  assert.deepEqual(saved.orientation, { yaw: 1.2, pitch: -0.25, bank: 0.4 });
+  assert.equal(saved.airborne, false);
+  assert.equal(saved.landingRequested, true);
   assert.deepEqual(saved.discovered, ["isle-1", "isle-2"]);
   const loaded = loadGame(storage);
   assert.equal(loaded.seed, 77);
+  assert.equal(loaded.airborne, false);
+  assert.equal(loaded.landingRequested, true);
+  assert.deepEqual(loaded.velocity, { x: 23, y: -4, z: 71 });
+  assert.deepEqual(loaded.orientation, { yaw: 1.2, pitch: -0.25, bank: 0.4 });
   assert.equal(loaded.recoveredCorruptPosition, false);
+  assert.equal(loaded.recoveredCorruptVelocity, false);
+  assert.equal(loaded.migratedFromVersion, null);
 }
 
 {
@@ -37,11 +53,14 @@ class MemoryStorage {
   saveGame({
     seed: 1337,
     position: { x: -4.3e12, y: 2.5, z: 2.5e12 },
+    velocity: { x: Infinity, y: 0, z: 0 },
     discovered: ["isle-45"],
   }, storage);
   const loaded = loadGame(storage);
   assert.deepEqual(loaded.position, { x: 0, y: 160, z: 0 });
+  assert.deepEqual(loaded.velocity, { x: 0, y: 0, z: 0 });
   assert.equal(loaded.recoveredCorruptPosition, false, "saveGame never persists a corrupt position");
+  assert.equal(loaded.recoveredCorruptVelocity, false, "saveGame never persists corrupt velocity");
   assert.deepEqual(loaded.discovered, ["isle-45"]);
 }
 
@@ -55,9 +74,37 @@ class MemoryStorage {
     settings: {},
   }));
   const loaded = loadGame(storage);
+  assert.equal(loaded.version, 2);
+  assert.equal(loaded.migratedFromVersion, 1);
   assert.deepEqual(loaded.position, { x: 0, y: 160, z: 0 });
+  assert.deepEqual(loaded.velocity, { x: 0, y: 0, z: 0 });
+  assert.deepEqual(loaded.orientation, { yaw: 0, pitch: 0, bank: 0 });
+  assert.equal(loaded.airborne, true);
+  assert.equal(loaded.landingRequested, false);
   assert.equal(loaded.recoveredCorruptPosition, true);
-  assert.deepEqual(loaded.discovered, ["isle-45"], "recovery preserves discovery state");
+  assert.equal(loaded.recoveredCorruptVelocity, true);
+  assert.deepEqual(loaded.discovered, ["isle-45"], "migration preserves discovery state");
+}
+
+{
+  const storage = new MemoryStorage();
+  storage.setItem("greyblue-archipelago-save-v1", JSON.stringify({
+    version: 2,
+    seed: 9,
+    position: { x: 1, y: 2, z: 3 },
+    velocity: { x: 9000, y: 0, z: 0 },
+    orientation: { yaw: NaN, pitch: Infinity, bank: -Infinity },
+    airborne: false,
+    landingRequested: true,
+    discovered: [],
+    settings: {},
+  }));
+  const loaded = loadGame(storage);
+  assert.deepEqual(loaded.velocity, { x: 0, y: 0, z: 0 });
+  assert.deepEqual(loaded.orientation, { yaw: 0, pitch: 0, bank: 0 });
+  assert.equal(loaded.recoveredCorruptVelocity, true);
+  assert.equal(loaded.airborne, false);
+  assert.equal(loaded.landingRequested, true);
 }
 
 {
@@ -65,9 +112,18 @@ class MemoryStorage {
   assert.equal(isValidWorldPosition({ x: Infinity, y: 0, z: 0 }), false);
   assert.equal(isValidWorldPosition({ x: 24001, y: 0, z: 0 }), false);
   assert.equal(isValidWorldPosition({ x: 0, y: 8001, z: 0 }), false);
-  const recovered = safeRespawn({ airborne: false }, { x: Infinity, y: 0, z: 0 });
+  assert.equal(isValidVelocity({ x: 0, y: -20, z: 120 }), true);
+  assert.equal(isValidVelocity({ x: 501, y: 0, z: 0 }), false);
+  const recovered = safeRespawn({
+    airborne: false,
+    landingRequested: true,
+    orientation: { yaw: 1, pitch: 2, bank: 3 },
+  }, { x: Infinity, y: 0, z: 0 });
   assert.deepEqual(recovered.position, { x: 0, y: 160, z: 0 });
+  assert.deepEqual(recovered.velocity, { x: 0, y: 0, z: 0 });
+  assert.deepEqual(recovered.orientation, { yaw: 1, pitch: 2, bank: 3 });
   assert.equal(recovered.airborne, true);
+  assert.equal(recovered.landingRequested, false);
 }
 
 console.log("save tests passed");
