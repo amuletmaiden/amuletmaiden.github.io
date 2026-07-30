@@ -24,6 +24,19 @@ export class DragonRuntime {
     this.clips.clear();
     this.actions.clear();
     this.roles.clear();
+    this.currentAction = null;
+    this.currentClip = null;
+    this.state = "grounded-idle";
+    this.stateAge = 0;
+    this.telemetry = {
+      state: this.state,
+      clip: null,
+      fallback: false,
+      available: [],
+      missing: [],
+      stateAge: 0,
+      heldState: false,
+    };
     for (const clip of clips) {
       const key = clip.name.toLowerCase();
       this.clips.set(key, clip);
