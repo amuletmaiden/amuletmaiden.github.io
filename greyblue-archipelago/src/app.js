@@ -13,6 +13,7 @@ const ASSETS = Object.freeze({
   isle: "../greyblue-dragon-flight-m1/isle.glb",
 });
 const STREAMING_RANGES = Object.freeze({ activateRange: 2400, deactivateRange: 3000 });
+const FALLBACK_SPAWN = Object.freeze({ x: 0, y: 160, z: 0 });
 
 const stateLine = document.querySelector("#state");
 const errorLine = document.querySelector("#error");
@@ -38,9 +39,9 @@ const seed = Number.isInteger(save?.seed) ? save.seed : 1337;
 const world = buildArchipelago({ seed, count: 64, radius: 11000, minGap: 390 });
 const discovered = new Set(save?.discovered || []);
 const position = new THREE.Vector3(
-  save?.position?.x ?? 0,
-  save?.position?.y ?? 140,
-  save?.position?.z ?? 180,
+  save?.position?.x ?? FALLBACK_SPAWN.x,
+  save?.position?.y ?? FALLBACK_SPAWN.y,
+  save?.position?.z ?? FALLBACK_SPAWN.z,
 );
 
 const controller = new FlightController();
@@ -165,7 +166,7 @@ function recover() {
     airborne: controller.airborne,
     landingRequested: controller.landingRequested,
     discovered,
-  }, { x: 0, y: 160, z: 220 });
+  }, FALLBACK_SPAWN);
   position.set(recovered.position.x, recovered.position.y, recovered.position.z);
   Object.assign(controller.velocity, recovered.velocity);
   controller.airborne = recovered.airborne;
