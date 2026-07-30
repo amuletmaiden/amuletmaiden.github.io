@@ -155,7 +155,9 @@ export function normalizeTerrainHeight(sampled) {
   if (sampled === null || sampled === undefined) return Number.NEGATIVE_INFINITY;
   if (typeof sampled === "object") {
     const validity = typeof sampled.validity === "string" ? sampled.validity.toLowerCase() : "";
-    if (sampled.valid === false
+    const surface = typeof sampled.surface === "string" ? sampled.surface.toLowerCase() : "";
+    if (surface === "water"
+      || sampled.valid === false
       || sampled.outOfBounds === true
       || sampled.missing === true
       || ["missing", "non-finite", "out-of-bounds"].includes(validity)) {

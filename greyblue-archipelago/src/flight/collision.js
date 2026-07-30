@@ -3,6 +3,7 @@ const DEFAULTS = Object.freeze({
   sweepStep: 6,
   maximumSweepSteps: 512,
   safeMargin: 8,
+  shorelineTransitionDistance: 12,
   touchdownMaximumDescent: 8,
   touchdownMaximumHorizontalSpeed: 24,
   touchdownHorizontalRetention: 0.35,
@@ -18,12 +19,19 @@ export class FlightCollisionResolver {
   constructor(options = {}) {
     this.options = { ...DEFAULTS, ...options };
     this.lastSafePosition = null;
+    this.lastSafeTerrainPosition = null;
     this.consecutiveContacts = 0;
     this.telemetry = neutralTelemetry();
   }
 
-  reset(position = null) {
+  reset(position = null, surface = null) {
     this.lastSafePosition = isFiniteVector(position) ? cloneVector(position) : null;
+    const normalized = surface === null ? null : normalizeSurface(surface);
+    this.lastSafeTerrainPosition = isFiniteVector(position)
+      && normalized?.valid
+      && normalized.surface !== "water"
+      ? cloneVector(position)
+      : null;
     this.consecutiveContacts = 0;
     this.telemetry = neutralTelemetry();
   }
@@ -55,6 +63,9 @@ export class FlightCollisionResolver {
       if (destinationSurface.valid
         && destination.y >= destinationSurface.height + this.options.clearance + this.options.safeMargin) {
         this.lastSafePosition = cloneVector(destination);
+        if (destinationSurface.surface !== "water") {
+          this.lastSafeTerrainPosition = cloneVector(destination);
+        }
       }
       this.telemetry = {
         collided: false,
@@ -89,7 +100,7 @@ export class FlightCollisionResolver {
       && horizontalSpeed <= this.options.touchdownMaximumHorizontalSpeed;
 
     if (contact.surface.surface === "water") {
-      return this.#recoveryResult("water-contact", contact);
+      return this.#recoveryResult("water-contact", contact, true);
     }
 
     if (settledGround || touchdown) {
@@ -106,6 +117,7 @@ export class FlightCollisionResolver {
         z: motion.z * retention,
       };
       this.lastSafePosition = cloneVector(position);
+      this.lastSafeTerrainPosition = cloneVector(position);
       this.consecutiveContacts = 0;
       this.telemetry = {
         collided: true,
@@ -151,6 +163,7 @@ export class FlightCollisionResolver {
       z: motion.z * horizontalRetention,
     };
     this.lastSafePosition = cloneVector(position);
+    this.lastSafeTerrainPosition = cloneVector(position);
     this.telemetry = {
       collided: true,
       grounded: false,
@@ -174,8 +187,10 @@ export class FlightCollisionResolver {
     };
   }
 
-  #recoveryResult(reason, contact = null) {
-    const fallback = this.lastSafePosition || { x: 0, y: 160, z: 220 };
+  #recoveryResult(reason, contact = null, preferTerrain = false) {
+    const fallback = preferTerrain
+      ? this.lastSafeTerrainPosition || this.lastSafePosition || { x: 0, y: 160, z: 0 }
+      : this.lastSafePosition || this.lastSafeTerrainPosition || { x: 0, y: 160, z: 0 };
     this.consecutiveContacts = 0;
     this.telemetry = {
       collided: Boolean(contact),
@@ -215,6 +230,7 @@ export function sweepSurfaceContact(previous, proposed, sampleSurface, options =
   );
   const rawSteps = Math.max(1, Math.ceil(distance / Math.max(settings.sweepStep, 0.01)));
   const steps = Math.min(settings.maximumSweepSteps, rawSteps);
+  let firstWaterContact = null;
 
   for (let step = 1; step <= steps; step += 1) {
     const t = step / steps;
@@ -224,12 +240,22 @@ export function sweepSurfaceContact(previous, proposed, sampleSurface, options =
       z: lerp(previous.z, proposed.z, t),
     };
     const surface = normalizeSurface(sampleSurface(point.x, point.z));
-    if (!surface.valid) continue;
-    if (point.y <= surface.height + settings.clearance) {
-      return { point, surface, t, step, steps };
+    if (!surface.valid || point.y > surface.height + settings.clearance) continue;
+
+    const contact = { point, surface, t, step, steps };
+    if (surface.surface !== "water") {
+      if (!firstWaterContact
+        || horizontalDistance(firstWaterContact.point, point) <= finiteNonNegative(
+          settings.shorelineTransitionDistance,
+          DEFAULTS.shorelineTransitionDistance,
+        )) {
+        return contact;
+      }
+      return firstWaterContact;
     }
+    if (!firstWaterContact) firstWaterContact = contact;
   }
-  return null;
+  return firstWaterContact;
 }
 
 export function normalizeSurface(value) {
@@ -311,6 +337,15 @@ function cloneVector(value) {
     y: Number(value.y),
     z: Number(value.z),
   };
+}
+
+function horizontalDistance(a, b) {
+  return Math.hypot(Number(a.x) - Number(b.x), Number(a.z) - Number(b.z));
+}
+
+function finiteNonNegative(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : fallback;
 }
 
 function lerp(start, end, amount) {
