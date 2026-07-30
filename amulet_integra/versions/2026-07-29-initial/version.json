@@ -9911,5 +9911,10 @@
       "bytes": 6357,
       "sha256": "b9d0c177f5e0be3f00756813571ec883e9d68a706313ac8938eb0ff4fc915dbf"
     }
-  ]
+  ],
+  "integrity": {
+    "algorithm": "sha256",
+    "byte_semantics": "git-blob-exact",
+    "line_ending_policy": "amulet_integra/.gitattributes versions/** -text"
+  }
 }
