@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Controller — Instant Track Switching</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body{font-family:system-ui,Segoe UI,Inter,Arial,sans-serif;max-width:900px;margin:24px auto;padding:0 12px;line-height:1.45}
+  h1{font-size:1.3rem;margin:0 0 10px}
+  .card{border:1px solid #ddd;border-radius:14px;padding:12px;margin:12px 0;background:#fff}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input,button,textarea{font:inherit}
+  button{padding:10px 14px;border:1px solid #ccc;border-radius:10px;background:#f7f7f7;cursor:pointer}
+  textarea{width:100%;height:140px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+  .muted{opacity:.7}.ok{color:#0a0}
+</style>
+</head>
+<body>
+<h1>Controller</h1>
+<p>1) Create offer and send it to the listener. 2) Paste their answer. 3) Click a track to switch it instantly on their device.</p>
+
+<div class="card">
+  <b>Tracks (names must match the listener list)</b>
+  <div id="tracks" class="grid"></div>
+  <div class="row">
+    <input id="nameIn" placeholder="Add track name (e.g., Binaural 1)">
+    <button id="addBtn">+ Add</button>
+  </div>
+  <div class="row">
+    <label><input id="hardCut" type="checkbox" checked> Hard cut</label>
+    <label>Fade ms: <input id="fadeMs" type="number" value="0" min="0" style="width:80px"></label>
+    <label><input id="loop" type="checkbox" checked> Loop</label>
+  </div>
+</div>
+
+<div class="card">
+  <b>Connect</b>
+  <div class="row">
+    <button id="createOfferBtn">Create Offer</button>
+  </div>
+  <textarea id="offerOut" placeholder="Send this to the listener" readonly></textarea>
+  <textarea id="answerIn" placeholder="Paste the listener's answer here"></textarea>
+  <div class="row">
+    <button id="applyAnswerBtn" disabled>Apply Answer</button>
+    <span id="status" class="muted">Not connected.</span>
+  </div>
+</div>
+
+<script>
+const tracksEl = document.getElementById('tracks');
+const nameIn = document.getElementById('nameIn');
+const addBtn = document.getElementById('addBtn');
+const hardCutEl = document.getElementById('hardCut');
+const fadeMsEl = document.getElementById('fadeMs');
+const loopEl = document.getElementById('loop');
+const createOfferBtn = document.getElementById('createOfferBtn');
+const offerOut = document.getElementById('offerOut');
+const answerIn = document.getElementById('answerIn');
+const applyAnswerBtn = document.getElementById('applyAnswerBtn');
+const statusEl = document.getElementById('status');
+
+let names = ["Binaural 1","Binaural 2"]; // edit or add more
+
+function render(){
+  tracksEl.innerHTML = '';
+  names.forEach(n=>{
+    const b = document.createElement('button');
+    b.textContent = n;
+    b.onclick = ()=> sendSwitch(n);
+    tracksEl.appendChild(b);
+  });
+}
+addBtn.onclick = ()=>{
+  const n = nameIn.value.trim();
+  if(!n) return;
+  names.push(n); nameIn.value=''; render();
+};
+function sendSwitch(name){
+  if (!dc || dc.readyState!=='open') return;
+  const msg = {
+    type:'switch',
+    name,
+    hardCut: hardCutEl.checked,
+    fadeMs: Math.max(0, parseInt(fadeMsEl.value||'0',10)),
+    loop: loopEl.checked
+  };
+  dc.send(JSON.stringify(msg));
+}
+
+// --- WebRTC (copy/paste signaling)
+const to64 = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const from64 = s => JSON.parse(decodeURIComponent(escape(atob(s))));
+let pc, dc;
+
+createOfferBtn.onclick = async ()=>{
+  statusEl.textContent = 'Creating offer…';
+  pc = new RTCPeerConnection({iceServers: []});
+  dc = pc.createDataChannel('control');
+  dc.onopen = ()=> statusEl.textContent = 'Connected.';
+  dc.onclose = ()=> statusEl.textContent = 'Disconnected.';
+  pc.oniceconnectionstatechange = ()=> statusEl.textContent = 'State: '+pc.iceConnectionState;
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await new Promise(res=>{
+    if (pc.iceGatheringState==='complete') return res();
+    pc.onicegatheringstatechange = ()=>{ if(pc.iceGatheringState==='complete') res(); };
+  });
+  offerOut.value = to64(pc.localDescription);
+  applyAnswerBtn.disabled = false;
+};
+
+applyAnswerBtn.onclick = async ()=>{
+  const ans = from64(answerIn.value.trim());
+  await pc.setRemoteDescription(ans);
+  statusEl.textContent = 'Connecting… (wait for "Connected.")';
+};
+
+render();
+</script>
+</body>
+</html>

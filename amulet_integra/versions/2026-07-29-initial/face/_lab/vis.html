@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>💚💥 MAGENTA/GREEN CHAOS 💥💚</title>
+  <meta name="theme-color" content="#00ff66" />
+  <meta name="description" content="A gloriously unhinged, neon-magenta-and-green playground showing off CSS & JavaScript shenanigans. Upload me to Neocities as index.html." />
+  <style>
+    /* ===================
+       GLOBAL & THEME
+       =================== */
+    :root {
+      --green: #00ff66;
+      --green-2: #16ff9a;
+      --magenta: #ff00cc;
+      --magenta-2: #ff33ff;
+      --ink: #0b0010;
+      --bg: #050007;
+      --white: #f8f8f8;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 18px;
+      --speed: 1; /* multiplied by JS "Insanity" slider */
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: var(--white);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      overflow: hidden; /* yes, we're going full app */
+    }
+
+    /* Animated background: layered gradients doing ridiculous things */
+    .bg {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      filter: saturate(1.2) contrast(1.15);
+      background:
+        radial-gradient(60vmax 60vmax at 10% 10%, rgba(255,0,204,.25), transparent 60%),
+        radial-gradient(60vmax 60vmax at 90% 20%, rgba(0,255,102,.25), transparent 60%),
+        radial-gradient(60vmax 60vmax at 20% 90%, rgba(255,0,204,.25), transparent 60%),
+        conic-gradient(from 0deg at 50% 50%, rgba(255,0,204,.2), rgba(0,255,102,.2), rgba(255,0,204,.2));
+      animation: swirl 26s linear infinite;
+    }
+
+    .bg-noise {
+      position: fixed; inset: 0; z-index: -1;
+      mix-blend-mode: overlay;
+      opacity: .2;
+      background-image: url('data:image/svg+xml;utf8,<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23n)" opacity=".6"/></svg>');
+      background-size: 200px 200px;
+      animation: noise 1.3s steps(2, end) infinite;
+    }
+
+    @keyframes swirl { to { transform: rotate(360deg); } }
+    @keyframes noise { 50% { transform: translate3d(0,0,0) scale(1.01); } }
+
+    /* ===================
+       HEADER HUB
+       =================== */
+    header#hud {
+      position: fixed;
+      top: 12px; left: 12px; right: 12px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .badge {
+      background: linear-gradient(135deg, var(--green), var(--magenta));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      font-weight: 900; letter-spacing: 1px; text-transform: uppercase;
+      text-shadow: 0 0 18px rgba(255,0,204,.45), 0 0 18px rgba(0,255,102,.45);
+      font-size: clamp(18px, 2.2vw, 28px);
+    }
+
+    .controls {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: rgba(11,0,16,.6); border: 2px solid rgba(255,0,204,.5);
+      box-shadow: var(--shadow); padding: 10px 14px; border-radius: var(--radius);
+      backdrop-filter: blur(6px) saturate(1.2);
+    }
+
+    .controls label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; opacity: .9; }
+    .controls input[type="range"] { width: 180px; }
+
+    .btn {
+      border: 2px solid var(--magenta);
+      background: linear-gradient(135deg, rgba(255,0,204,.15), rgba(0,255,102,.15));
+      color: var(--white); font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+      border-radius: 999px; padding: 8px 14px; cursor: pointer;
+      transition: transform .08s ease, box-shadow .2s ease, filter .2s ease;
+      box-shadow: 0 0 0 0 rgba(255,0,204,.6);
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(255,0,204,.25); }
+    .btn:active { transform: translateY(0) scale(.98); }
+
+    .blink { animation: blink 1.4s infinite; }
+    @keyframes blink { 50% { filter: drop-shadow(0 0 12px var(--green)) drop-shadow(0 0 16px var(--magenta)); } }
+
+    /* ===================
+       WINDOWS (DRAGGABLE)
+       =================== */
+    .win {
+      position: absolute;
+      min-width: 220px;
+      max-width: min(520px, 90vw);
+      background: rgba(5,0,7,.75);
+      border: 2px solid var(--green);
+      border-radius: 16px;
+      box-shadow: var(--shadow), 0 0 18px rgba(0,255,102,.3), inset 0 0 0 2px rgba(255,0,204,.15);
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .win .titlebar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; font-weight: 900; letter-spacing: .06em; text-transform: uppercase;
+      background: linear-gradient(180deg, rgba(0,255,102,.25), rgba(255,0,204,.25));
+      cursor: move;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.g { background: var(--green); box-shadow: 0 0 12px var(--green); }
+    .dot.m { background: var(--magenta); box-shadow: 0 0 12px var(--magenta); }
+
+    .win .body { padding: 12px; line-height: 1.45; }
+
+    .tag {
+      display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px;
+      background: rgba(255,0,204,.2); border: 1px solid rgba(255,0,204,.6);
+    }
+
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+    /* ===================
+       FLOATERS (BOUNCING THINGS)
+       =================== */
+    .floater {
+      position: absolute;
+      will-change: transform; /* smoother */
+      filter: drop-shadow(0 8px 12px rgba(0,0,0,.4));
+      pointer-events: auto;
+    }
+
+    .sticker {
+      padding: 8px 12px; border-radius: 12px; font-weight: 900;
+      color: var(--ink); background: var(--green);
+      transform: rotate(-6deg);
+      border: 2px solid var(--magenta);
+      text-shadow: none;
+    }
+
+    .orb { width: 70px; height: 70px; border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, var(--magenta-2), var(--magenta) 40%, #320022 75%);
+      box-shadow: 0 0 30px rgba(255,0,204,.55), inset 0 0 24px rgba(0,255,102,.35);
+    }
+
+    .square { width: 90px; height: 90px; border-radius: 12px;
+      background: conic-gradient(from 90deg, var(--green), var(--magenta), var(--green));
+      box-shadow: 0 0 30px rgba(0,255,102,.45), inset 0 0 24px rgba(255,0,204,.35);
+    }
+
+    .marquee {
+      white-space: nowrap; overflow: hidden; border-top: 2px dashed var(--magenta); border-bottom: 2px dashed var(--green);
+      background: rgba(0,0,0,.35);
+    }
+    .marquee span {
+      display: inline-block; padding-block: 8px; padding-left: 100%;
+      animation: scroll 15s linear infinite;
+      font-weight: 900; letter-spacing: .08em;
+      background: linear-gradient(90deg, var(--green), var(--magenta));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      text-shadow: 0 0 12px rgba(255,0,204,.4), 0 0 12px rgba(0,255,102,.4);
+    }
+    @keyframes scroll { to { transform: translateX(-100%); } }
+
+    /* ===================
+       FOOTER
+       =================== */
+    footer {
+      position: fixed; bottom: 6px; left: 10px; right: 10px; display: flex; justify-content: space-between; gap: 8px; align-items: center;
+      font-size: 12px; opacity: .85;
+    }
+    footer a { color: var(--green-2); font-weight: 800; text-decoration: none; border-bottom: 2px solid var(--magenta); }
+
+    /* ===================
+       REDUCE MOTION SUPPORT
+       =================== */
+    @media (prefers-reduced-motion: reduce) {
+      .bg, .bg-noise, .marquee span, .blink { animation: none !important; }
+      .floater, .win { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="bg-noise"></div>
+
+  <header id="hud" aria-live="polite">
+    <div class="badge">NEON CHAOS EXPERIMENT</div>
+    <div class="controls">
+      <label for="insanity">Insanity</label>
+      <input id="insanity" type="range" min="0" max="200" value="120" />
+      <button id="spawn" class="btn blink" title="Release the grellow gremlins">Spawn more!!</button>
+      <button id="panic" class="btn" title="Pause motion if it gets overwhelming">Panic (Pause)</button>
+      <button id="flash" class="btn" title="Flashnado">Flashnado</button>
+    </div>
+    <div class="badge" style="text-align:right">Green & Magenta MOSTLY™</div>
+  </header>
+
+  <!-- Draggable Windows -->
+  <section id="windows">
+    <article class="win" style="left: 5vw; top: 18vh;">
+      <div class="titlebar"><span class="dot g"></span><span class="dot m"></span> Chaos README</div>
+      <div class="body">
+        <p><span class="tag">What is this?</span> A single-file Neocities site designed to be <em>delightfully unhinged</em> while showcasing modern CSS & JS.</p>
+        <p>Try these: drag windows, click anywhere for fireworks, hover things for sounds, crank the <strong>Insanity</strong> slider. 🌀</p>
+        <p class="mono">Tech flex: CSS conic/radial gradients, animated backdrops, draggable windows, physics-ish bouncers, canvas particles, WebAudio synth, respect for <code>prefers-reduced-motion</code>.</p>
+      </div>
+    </article>
+
+    <article class="win" style="right: 6vw; top: 24vh;">
+      <div class="titlebar"><span class="dot g"></span><span class="dot m"></span> Controls</div>
+      <div class="body">
+        <ul>
+          <li><strong>Spawn more!!</strong> adds bouncing weirdos.</li>
+          <li><strong>Panic</strong> toggles motion pause.</li>
+          <li><strong>Flashnado</strong> briefly goes full rave.</li>
+          <li>Click background to launch magenta-green fireworks.</li>
+          <li>Hover floaters to hear synth chirps.</li>
+        </ul>
+        <div class="marquee"><span> MOSTLY GREEN AND MAGENTA • NO REFUNDS • CHAOS CON CARNE • 100% HAND-CRAFTED WEB ODDITY • </span></div>
+      </div>
+    </article>
+  </section>
+
+  <!-- Bouncing Floaters will be inserted here -->
+  <div id="floaters"></div>
+
+  <!-- Canvas for fireworks & cursor goo -->
+  <canvas id="fx"></canvas>
+
+  <footer>
+    <div>Made with 💚 + 💜 for <strong>Neocities</strong>. Upload this file as <code>index.html</code>.</div>
+    <div><a href="#" id="bookmarklet">Bookmarklet</a>: drag me to your bar → chaos on any site</div>
+  </footer>
+
+  <script>
+    /* ===================
+       UTILITIES
+       =================== */
+    const $ = (sel, el=document) => el.querySelector(sel);
+    const $$ = (sel, el=document) => [...el.querySelectorAll(sel)];
+    const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+    const rand = (min, max) => Math.random() * (max - min) + min;
+
+    /* ===================
+       DRAGGABLE (now works for windows AND floaters)
+       =================== */
+    function makeDraggable(el, handleSel = '.titlebar') {
+      const handle = (handleSel && el.querySelector) ? el.querySelector(handleSel) : null;
+      const dragTarget = handle || el;
+      let offX = 0, offY = 0, dragging = false;
+      let z = parseInt(getComputedStyle(el).zIndex) || 20;
+
+      if (dragTarget && dragTarget.style) dragTarget.style.cursor = 'move';
+
+      dragTarget.addEventListener('pointerdown', (e) => {
+        dragging = true; dragTarget.setPointerCapture(e.pointerId);
+        const r = el.getBoundingClientRect();
+        offX = e.clientX - r.left; offY = e.clientY - r.top; el.style.zIndex = ++z;
+      });
+      dragTarget.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const x = clamp(e.clientX - offX, 6, innerWidth - el.offsetWidth - 6);
+        const y = clamp(e.clientY - offY, 6, innerHeight - el.offsetHeight - 6);
+        el.style.left = x + 'px'; el.style.top = y + 'px';
+      });
+      dragTarget.addEventListener('pointerup', () => dragging = false);
+    }
+    $$('#windows .win').forEach(el => makeDraggable(el));
+
+    /* ===================
+       BOUNCERS
+       =================== */
+    const floaters = $('#floaters');
+    const palette = ['orb', 'square'];
+
+    function makeFloater(kind) {
+      const el = document.createElement('div');
+      el.className = `floater ${kind}`;
+      el.style.left = rand(0, innerWidth-100) + 'px';
+      el.style.top = rand(0, innerHeight-100) + 'px';
+      el.style.transform = `translateZ(0) rotate(${rand(-20,20)}deg)`;
+      el.title = 'Drag me! Or just watch me vibe.';
+
+      // Draggable (use the whole element as handle)
+      makeDraggable(el, null);
+
+      // Add a sticker label sometimes
+      if (Math.random() < .4) {
+        const tag = document.createElement('div');
+        tag.className = 'sticker';
+        tag.textContent = Math.random() < .5 ? 'WIGGLE' : 'BLORP';
+        el.appendChild(tag);
+      }
+
+      // physics-ish
+      el.vx = rand(-2, 2); el.vy = rand(-2, 2);
+      el.speed = rand(.4, 1.6);
+      el.addEventListener('pointerdown', () => { el.vx = rand(-3,3); el.vy = rand(-3,3); bonk(el, {x: el.vx, y: el.vy}); });
+
+      floaters.appendChild(el);
+      return el;
+    }
+
+    // create initial floaters
+    for (let i=0;i<8;i++) makeFloater(palette[i%palette.length]);
+
+    /* ===================
+       FIREWORKS / CURSOR FX (Canvas)
+       =================== */
+    const canvas = $('#fx');
+    const ctx = canvas.getContext('2d');
+    const DPR = Math.max(1, devicePixelRatio || 1);
+
+    function resizeCanvas(){
+      canvas.width = innerWidth * DPR; canvas.height = innerHeight * DPR;
+      canvas.style.width = innerWidth + 'px'; canvas.style.height = innerHeight + 'px';
+      ctx.setTransform(1,0,0,1,0,0); // reset before scaling to prevent compound scaling
+      ctx.scale(DPR, DPR);
+    }
+    addEventListener('resize', resizeCanvas, {passive:true});
+    resizeCanvas();
+
+    const sparks = [];
+    function boom(x,y,color){
+      const cnt = 80;
+      for(let i=0;i<cnt;i++){
+        sparks.push({
+          x, y,
+          vx: Math.cos((i/cnt)*Math.PI*2)*rand(1,5),
+          vy: Math.sin((i/cnt)*Math.PI*2)*rand(1,5),
+          life: rand(40, 80),
+          color,
+        });
+      }
+    }
+
+    canvas.addEventListener('pointerdown', e => {
+      const c = Math.random()<.5 ? 'rgba(0,255,102,.9)' : 'rgba(255,0,204,.9)';
+      boom(e.clientX, e.clientY, c);
+      ping(660 + rand(-120,120)); // lil bleep
+    });
+
+    /* ===================
+       WEB AUDIO BLEEPS
+       =================== */
+    const audio = new (window.AudioContext || window.webkitAudioContext)();
+    let master = audio.createGain(); master.gain.value = 0.09; master.connect(audio.destination);
+
+    function ping(freq=660){
+      try {
+        const o = audio.createOscillator();
+        const g = audio.createGain();
+        const lfo = audio.createOscillator();
+        o.type = 'triangle'; o.frequency.value = freq;
+        lfo.frequency.value = 12; // vibrato
+        lfo.connect(o.frequency);
+        o.connect(g); g.connect(master);
+        g.gain.setValueAtTime(0, audio.currentTime);
+        g.gain.linearRampToValueAtTime(.2, audio.currentTime+.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime+.25);
+        o.start(); lfo.start();
+        o.stop(audio.currentTime+.26); lfo.stop(audio.currentTime+.26);
+      } catch (e) { /* ignore mobile autoplay gripes */ }
+    }
+
+    // hover bleeps on floaters
+    floaters.addEventListener('pointerenter', (e)=>{
+      if (e.target.classList.contains('floater')) ping(rand(330, 880));
+    }, true);
+
+    /* ===================
+       CHAOS ENGINE (RAF loop)
+       =================== */
+    let paused = false;
+    let flashTimer = 0;
+    function loop(){
+      if (!paused) {
+        // move bouncers
+        const spd = ($('#insanity').value/100) * 1.5;
+        $$('#floaters .floater').forEach(el=>{
+          const r = el.getBoundingClientRect();
+          let x = r.left + el.vx * el.speed * spd;
+          let y = r.top + el.vy * el.speed * spd;
+          if (x<=0 || x + r.width >= innerWidth) { el.vx *= -1; bonk(el, {x: el.vx, y: el.vy}); }
+          if (y<=0 || y + r.height >= innerHeight) { el.vy *= -1; bonk(el, {x: el.vy, y: el.vx}); }
+          el.style.left = clamp(x, 0, innerWidth - r.width) + 'px';
+          el.style.top = clamp(y, 0, innerHeight - r.height) + 'px';
+          el.style.transform = `translateZ(0) rotate(${(x+y)%360}deg)`;
+        });
+
+        // fireworks decay
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = 'rgba(5,0,7,.2)';
+        ctx.fillRect(0,0,innerWidth,innerHeight);
+        for (let i=sparks.length-1;i>=0;i--){
+          const s = sparks[i]; s.life -= 1;
+          if (s.life <= 0) { sparks.splice(i,1); continue; }
+          s.x += s.vx; s.y += s.vy; s.vy += 0.03; // gravity-ish
+          ctx.beginPath(); ctx.arc(s.x, s.y, 2, 0, Math.PI*2);
+          ctx.fillStyle = s.color; ctx.fill();
+        }
+
+        // flashnado
+        if (flashTimer>0){
+          document.documentElement.style.filter = `hue-rotate(${(performance.now()/3)%360}deg) saturate(1.8)`;
+          flashTimer -= 16;
+        } else {
+          document.documentElement.style.filter = '';
+        }
+      }
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+
+    function bonk(el, v){
+      el.animate([
+        { transform: el.style.transform + ' scale(1)' },
+        { transform: el.style.transform + ' scale(1.12) rotate(8deg)' },
+        { transform: el.style.transform + ' scale(1)' }
+      ], { duration: 180, easing: 'cubic-bezier(.2,.6,0,1)' });
+      // trailing ping with velocity-influenced pitch
+      ping(400 + (Math.abs(v.x)+Math.abs(v.y))*40);
+    }
+
+    /* ===================
+       CONTROLS WIRES
+       =================== */
+    $('#spawn').addEventListener('click', () => {
+      for (let i=0;i<3;i++) makeFloater(palette[Math.floor(rand(0,palette.length))]);
+    });
+
+    $('#panic').addEventListener('click', (e)=>{
+      paused = !paused;
+      e.target.textContent = paused ? 'Resume' : 'Panic (Pause)';
+    });
+
+    $('#flash').addEventListener('click', ()=>{ flashTimer = 1200; });
+
+    // bookmarklet for chaos anywhere
+    (function setBookmarklet(){
+      const js = encodeURIComponent(`(()=>{const s=document.createElement('script');s.src='${location.href}';alert('Drag me into bookmarks from the page footer on your Neocities site!');})()`);
+      $('#bookmarklet').setAttribute('href', 'javascript:'+js);
+    })();
+
+    /* ===================
+       ACCESSIBILITY NODS
+       =================== */
+    matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', (e)=>{
+      paused = e.matches; // auto-pause if user prefers less motion
+      $('#panic').textContent = paused ? 'Resume' : 'Panic (Pause)';
+    });
+  </script>
+</body>
+</html>

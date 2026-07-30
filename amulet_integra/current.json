@@ -1,6 +1,7 @@
 {
   "schema": 1,
-  "version": null,
-  "path": null,
-  "status": "awaiting-first-validated-version"
+  "version": "2026-07-29-initial",
+  "path": "versions/2026-07-29-initial/",
+  "status": "validated",
+  "manifest": "versions/2026-07-29-initial/version.json"
 }

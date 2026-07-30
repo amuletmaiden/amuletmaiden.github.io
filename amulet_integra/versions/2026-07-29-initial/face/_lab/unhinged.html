@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Unhinged HTML/CSS Carnival</title>
+<style>
+  /* ===== CHAOS THEME (HTML + CSS ONLY) ===== */
+  :root{ --ink:#fff }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family: "Comic Sans MS", "Papyrus", system-ui, cursive, fantasy, sans-serif;
+    color:var(--ink);
+    background:#000;
+    overflow-x:hidden;
+    cursor: crosshair;
+  }
+
+  /* Motion safety */
+  @media (prefers-reduced-motion: reduce){ *{animation: none !important; transition: none !important} }
+
+  /* ===== GLOBAL BACKDROP: rotating color storm ===== */
+  .storm{ position:fixed; inset:-20vmax; z-index:-3; filter: blur(30px) saturate(180%);
+    background:
+      radial-gradient(70vmax 60vmax at 10% 10%, #ff00ff, transparent 40%),
+      radial-gradient(60vmax 70vmax at 90% 20%, #00ffff, transparent 45%),
+      radial-gradient(80vmax 60vmax at 50% 90%, #ffff00, transparent 40%),
+      #000; mix-blend-mode: screen; animation: swirl 26s linear infinite }
+  .pizza{ position:fixed; inset:-10vmax; z-index:-2; opacity:.6; pointer-events:none;
+    background: repeating-conic-gradient(from 0deg, #ff0040 0 15deg, #00ffea 15deg 30deg, #ffff00 30deg 45deg, #9b5cf6 45deg 60deg);
+    animation: spin 12s linear infinite reverse }
+  @keyframes swirl{to{transform: rotate(360deg)}}
+  @keyframes spin{to{transform: rotate(-360deg)}}
+
+  /* ===== UNSTABLE NAV ===== */
+  .topbar{ position:sticky; top:0; z-index:10; background: rgba(0,0,0,.6); border-bottom: 4px dashed #fff; backdrop-filter: blur(8px); animation: wobble 2.4s ease-in-out infinite }
+  .topbar .inner{display:flex; gap:12px; align-items:center; justify-content:space-between; padding:10px 16px}
+  .brand{font-weight:900; letter-spacing:.04em; transform:skew(-8deg); text-shadow:2px 2px 0 #00ffea, -2px -2px 0 #ff0040}
+  nav{display:flex; flex-wrap:wrap; gap:8px}
+  nav a{ text-decoration:none; font-weight:800; padding:.45rem .7rem; border-radius:999px; background:linear-gradient(120deg,#00ffea,#ff00ff,#ffff00); color:#000; border:2px solid #fff; box-shadow:0 0 0 3px #000 inset; transform: rotate(calc(var(--i,0) * 1deg)) }
+  nav a:hover{filter:hue-rotate(140deg); transform: scale(1.05) rotate(calc(var(--i,0) * 1deg))}
+  @keyframes wobble{ 50%{ transform: translateY(2px) rotate(-0.5deg) } }
+
+  .container{max-width:1200px; margin-inline:auto; padding: clamp(16px, 4vw, 40px)}
+
+  /* ===== SECTION WRAPS ===== */
+  section{margin:40px 0; border:4px dotted #fff; padding:18px; background:rgba(0,0,0,.45)}
+  h2{margin:0 0 .5rem; font-size: clamp(1.6rem, 3.6vw, 3rem); text-transform:uppercase; letter-spacing:.08em}
+  .tag{font-size:.8rem; padding:.2rem .5rem; border-radius:6px; border:2px solid #fff; background:#000}
+
+  /* ===== 1) GLITCH TITLE ===== */
+  .glitch{position:relative; display:inline-block; font-size: clamp(2.2rem, 9vw, 8rem); font-weight:900; text-transform:uppercase}
+  .glitch::before, .glitch::after{ content: attr(data-text); position:absolute; inset:0; mix-blend-mode: difference }
+  .glitch::before{ left:2px; text-shadow:-2px 0 #00ffea; animation: glitchX .8s infinite alternate-reverse }
+  .glitch::after{ left:-2px; text-shadow:2px 0 #ff0040; animation: glitchY .75s infinite alternate }
+  @keyframes glitchX{ 0%{transform:translate(0,0)} 50%{transform:translate(2px,-1px)} 100%{transform:translate(-2px,1px)} }
+  @keyframes glitchY{ 0%{transform:translate(0,0)} 50%{transform:translate(-2px,2px)} 100%{transform:translate(2px,-1px)} }
+
+  /* ===== 2) UNHOLY GLASS ===== */
+  .glass{ position:relative; padding:20px; border-radius:24px; overflow:hidden; border:3px solid #fff; background:linear-gradient(135deg, rgba(255,255,255,.25), rgba(255,255,255,.02)); backdrop-filter: blur(20px) saturate(200%); box-shadow: 0 0 40px 10px rgba(255,255,255,.25) }
+  .glass .badge{display:inline-block; padding:.3rem .6rem; border:2px solid #fff; border-radius:999px; background:#000}
+  .loud-btns{display:flex; gap:.5rem; flex-wrap:wrap}
+  .btn{padding:.7rem 1rem; border:3px double #fff; border-radius:12px; text-decoration:none; background: repeating-linear-gradient(45deg,#ff00ff,#ff00ff 10px,#00ffea 10px,#00ffea 20px,#ffff00 20px,#ffff00 30px); color:#000; font-weight:900}
+  .btn:hover{filter:hue-rotate(220deg)}
+
+  /* ===== 3) CUBE ===== */
+  .scene{ perspective:900px; display:grid; place-items:center; height:280px }
+  .cube{ position:relative; width:160px; height:160px; transform-style:preserve-3d; animation: cube-spin 6s linear infinite }
+  .cube .side{ position:absolute; inset:0; display:grid; place-items:center; font-weight:900; color:#000; border:3px solid #fff }
+  .front{ transform: translateZ(80px); background:#ffff00 }
+  .back{ transform: rotateY(180deg) translateZ(80px); background:#ff00ff }
+  .right{ transform: rotateY(90deg) translateZ(80px); background:#00ffea }
+  .left{ transform: rotateY(-90deg) translateZ(80px); background:#9b5cf6 }
+  .top{ transform: rotateX(90deg) translateZ(80px); background:#ff6b00 }
+  .bottom{ transform: rotateX(-90deg) translateZ(80px); background:#00ff66 }
+  @keyframes cube-spin{ to{ transform: rotateX(360deg) rotateY(360deg) } }
+
+  /* ===== 4) DONUT ===== */
+  .donut{ width:260px; aspect-ratio:1; border-radius:50%; margin:auto; position:relative; box-shadow:0 0 0 6px #fff inset, 0 0 60px 10px rgba(255,255,255,.3); background: conic-gradient(#00ffea 0 20%, #ffff00 20% 45%, #ff0040 45% 70%, #9b5cf6 70% 100%); animation: throb 2s ease-in-out infinite }
+  .donut::after{ content:""; position:absolute; inset:18%; border-radius:50%; background:#000; box-shadow:0 0 0 4px #fff inset }
+  @keyframes throb{ 50%{ transform: scale(1.08) rotate(8deg) } }
+
+  /* ===== 5) SCROLL-SNAP FUNHOUSE ===== */
+  .snapwrap{ height:60vh; border:4px dashed #fff; overflow:auto; scroll-snap-type:y mandatory; background:#111 }
+  .slide{ height:60vh; display:grid; place-items:center; font-size: clamp(2rem, 8vw, 6rem); text-shadow: 2px 2px 0 #000, -2px -2px 0 #fff; scroll-snap-align:start }
+  .a{ background: repeating-linear-gradient(90deg,#ff00ff 0 40px,#00ffea 40px 80px,#ffff00 80px 120px) }
+  .b{ background: repeating-linear-gradient(0deg,#9b5cf6 0 50px,#ff6b00 50px 100px) }
+  .c{ background: radial-gradient(circle at 30% 30%, #00ff66, transparent 40%), radial-gradient(circle at 70% 70%, #ff0040, transparent 40%), #111 }
+  .hint{ font-size:1rem; position:absolute; bottom:16px }
+
+  /* ===== 6) MASKS & CLIPS ===== */
+  .maskgrid{ display:grid; gap:16px; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)) }
+  .shard{ aspect-ratio: 3/2; background: linear-gradient(135deg,#ff0040,#00ffea); clip-path: polygon(10% 0%, 100% 5%, 90% 90%, 0% 100%, 5% 30%); border:4px solid #fff; transform: rotate(-2deg); animation: tilt 3s ease-in-out infinite }
+  .portal{ aspect-ratio:1/1; background: radial-gradient(circle, #fff 10%, #ff00ff 30%, transparent 31%), conic-gradient(from 0deg, #ffff00, #00ffea, #ff00ff, #ffff00); border:4px solid #fff; border-radius:50%; animation: spin 5s linear infinite }
+  @keyframes tilt{50%{transform: rotate(3deg)}}
+
+  /* ===== 7) MARQUEE TUNNEL ===== */
+  .marquee{ position:relative; overflow:hidden; border:4px double #fff; background:#000 }
+  .marquee__track{ display:flex; gap:40px; white-space:nowrap; animation: scroll 12s linear infinite }
+  .marquee__item{ font-weight:900; padding:10px 20px; background:#fff; color:#000; transform:skew(-10deg) }
+  @keyframes scroll{ to{ transform: translateX(-50%) } }
+
+  /* ===== 8) ANIMATED CHECKERBOARD ===== */
+  .checker{ aspect-ratio: 16/9; border:4px solid #fff; background: conic-gradient(from 45deg, #fff 0 90deg, #000 90deg 180deg, #fff 180deg 270deg, #000 270deg 360deg); background-size: 60px 60px; animation: slidebg 2s linear infinite; image-rendering: pixelated }
+  @keyframes slidebg{ to{ background-position: 60px 60px } }
+
+  /* ===== 9) CRT GLASS & SCANLINES ===== */
+  .crt{ position:relative; padding:20px; border:4px solid #fff; background:#020202; filter: contrast(140%) saturate(120%); transform: skew(-0.5deg) }
+  .crt::before{ content:""; position:absolute; inset:0; pointer-events:none; background: repeating-linear-gradient(0deg, rgba(255,255,255,.08) 0 2px, transparent 2px 4px); mix-blend-mode: overlay; animation: flicker 1.2s infinite }
+  .crt h3{ font-size: clamp(1.4rem,3vw,2.6rem); text-shadow: 0 0 6px #0ff, 0 0 12px #f0f; letter-spacing:.06em }
+  @keyframes flicker{ 50%{ opacity:.6 } }
+
+  /* ===== 10) WAVY RAINBOW TEXT ===== */
+  .wavy{ font-weight:900; font-size: clamp(2rem, 8vw, 6rem); background: conic-gradient(from 0deg, #ff0040, #ffff00, #00ffea, #9b5cf6, #ff0040); background-size: 200% 200%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: hueflow 4s linear infinite }
+  @keyframes hueflow{ to{ background-position: 200% 0 } }
+
+  /* ===== 11) FLOATING EMOJIS ===== */
+  .field{ position:relative; border:4px dashed #fff; height: 200px; overflow:hidden }
+  .float{ position:absolute; font-size: 2rem; animation: floaty var(--t,8s) ease-in-out infinite; left: var(--x,10%) }
+  @keyframes floaty{ 50%{ transform: translateY(-60px) rotate(12deg) } }
+
+</style>
+</head>
+<body>
+  <div class="storm"></div>
+  <div class="pizza"></div>
+
+  <header class="topbar">
+    <div class="inner">
+      <div class="brand">UNHINGED CSS CARNIVAL 🎪</div>
+      <nav>
+        <a style="--i:2" href="#title">Glitch</a>
+        <a style="--i:-4" href="#glass">Glass?!</a>
+        <a style="--i:8" href="#cube">Cube</a>
+        <a style="--i:-6" href="#donut">Donut</a>
+        <a style="--i:3" href="#snap">Snap</a>
+        <a style="--i:-9" href="#masks">Shards</a>
+        <a style="--i:5" href="#marq">Marquee</a>
+        <a style="--i:-2" href="#checker">Checker</a>
+        <a style="--i:6" href="#crt">CRT</a>
+        <a style="--i:-7" href="#wavy">Wavy</a>
+        <a style="--i:4" href="#float">Emojis</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- 1) GLITCH TITLE -->
+    <section id="title">
+      <span class="tag">Text Effects · Chaos</span>
+      <h1 class="glitch" data-text="MAKE IT WEIRD">MAKE IT WEIRD</h1>
+      <p><em>Everything here is pure HTML/CSS. No JS. No shame.</em></p>
+    </section>
+
+    <!-- 2) UNHOLY GLASS -->
+    <section id="glass">
+      <h2>Unholy Glassmorphism</h2>
+      <div class="glass">
+        <span class="badge">⚠ TOO SHINY</span>
+        <p>Translucent, over-saturated, and absolutely impractical. Perfect.</p>
+        <div class="loud-btns">
+          <a class="btn" href="#">BUTTON!!!</a>
+          <a class="btn" href="#">ANOTHER!</a>
+          <a class="btn" href="#">MORE!!</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3) CUBE -->
+    <section id="cube">
+      <h2>Rotating Cube From Another Dimension</h2>
+      <div class="scene">
+        <div class="cube">
+          <div class="side front">WOW</div>
+          <div class="side back">BACK</div>
+          <div class="side right">RIGHT</div>
+          <div class="side left">LEFT</div>
+          <div class="side top">UP</div>
+          <div class="side bottom">DOWN</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4) DONUT -->
+    <section id="donut">
+      <h2>The Loud Donut Chart</h2>
+      <div class="donut" aria-label="shouting donut chart"></div>
+      <p><small>Statistics? Unknown. Vibes? Loud.</small></p>
+    </section>
+
+    <!-- 5) SCROLL-SNAP FUNHOUSE -->
+    <section id="snap">
+      <h2>Scroll-Snap Funhouse</h2>
+      <div class="snapwrap">
+        <div class="slide a">HELLO <span class="hint">(scroll)</span></div>
+        <div class="slide b">IS IT ART?</div>
+        <div class="slide c">MAYBE</div>
+      </div>
+    </section>
+
+    <!-- 6) MASKS & CLIPS -->
+    <section id="masks">
+      <h2>Shards & Portals</h2>
+      <div class="maskgrid">
+        <div class="shard"></div>
+        <div class="portal"></div>
+        <div class="shard" style="animation-delay:.7s"></div>
+        <div class="portal" style="animation-duration:8s"></div>
+      </div>
+    </section>
+
+    <!-- 7) MARQUEE -->
+    <section id="marq">
+      <h2>Marquee Tunnel</h2>
+      <div class="marquee">
+        <div class="marquee__track">
+          <div class="marquee__item">✨ CHAOS ✨</div>
+          <div class="marquee__item">💥 GLAM 💥</div>
+          <div class="marquee__item">🌀 SPIN 🌀</div>
+          <div class="marquee__item">🎉 WOW 🎉</div>
+          <div class="marquee__item">✨ CHAOS ✨</div>
+          <div class="marquee__item">💥 GLAM 💥</div>
+          <div class="marquee__item">🌀 SPIN 🌀</div>
+          <div class="marquee__item">🎉 WOW 🎉</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8) ANIMATED CHECKERBOARD -->
+    <section id="checker">
+      <h2>Hypno-Checkerboard</h2>
+      <div class="checker"></div>
+    </section>
+
+    <!-- 9) CRT MODE -->
+    <section id="crt">
+      <h2>CRT Mode</h2>
+      <div class="crt">
+        <h3>PLEASE DO NOT ADJUST YOUR SET</h3>
+        <p>Scanlines, glow, and a touch of flicker. Nostalgia not included.</p>
+      </div>
+    </section>
+
+    <!-- 10) WAVY RAINBOW TEXT -->
+    <section id="wavy">
+      <h2>Wavy Rainbow Text</h2>
+      <div class="wavy">SQUIGGLE SQUAD</div>
+    </section>
+
+    <!-- 11) FLOATING EMOJIS -->
+    <section id="float">
+      <h2>Floating Emojis</h2>
+      <div class="field">
+        <div class="float" style="--x:10%; --t:7s; top:60%">🦄</div>
+        <div class="float" style="--x:30%; --t:9s; top:70%">🔥</div>
+        <div class="float" style="--x:55%; --t:6s; top:65%">🍕</div>
+        <div class="float" style="--x:75%; --t:8s; top:72%">💎</div>
+        <div class="float" style="--x:88%; --t:10s; top:68%">🌀</div>
+      </div>
+      <p><small>100% CSS. You get five floaters; any more and the vibes explode.</small></p>
+    </section>
+
+    <section>
+      <p><strong>Tip:</strong> If it’s <em>too</em> unhinged, add <code>@media (prefers-reduced-motion: reduce)</code> overrides or tone down the backgrounds.</p>
+    </section>
+  </main>
+</body>
+</html>
