@@ -9,15 +9,7 @@ export class DragonRuntime {
     this.currentClip = null;
     this.state = "grounded-idle";
     this.stateAge = 0;
-    this.telemetry = {
-      state: this.state,
-      clip: null,
-      fallback: false,
-      available: [],
-      missing: [],
-      stateAge: 0,
-      heldState: false,
-    };
+    this.telemetry = emptyTelemetry(this.state);
   }
 
   bindClips(clips = []) {
@@ -28,20 +20,35 @@ export class DragonRuntime {
     this.currentClip = null;
     this.state = "grounded-idle";
     this.stateAge = 0;
-    this.telemetry = {
-      state: this.state,
-      clip: null,
-      fallback: false,
-      available: [],
-      missing: [],
-      stateAge: 0,
-      heldState: false,
-    };
-    for (const clip of clips) {
-      const key = clip.name.toLowerCase();
+    this.telemetry = emptyTelemetry(this.state);
+
+    const source = Array.isArray(clips) ? clips : [];
+    const rejected = [];
+    const actionErrors = [];
+    for (let index = 0; index < source.length; index += 1) {
+      const clip = source[index];
+      const name = typeof clip?.name === "string" ? clip.name.trim() : "";
+      if (!name) {
+        rejected.push({ index, reason: "missing-name" });
+        continue;
+      }
+      const key = name.toLowerCase();
+      if (this.clips.has(key)) {
+        rejected.push({ index, name, reason: "duplicate-name" });
+        continue;
+      }
       this.clips.set(key, clip);
-      if (this.mixer) this.actions.set(key, this.mixer.clipAction(clip));
+      if (this.mixer) {
+        try {
+          const action = this.mixer.clipAction(clip);
+          if (action) this.actions.set(key, action);
+          else actionErrors.push({ name, reason: "missing-action" });
+        } catch (error) {
+          actionErrors.push({ name, reason: error instanceof Error ? error.message : String(error) });
+        }
+      }
     }
+
     const keys = [...this.clips.keys()];
     const idle = firstMatch(keys, ["idle", "rest", "sentinel", "ground"]);
     const flight = firstMatch(keys, ["fly", "flight", "flap", "wing", "readiness"]);
@@ -56,6 +63,8 @@ export class DragonRuntime {
     };
     for (const [role, key] of Object.entries(mappings)) if (key) this.roles.set(role, key);
     this.telemetry.available = keys;
+    this.telemetry.rejected = rejected;
+    this.telemetry.actionErrors = actionErrors;
     this.choose("grounded-idle", { speed: 0 }, true);
     return keys;
   }
@@ -91,6 +100,7 @@ export class DragonRuntime {
       ? this.telemetry.missing.filter((value) => value !== state)
       : [...new Set([...this.telemetry.missing, state])];
     this.telemetry = {
+      ...this.telemetry,
       state,
       clip: clip?.name || null,
       fallback: Boolean(key && !exact),
@@ -120,15 +130,27 @@ export class DragonRuntime {
   }
 }
 
+function emptyTelemetry(state) {
+  return {
+    state,
+    clip: null,
+    fallback: false,
+    available: [],
+    missing: [],
+    rejected: [],
+    actionErrors: [],
+    stateAge: 0,
+    heldState: false,
+  };
+}
+
 function desiredState(flight, currentState) {
   if (!flight.airborne) return "grounded-idle";
   if (flight.landingRequested || flight.mode === "landing") return "landing";
   if (flight.mode === "recovery") return "recovery";
   if (flight.mode === "takeoff") return "takeoff";
-
   const bank = Math.abs(flight.bank || 0);
   if (bank > 0.42 || (currentState === "turn" && bank > 0.24)) return "turn";
-
   const speed = Number.isFinite(flight.speed) ? flight.speed : 0;
   if (flight.mode === "glide" || speed > 44 || (currentState === "glide" && speed > 38)) return "glide";
   return "flight";
