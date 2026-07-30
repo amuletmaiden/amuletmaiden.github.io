@@ -30,10 +30,20 @@ export class FlightController {
     this.yaw += steer * turnAuthority * frame;
 
     const forward = { x: Math.sin(this.yaw), z: Math.cos(this.yaw) };
+    const stallPressure = this.airborne
+      ? clamp((11 - planarSpeed) / 11, 0, 1) * (1 - Math.max(0, throttle))
+      : 0;
     let targetSpeed = 0;
     if (this.airborne) {
       targetSpeed = throttle >= 0 ? 20 + 42 * throttle : 20 + 12 * throttle;
-      if (this.landingRequested) targetSpeed = Math.min(targetSpeed, 14);
+      if (this.landingRequested) {
+        targetSpeed = Math.min(targetSpeed, 14);
+      } else if (stallPressure > 0) {
+        // A dragon below flying speed should naturally lower its nose and regain
+        // airflow. Reverse throttle previously commanded an 8-unit target below
+        // the 11-unit stall threshold, creating a self-sustaining stall.
+        targetSpeed = Math.max(targetSpeed, 14 + 10 * stallPressure);
+      }
     }
 
     // Converge the entire planar velocity vector toward the desired heading.
