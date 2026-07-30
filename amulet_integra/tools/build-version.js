@@ -17,6 +17,8 @@ const archiveSource = path.resolve(argument('archive'));
 const indexSource = path.resolve(argument('index'));
 const integraRoot = path.resolve(__dirname, '..');
 const versionRoot = path.join(integraRoot, 'versions', version);
+const textExtensions = new Set(['.html','.htm','.css','.js','.json','.txt','.xml','.svg','.md']);
+const windowsReserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 
 function normalize(value) { return value.split(path.sep).join('/'); }
 function relative(base, file) { return normalize(path.relative(base, file)); }
@@ -48,6 +50,47 @@ function counts(root) {
   }
   return result;
 }
+function safeSegment(segment) {
+  const extension = path.extname(segment);
+  const stem = extension ? segment.slice(0, -extension.length) : segment;
+  return windowsReserved.test(stem) ? `${stem}-windows-safe${extension}` : segment;
+}
+function safeRelative(relativePath) {
+  return normalize(relativePath).split('/').map(safeSegment).join('/');
+}
+function copyTree(source, destination, scope, aliases) {
+  for (const sourceFile of files(source)) {
+    const sourcePath = relative(source, sourceFile);
+    const publishedPath = safeRelative(sourcePath);
+    if (sourcePath !== publishedPath) {
+      aliases.push({ scope, source_path: sourcePath, published_path: publishedPath, reason: 'windows-reserved-device-name' });
+    }
+    const destinationFile = path.join(destination, ...publishedPath.split('/'));
+    fs.mkdirSync(path.dirname(destinationFile), { recursive: true });
+    fs.copyFileSync(sourceFile, destinationFile, fs.constants.COPYFILE_EXCL);
+  }
+}
+function rewriteAliases(root, aliases) {
+  if (!aliases.length) return;
+  for (const file of files(root)) {
+    if (!textExtensions.has(path.extname(file).toLowerCase())) continue;
+    let text = fs.readFileSync(file, 'utf8');
+    let changed = false;
+    for (const alias of aliases) {
+      const replacements = [
+        [alias.source_path, alias.published_path],
+        [encodeURI(alias.source_path), encodeURI(alias.published_path)]
+      ];
+      for (const [from, to] of replacements) {
+        if (text.includes(from)) {
+          text = text.split(from).join(to);
+          changed = true;
+        }
+      }
+    }
+    if (changed) fs.writeFileSync(file, text, 'utf8');
+  }
+}
 function injectBridge(file, current) {
   let html = fs.readFileSync(file, 'utf8');
   if (html.includes('data-amulet-integra-bridge')) return;
@@ -64,18 +107,20 @@ if (fs.existsSync(versionRoot)) throw new Error(`Refusing to overwrite existing 
 
 const faceDest = path.join(versionRoot, 'face');
 const archiveDest = path.join(versionRoot, 'archive');
+const pathAliases = [];
 fs.mkdirSync(path.dirname(versionRoot), { recursive: true });
 fs.mkdirSync(versionRoot, { recursive: false });
-fs.cpSync(faceSource, faceDest, { recursive: true, force: false, errorOnExist: true });
-fs.cpSync(archiveSource, archiveDest, { recursive: true, force: false, errorOnExist: true });
-fs.copyFileSync(indexSource, path.join(versionRoot, 'archive-index.json'));
+copyTree(faceSource, faceDest, 'face', pathAliases);
+copyTree(archiveSource, archiveDest, 'archive', pathAliases);
+rewriteAliases(faceDest, pathAliases.filter(alias => alias.scope === 'face'));
+rewriteAliases(archiveDest, pathAliases.filter(alias => alias.scope === 'archive'));
+fs.copyFileSync(indexSource, path.join(versionRoot, 'archive-index.json'), fs.constants.COPYFILE_EXCL);
 
 injectBridge(path.join(faceDest, 'index.html'), 'face');
 injectBridge(path.join(archiveDest, 'index.html'), 'archive');
 write(path.join(versionRoot, 'index.html'), fs.readFileSync(path.join(integraRoot, 'templates', 'version-index.html'), 'utf8').replaceAll('__VERSION__', version));
 write(path.join(integraRoot, 'index.html'), fs.readFileSync(path.join(integraRoot, 'templates', 'landing.html'), 'utf8'));
 
-const textExtensions = new Set(['.html','.htm','.css','.js','.json','.txt','.xml','.svg','.md']);
 const forbidden = [];
 for (const file of files(versionRoot)) {
   if (!textExtensions.has(path.extname(file).toLowerCase())) continue;
@@ -100,6 +145,7 @@ const record = {
     { id: 'amuletarchive-generated', label: 'amuletarchive-site', copied_as: 'archive/', source_counts: sourceCounts.archive, copied_counts: copiedCounts.archive },
     { id: 'accepted-reader-index', label: 'archive-index.json from the accepted local reader', copied_as: 'archive-index.json' }
   ],
+  path_aliases: pathAliases,
   integration: {
     entrypoint: 'index.html',
     modes: ['face','archive','find'],
@@ -123,4 +169,4 @@ const required = ['index.html','version.json','archive-index.json','face/index.h
 const missing = required.filter(file => !fs.existsSync(file));
 if (missing.length) throw new Error(`Required files missing: ${missing.join(', ')}`);
 
-process.stdout.write(JSON.stringify({ version, versionRoot, sourceCounts, copiedCounts, publishedFileCount: manifestFiles.length + 1, originalSourcesModified: false, required: required.map(file => relative(integraRoot, file)) }, null, 2) + '\n');
+process.stdout.write(JSON.stringify({ version, versionRoot, sourceCounts, copiedCounts, pathAliases, publishedFileCount: manifestFiles.length + 1, originalSourcesModified: false, required: required.map(file => relative(integraRoot, file)) }, null, 2) + '\n');
