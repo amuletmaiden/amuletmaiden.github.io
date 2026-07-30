@@ -4,6 +4,7 @@ import { FlightController } from "./flight/controller.js";
 import { FlightInput } from "./flight/input.js";
 import { ChaseCameraRig } from "./flight/chase-camera.js";
 import { FlightCollisionResolver } from "./flight/collision.js";
+import { createIsleTerrainSampler } from "./flight/isle-terrain-sampler.js";
 import { DragonRuntime } from "./dragon/runtime.js";
 import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
 import { loadGame, saveGame, safeRespawn } from "./core/save.js";
@@ -66,6 +67,9 @@ let dragonRuntime = null;
 let mixer = null;
 let heroIsle = null;
 let heroBounds = null;
+let heroTerrain = null;
+let paused = false;
+let lastCameraState = null;
 let lastSaveAt = performance.now();
 let lastFrameAt = performance.now();
 let latestDiscovery = null;
@@ -157,10 +161,16 @@ function sampleSurfaceAt(x, z) {
       }
     }
   }
-  if (heroBounds && x >= heroBounds.min.x && x <= heroBounds.max.x && z >= heroBounds.min.z && z <= heroBounds.max.z) {
+
+  const sampledIsleHeight = heroTerrain?.sample(x, z);
+  if (Number.isFinite(sampledIsleHeight) && (result.surface === "water" || sampledIsleHeight > result.height)) {
+    result = { height: sampledIsleHeight, surface: "terrain", id: "greyblue-isle" };
+  } else if (!heroTerrain && heroBounds
+    && x >= heroBounds.min.x && x <= heroBounds.max.x
+    && z >= heroBounds.min.z && z <= heroBounds.max.z) {
     const height = heroBounds.min.y + 4;
     if (result.surface === "water" || height > result.height) {
-      result = { height, surface: "terrain", id: "greyblue-isle" };
+      result = { height, surface: "terrain", id: "greyblue-isle-fallback" };
     }
   }
   return result;
@@ -187,6 +197,7 @@ function recover() {
   collisionResolver.reset(recovered.position);
   lastCollision = { ...collisionResolver.telemetry };
   chaseCamera.snapTo(position, controller.yaw);
+  persist();
 }
 
 function persist() {
@@ -198,6 +209,13 @@ function persist() {
     settings: { cameraDistance: chaseCamera.distance },
   });
   lastSaveAt = performance.now();
+}
+
+function setPaused(nextPaused, now) {
+  paused = Boolean(nextPaused);
+  flightInput.clear();
+  lastFrameAt = now;
+  if (paused) persist();
 }
 
 function updateFog(dt) {
@@ -281,6 +299,29 @@ function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
+function publishPausedState() {
+  const flightState = controller.snapshot();
+  const surface = sampleSurfaceAt(position.x, position.z);
+  stateLine.textContent = `PAUSED · ${controller.airborne ? "FLIGHT" : "LANDED"} · Greyblue Archipelago`;
+  globalThis.__greyblueState = {
+    ...(globalThis.__greyblueState || {}),
+    ready: Boolean(dragon && heroIsle),
+    dragonLoaded: Boolean(dragon),
+    isleLoaded: Boolean(heroIsle),
+    paused: true,
+    seed,
+    position: { x: position.x, y: position.y, z: position.z },
+    flight: flightState,
+    collision: lastCollision,
+    surface,
+    camera: lastCameraState,
+    world: {
+      ...(globalThis.__greyblueState?.world || {}),
+      heroTerrain: heroTerrain?.telemetry || null,
+    },
+  };
+}
+
 addEventListener("keydown", (event) => {
   flightInput.keyDown(event.code, event.repeat);
 });
@@ -313,6 +354,7 @@ async function boot() {
   const isleCenter = isleBox.getCenter(new THREE.Vector3());
   heroIsle.position.sub(isleCenter);
   heroBounds = new THREE.Box3().setFromObject(heroIsle);
+  heroTerrain = createIsleTerrainSampler({ THREE, root: heroIsle, bounds: heroBounds });
 
   const dragonBox = new THREE.Box3().setFromObject(dragon);
   const isleSize = heroBounds.getSize(new THREE.Vector3());
@@ -340,6 +382,18 @@ function frame(now) {
     : [];
   flightInput.setGamepad(gamepads.find(Boolean) || null);
   const input = flightInput.sample();
+
+  if (input.pause) {
+    setPaused(!paused, now);
+    if (paused) publishPausedState();
+    renderer.render(scene, camera);
+    return;
+  }
+  if (paused) {
+    publishPausedState();
+    renderer.render(scene, camera);
+    return;
+  }
   if (input.recover) recover();
 
   const previous = { x: position.x, y: position.y, z: position.z };
@@ -411,6 +465,7 @@ function frame(now) {
     dt,
     sampleHeight: terrainHeightAt,
   });
+  lastCameraState = cameraState;
   camera.position.set(cameraState.position.x, cameraState.position.y, cameraState.position.z);
   camera.lookAt(cameraState.lookTarget.x, cameraState.lookTarget.y, cameraState.lookTarget.z);
   dragonRuntime?.update(dt);
@@ -423,14 +478,17 @@ function frame(now) {
     : "";
   stateLine.textContent = `${controller.airborne ? "FLIGHT" : "LANDED"} · ${Math.round(speed)} speed · ${Math.round(position.y)} altitude · ${discovered.size} isles · ${discoveredRoutes.size} routes${regionLabel}${routeLabel}`;
 
+  const surface = sampleSurfaceAt(position.x, position.z);
   globalThis.__greyblueState = {
     ready: Boolean(dragon && heroIsle),
     dragonLoaded: Boolean(dragon),
     isleLoaded: Boolean(heroIsle),
+    paused: false,
     seed,
     position: { x: position.x, y: position.y, z: position.z },
     flight: flightState,
     collision: lastCollision,
+    surface,
     input: {
       source: input.source,
       throttle: input.throttle,
@@ -464,6 +522,7 @@ function frame(now) {
       routeCount: world.routes.length,
       islandCount: world.islands.length,
       streaming: STREAMING_RANGES,
+      heroTerrain: heroTerrain?.telemetry || null,
     },
     clip,
   };
