@@ -1,7 +1,8 @@
 const DEFAULTS = Object.freeze({
   clearance: 2.5,
   sweepStep: 6,
-  maximumSweepSteps: 512,
+  maximumProbeSpacing: 0.5,
+  maximumSweepSteps: 4096,
   safeMargin: 8,
   shorelineTransitionDistance: 12,
   touchdownMaximumDescent: 8,
@@ -228,8 +229,16 @@ export function sweepSurfaceContact(previous, proposed, sampleSurface, options =
     proposed.y - previous.y,
     proposed.z - previous.z,
   );
-  const rawSteps = Math.max(1, Math.ceil(distance / Math.max(settings.sweepStep, 0.01)));
-  const steps = Math.min(settings.maximumSweepSteps, rawSteps);
+  const requestedSpacing = Math.max(finitePositive(settings.sweepStep, DEFAULTS.sweepStep), 0.01);
+  const probeSpacing = Math.min(
+    requestedSpacing,
+    Math.max(finitePositive(settings.maximumProbeSpacing, DEFAULTS.maximumProbeSpacing), 0.01),
+  );
+  const rawSteps = Math.max(1, Math.ceil(distance / probeSpacing));
+  const steps = Math.min(
+    clampInteger(settings.maximumSweepSteps, 1, 16384, DEFAULTS.maximumSweepSteps),
+    rawSteps,
+  );
   let firstWaterContact = null;
 
   for (let step = 1; step <= steps; step += 1) {
@@ -346,6 +355,16 @@ function horizontalDistance(a, b) {
 function finiteNonNegative(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : fallback;
+}
+
+function finitePositive(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
+function clampInteger(value, minimum, maximum, fallback) {
+  const number = Number(value);
+  return Number.isInteger(number) ? Math.max(minimum, Math.min(maximum, number)) : fallback;
 }
 
 function lerp(start, end, amount) {
