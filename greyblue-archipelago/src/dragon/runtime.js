@@ -44,7 +44,7 @@ export class DragonRuntime {
           if (action) this.actions.set(key, action);
           else actionErrors.push({ name, reason: "missing-action" });
         } catch (error) {
-          actionErrors.push({ name, reason: error instanceof Error ? error.message : String(error) });
+          actionErrors.push({ name, reason: errorMessage(error) });
         }
       }
     }
@@ -79,19 +79,30 @@ export class DragonRuntime {
       : Math.hypot(flight.velocity?.x || 0, flight.velocity?.z || 0);
     const rate = playbackRate(state, speed);
     const stateChanged = state !== this.state;
+    let transitionSucceeded = false;
+    let actionFailure = null;
 
     if (action && action !== this.currentAction) {
-      action.reset();
-      action.enabled = true;
-      action.setEffectiveWeight?.(1);
-      action.setEffectiveTimeScale?.(rate);
-      action.fadeIn?.(crossfadeDuration(state));
-      action.play?.();
-      this.currentAction?.fadeOut?.(crossfadeDuration(state));
-      this.currentAction = action;
-      this.currentClip = key;
+      try {
+        action.reset?.();
+        action.enabled = true;
+        action.setEffectiveWeight?.(1);
+        action.setEffectiveTimeScale?.(rate);
+        action.fadeIn?.(crossfadeDuration(state));
+        action.play?.();
+        this.currentAction?.fadeOut?.(crossfadeDuration(state));
+        this.currentAction = action;
+        this.currentClip = key;
+        transitionSucceeded = true;
+      } catch (error) {
+        actionFailure = { state, clip: clip?.name || null, reason: errorMessage(error) };
+      }
     } else if (action) {
-      action.setEffectiveTimeScale?.(rate);
+      try {
+        action.setEffectiveTimeScale?.(rate);
+      } catch (error) {
+        actionFailure = { state, clip: clip?.name || null, reason: errorMessage(error) };
+      }
     }
 
     if (stateChanged || force) this.stateAge = 0;
@@ -99,16 +110,30 @@ export class DragonRuntime {
     const missing = key
       ? this.telemetry.missing.filter((value) => value !== state)
       : [...new Set([...this.telemetry.missing, state])];
+    const fallbackReason = !key
+      ? "missing-role"
+      : actionFailure
+        ? "action-error"
+        : this.mixer && !action
+          ? "missing-action"
+          : !exact
+            ? "role-fallback"
+            : null;
     this.telemetry = {
       ...this.telemetry,
       state,
       clip: clip?.name || null,
-      fallback: Boolean(key && !exact),
+      activeClip: this.currentClip ? this.clips.get(this.currentClip)?.name || null : null,
+      actionAvailable: Boolean(action),
+      actionFailure,
+      fallback: Boolean(fallbackReason),
+      fallbackReason,
       playbackRate: rate,
       available: [...this.clips.keys()],
       missing,
       stateAge: this.stateAge,
       heldState,
+      transitionCount: this.telemetry.transitionCount + (transitionSucceeded ? 1 : 0),
     };
     return clip?.name || null;
   }
@@ -134,13 +159,18 @@ function emptyTelemetry(state) {
   return {
     state,
     clip: null,
+    activeClip: null,
+    actionAvailable: false,
+    actionFailure: null,
     fallback: false,
+    fallbackReason: null,
     available: [],
     missing: [],
     rejected: [],
     actionErrors: [],
     stateAge: 0,
     heldState: false,
+    transitionCount: 0,
   };
 }
 
@@ -196,6 +226,10 @@ function playbackRate(state, speed) {
 
 function crossfadeDuration(state) {
   return state === "takeoff" || state === "landing" ? 0.18 : 0.3;
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function clamp(value, min, max) {
