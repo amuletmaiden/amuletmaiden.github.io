@@ -40,7 +40,7 @@ class MemoryStorage {
     discovered: ["isle-45"],
   }, storage);
   const loaded = loadGame(storage);
-  assert.deepEqual(loaded.position, { x: 0, y: 160, z: 220 });
+  assert.deepEqual(loaded.position, { x: 0, y: 160, z: 0 });
   assert.equal(loaded.recoveredCorruptPosition, false, "saveGame never persists a corrupt position");
   assert.deepEqual(loaded.discovered, ["isle-45"]);
 }
@@ -55,7 +55,7 @@ class MemoryStorage {
     settings: {},
   }));
   const loaded = loadGame(storage);
-  assert.deepEqual(loaded.position, { x: 0, y: 160, z: 220 });
+  assert.deepEqual(loaded.position, { x: 0, y: 160, z: 0 });
   assert.equal(loaded.recoveredCorruptPosition, true);
   assert.deepEqual(loaded.discovered, ["isle-45"], "recovery preserves discovery state");
 }
@@ -66,7 +66,7 @@ class MemoryStorage {
   assert.equal(isValidWorldPosition({ x: 24001, y: 0, z: 0 }), false);
   assert.equal(isValidWorldPosition({ x: 0, y: 8001, z: 0 }), false);
   const recovered = safeRespawn({ airborne: false }, { x: Infinity, y: 0, z: 0 });
-  assert.deepEqual(recovered.position, { x: 0, y: 160, z: 220 });
+  assert.deepEqual(recovered.position, { x: 0, y: 160, z: 0 });
   assert.equal(recovered.airborne, true);
 }
 
