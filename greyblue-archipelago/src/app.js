@@ -45,7 +45,12 @@ const position = new THREE.Vector3(
 );
 
 const controller = new FlightController();
-controller.airborne = true;
+Object.assign(controller.velocity, save?.velocity || {});
+controller.yaw = save?.orientation?.yaw ?? 0;
+controller.pitch = save?.orientation?.pitch ?? 0;
+controller.bank = save?.orientation?.bank ?? 0;
+controller.airborne = save?.airborne ?? true;
+controller.landingRequested = save?.landingRequested ?? false;
 const flightInput = new FlightInput();
 const chaseCamera = new ChaseCameraRig({ distance: save?.settings?.cameraDistance ?? 24 });
 const collisionResolver = new FlightCollisionResolver();
@@ -163,23 +168,32 @@ function recover() {
     seed,
     position: { x: position.x, y: position.y, z: position.z },
     velocity: { ...controller.velocity },
+    orientation: { yaw: controller.yaw, pitch: controller.pitch, bank: controller.bank },
     airborne: controller.airborne,
     landingRequested: controller.landingRequested,
     discovered,
   }, FALLBACK_SPAWN);
   position.set(recovered.position.x, recovered.position.y, recovered.position.z);
   Object.assign(controller.velocity, recovered.velocity);
+  controller.yaw = recovered.orientation.yaw;
+  controller.pitch = recovered.orientation.pitch;
+  controller.bank = recovered.orientation.bank;
   controller.airborne = recovered.airborne;
   controller.landingRequested = recovered.landingRequested;
   collisionResolver.reset(recovered.position);
   lastCollision = { ...collisionResolver.telemetry };
   chaseCamera.snapTo(position, controller.yaw);
+  persist();
 }
 
 function persist() {
   saveGame({
     seed,
     position: { x: position.x, y: position.y, z: position.z },
+    velocity: { ...controller.velocity },
+    orientation: { yaw: controller.yaw, pitch: controller.pitch, bank: controller.bank },
+    airborne: controller.airborne,
+    landingRequested: controller.landingRequested,
     discovered,
     settings: { cameraDistance: chaseCamera.distance },
   });
@@ -230,6 +244,7 @@ async function boot() {
   dragonRuntime.bindClips(dragonGltf.animations);
   collisionResolver.reset(position);
   lastCollision = { ...collisionResolver.telemetry };
+  chaseCamera.snapTo(position, controller.yaw);
 
   stateLine.textContent = "FLIGHT · Greyblue Archipelago";
   requestAnimationFrame(frame);
