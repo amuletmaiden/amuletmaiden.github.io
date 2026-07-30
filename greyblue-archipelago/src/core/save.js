@@ -6,35 +6,43 @@ const ALTITUDE_MIN = -100;
 const ALTITUDE_MAX = 8000;
 const MAX_DISCOVERY_RECORDS = 2048;
 
-export function saveGame(state, storage = localStorage) {
+export function saveGame(state, storage = localStorage, guidanceContext = null) {
+  const discoveredRoutes = normalizeStringSet(state.discoveredRoutes);
   const payload = {
     version: CURRENT_VERSION,
     savedAt: new Date().toISOString(),
     seed: Number.isInteger(state.seed) ? state.seed : 1337,
     position: normalizePosition(state.position),
     discovered: normalizeStringSet(state.discovered),
-    discoveredRoutes: normalizeStringSet(state.discoveredRoutes),
-    guidance: normalizeGuidance(state.guidance),
+    discoveredRoutes,
+    guidance: normalizeGuidanceForWorld(state.guidance, {
+      ...guidanceContext,
+      discoveredRoutes: guidanceContext?.discoveredRoutes ?? discoveredRoutes,
+    }),
     settings: isPlainObject(state.settings) ? state.settings : {},
   };
   storage.setItem(SAVE_KEY, JSON.stringify(payload));
   return payload;
 }
 
-export function loadGame(storage = localStorage) {
+export function loadGame(storage = localStorage, guidanceContext = null) {
   const raw = storage.getItem(SAVE_KEY);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
     if (!parsed || !isPlainObject(parsed) || ![1, CURRENT_VERSION].includes(parsed.version)) return null;
+    const discoveredRoutes = normalizeStringSet(parsed.discoveredRoutes);
     return {
       ...parsed,
       version: CURRENT_VERSION,
       seed: Number.isInteger(parsed.seed) ? parsed.seed : 1337,
       position: normalizePosition(parsed.position),
       discovered: normalizeStringSet(parsed.discovered),
-      discoveredRoutes: normalizeStringSet(parsed.discoveredRoutes),
-      guidance: normalizeGuidance(parsed.guidance),
+      discoveredRoutes,
+      guidance: normalizeGuidanceForWorld(parsed.guidance, {
+        ...guidanceContext,
+        discoveredRoutes: guidanceContext?.discoveredRoutes ?? discoveredRoutes,
+      }),
       settings: isPlainObject(parsed.settings) ? parsed.settings : {},
       recoveredCorruptPosition: !isValidWorldPosition(parsed.position),
       migratedFromVersion: parsed.version === CURRENT_VERSION ? null : parsed.version,
@@ -68,6 +76,21 @@ export function isValidWorldPosition(position) {
     && y <= ALTITUDE_MAX;
 }
 
+export function normalizeGuidanceForWorld(guidance, context = null) {
+  const normalized = normalizeGuidance(guidance);
+  if (!normalized) return null;
+  if (!context) return normalized;
+  if (context.validation && context.validation.valid !== true) return null;
+
+  const routeIds = normalizeIdLookup(context.routeIds);
+  if (routeIds && !routeIds.has(normalized.activeRouteId)) return null;
+
+  const discoveredRoutes = normalizeIdLookup(context.discoveredRoutes);
+  if (discoveredRoutes && !discoveredRoutes.has(normalized.activeRouteId)) return null;
+
+  return normalized;
+}
+
 function normalizePosition(position) {
   if (!isValidWorldPosition(position)) return { ...DEFAULT_SPAWN };
   return {
@@ -90,6 +113,11 @@ function normalizeStringSet(values) {
       .filter(Boolean)
       .slice(0, MAX_DISCOVERY_RECORDS),
   )];
+}
+
+function normalizeIdLookup(values) {
+  if (values == null) return null;
+  return new Set(normalizeStringSet(values));
 }
 
 function normalizeGuidance(guidance) {
