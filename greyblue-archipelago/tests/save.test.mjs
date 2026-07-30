@@ -23,13 +23,34 @@ class MemoryStorage {
     seed: 77,
     position: { x: 12, y: 144, z: -31 },
     discovered: new Set(["isle-1", "isle-1", "isle-2"]),
+    discoveredRoutes: new Set(["route:a", "route:a", " route:b ", ""]),
     settings: { cameraDistance: 24 },
   }, storage);
+  assert.equal(saved.version, 2);
   assert.deepEqual(saved.position, { x: 12, y: 144, z: -31 });
   assert.deepEqual(saved.discovered, ["isle-1", "isle-2"]);
+  assert.deepEqual(saved.discoveredRoutes, ["route:a", "route:b"]);
   const loaded = loadGame(storage);
   assert.equal(loaded.seed, 77);
   assert.equal(loaded.recoveredCorruptPosition, false);
+  assert.equal(loaded.migratedFromVersion, null);
+  assert.deepEqual(loaded.discoveredRoutes, ["route:a", "route:b"]);
+}
+
+{
+  const storage = new MemoryStorage();
+  storage.setItem("greyblue-archipelago-save-v1", JSON.stringify({
+    version: 1,
+    seed: 55,
+    position: { x: 1, y: 160, z: 2 },
+    discovered: ["isle-9"],
+    settings: {},
+  }));
+  const loaded = loadGame(storage);
+  assert.equal(loaded.version, 2, "v1 saves migrate in memory");
+  assert.equal(loaded.migratedFromVersion, 1);
+  assert.deepEqual(loaded.discoveredRoutes, [], "v1 saves gain an empty route set");
+  assert.deepEqual(loaded.discovered, ["isle-9"]);
 }
 
 {
@@ -38,26 +59,30 @@ class MemoryStorage {
     seed: 1337,
     position: { x: -4.3e12, y: 2.5, z: 2.5e12 },
     discovered: ["isle-45"],
+    discoveredRoutes: ["route:ring:1"],
   }, storage);
   const loaded = loadGame(storage);
   assert.deepEqual(loaded.position, { x: 0, y: 160, z: 0 });
   assert.equal(loaded.recoveredCorruptPosition, false, "saveGame never persists a corrupt position");
   assert.deepEqual(loaded.discovered, ["isle-45"]);
+  assert.deepEqual(loaded.discoveredRoutes, ["route:ring:1"]);
 }
 
 {
   const storage = new MemoryStorage();
   storage.setItem("greyblue-archipelago-save-v1", JSON.stringify({
-    version: 1,
+    version: 2,
     seed: 1337,
     position: { x: Number.MAX_VALUE, y: 2.5, z: -Number.MAX_VALUE },
     discovered: ["isle-45"],
+    discoveredRoutes: ["route:ring:4", 7, null, "route:ring:4"],
     settings: {},
   }));
   const loaded = loadGame(storage);
   assert.deepEqual(loaded.position, { x: 0, y: 160, z: 0 });
   assert.equal(loaded.recoveredCorruptPosition, true);
-  assert.deepEqual(loaded.discovered, ["isle-45"], "recovery preserves discovery state");
+  assert.deepEqual(loaded.discovered, ["isle-45"], "recovery preserves island discovery state");
+  assert.deepEqual(loaded.discoveredRoutes, ["route:ring:4"], "recovery preserves normalized route discovery state");
 }
 
 {
@@ -65,9 +90,10 @@ class MemoryStorage {
   assert.equal(isValidWorldPosition({ x: Infinity, y: 0, z: 0 }), false);
   assert.equal(isValidWorldPosition({ x: 24001, y: 0, z: 0 }), false);
   assert.equal(isValidWorldPosition({ x: 0, y: 8001, z: 0 }), false);
-  const recovered = safeRespawn({ airborne: false }, { x: Infinity, y: 0, z: 0 });
+  const recovered = safeRespawn({ airborne: false, discoveredRoutes: new Set(["route:a"]) }, { x: Infinity, y: 0, z: 0 });
   assert.deepEqual(recovered.position, { x: 0, y: 160, z: 0 });
   assert.equal(recovered.airborne, true);
+  assert.deepEqual([...recovered.discoveredRoutes], ["route:a"]);
 }
 
 console.log("save tests passed");
