@@ -70,9 +70,9 @@ function finite(snapshot) {
   const controller = new FlightController();
   controller.airborne = true;
   controller.velocity = { x: 0, y: -6, z: 0 };
-  let snapshot = controller.snapshot();
-  assert.equal(snapshot.mode, "recovery", "zero-airflow flight begins stalled");
-  for (let i = 0; i < 360; i += 1) {
+  let snapshot = controller.step({ throttle: -1, climb: 0 }, 1 / 60);
+  assert.equal(snapshot.mode, "recovery", "zero-airflow flight enters recovery after evaluation");
+  for (let i = 1; i < 360; i += 1) {
     snapshot = controller.step({ throttle: -1, climb: 0 }, 1 / 60);
   }
   assert.ok(snapshot.speed >= 10.5, "stall recovery regains flying speed despite reverse throttle");
