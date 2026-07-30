@@ -150,4 +150,43 @@ function flight(overrides = {}) {
   assert.ok(runtime.telemetry.missing.includes("flight"));
 }
 
+{
+  const mixer = new FakeMixer();
+  const runtime = new DragonRuntime({}, mixer);
+  runtime.bindClips([]);
+  runtime.updateFromFlight(flight());
+  assert.ok(runtime.telemetry.missing.includes("flight"));
+  const rebound = runtime.bindClips(clips);
+  assert.deepEqual(rebound, clips.map(({ name }) => name.toLowerCase()));
+  assert.equal(runtime.telemetry.state, "grounded-idle");
+  assert.equal(runtime.telemetry.clip, "Dragon_Idle_Sentinel_v44");
+  assert.deepEqual(runtime.telemetry.missing, [], "rebinding a valid production set clears stale missing-role telemetry");
+}
+
+{
+  const mixer = new FakeMixer();
+  const runtime = new DragonRuntime({}, mixer);
+  runtime.bindClips(clips);
+  runtime.updateFromFlight(flight({ mode: "takeoff", speed: 8 }));
+  const readiness = mixer.actions.get("Dragon_Wing_Readiness_Test");
+  assert.ok(readiness.calls.some(([name, value]) => name === "fadeIn" && value === 0.18));
+  assert.ok(readiness.calls.some(([name, value]) => name === "rate" && value === 1.35));
+  runtime.update(0.65);
+  runtime.updateFromFlight(flight({ speed: 10000 }));
+  assert.equal(runtime.telemetry.playbackRate, 1.55, "powered-flight rate clamps at the production ceiling");
+  runtime.updateFromFlight(flight({ speed: -10000 }));
+  assert.equal(runtime.telemetry.playbackRate, 0.78, "powered-flight rate clamps at the production floor");
+}
+
+{
+  const mixer = new FakeMixer();
+  const runtime = new DragonRuntime({}, mixer);
+  runtime.bindClips(clips);
+  runtime.update(Number.NaN);
+  runtime.update(-1);
+  runtime.update(0);
+  assert.equal(runtime.telemetry.stateAge, 0, "invalid delta times cannot age or destabilize a runtime state");
+  assert.deepEqual(mixer.updates, []);
+}
+
 console.log("dragon-runtime tests passed");
