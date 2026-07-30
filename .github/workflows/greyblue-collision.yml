@@ -28,3 +28,21 @@ jobs:
           node greyblue-archipelago/tests/chase-camera.test.mjs
           node greyblue-archipelago/tests/input.test.mjs
           node greyblue-archipelago/tests/app-collision-integration.test.mjs
+
+  live-browser:
+    needs: regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install headless Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Validate deployed Greyblue build
+        env:
+          GREYBLUE_URL: https://amuletmaiden.github.io/greyblue-archipelago/
+        run: node greyblue-archipelago/tests/live-smoke.mjs
