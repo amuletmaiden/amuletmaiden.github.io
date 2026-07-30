@@ -189,8 +189,8 @@ export class FlightCollisionResolver {
 
   #recoveryResult(reason, contact = null, preferTerrain = false) {
     const fallback = preferTerrain
-      ? this.lastSafeTerrainPosition || this.lastSafePosition || { x: 0, y: 160, z: 0 }
-      : this.lastSafePosition || this.lastSafeTerrainPosition || { x: 0, y: 160, z: 0 };
+      ? this.lastSafeTerrainPosition || this.lastSafePosition || { x: 0, y: 160, z: 220 }
+      : this.lastSafePosition || this.lastSafeTerrainPosition || { x: 0, y: 160, z: 220 };
     this.consecutiveContacts = 0;
     this.telemetry = {
       collided: Boolean(contact),
