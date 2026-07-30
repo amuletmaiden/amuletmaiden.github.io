@@ -92,4 +92,25 @@ const { FlightInput, normalizeGamepad } = await import(moduleUrl);
   assert.equal(sample.climb, 0);
 }
 
+{
+  const input = new FlightInput();
+  const pressed = { axes: [], buttons: [{ value: 1, pressed: true }] };
+  const released = { axes: [], buttons: [{ value: 0, pressed: false }] };
+
+  input.setGamepad(pressed);
+  assert.equal(input.sample().toggleFlight, true, "initial gamepad press creates one edge");
+
+  input.setGamepad(pressed);
+  assert.equal(
+    input.sample().toggleFlight,
+    false,
+    "held gamepad button does not retrigger every frame",
+  );
+
+  input.setGamepad(released);
+  input.sample();
+  input.setGamepad(pressed);
+  assert.equal(input.sample().toggleFlight, true, "release and repress creates a new edge");
+}
+
 console.log("input tests passed");
