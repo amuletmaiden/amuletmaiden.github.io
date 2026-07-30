@@ -5,6 +5,8 @@ export class ChaseCameraRig {
     lookAhead = 10,
     terrainClearance = 5,
     clearanceSamples = 7,
+    recoveryClearance = 36,
+    recoveryMinimumAltitude = 72,
     smoothing = 7.5,
   } = {}) {
     this.distance = distance;
@@ -12,11 +14,14 @@ export class ChaseCameraRig {
     this.lookAhead = lookAhead;
     this.terrainClearance = terrainClearance;
     this.clearanceSamples = clampInteger(clearanceSamples, 2, 33, 7);
+    this.recoveryClearance = finiteNonNegative(recoveryClearance, 36);
+    this.recoveryMinimumAltitude = finiteNonNegative(recoveryMinimumAltitude, 72);
     this.smoothing = smoothing;
     this.position = { x: 0, y: 0, z: 0 };
     this.lookTarget = { x: 0, y: 0, z: 0 };
     this.initialized = false;
     this.obstructed = false;
+    this.lastSampleHeight = () => Number.NEGATIVE_INFINITY;
   }
 
   update({
@@ -25,8 +30,12 @@ export class ChaseCameraRig {
     bank = 0,
     speed = 0,
     dt = 1 / 60,
-    sampleHeight = () => Number.NEGATIVE_INFINITY,
+    sampleHeight = this.lastSampleHeight,
   }) {
+    if (typeof sampleHeight === "function") this.lastSampleHeight = sampleHeight;
+    const activeSampleHeight = typeof sampleHeight === "function"
+      ? sampleHeight
+      : this.lastSampleHeight;
     const anchor = finiteVector(target) ? target : { x: 0, y: 160, z: 0 };
     const safeYaw = Number.isFinite(yaw) ? yaw : 0;
     const safeBank = Number.isFinite(bank) ? bank : 0;
@@ -47,7 +56,7 @@ export class ChaseCameraRig {
     const terrainHeight = maximumFiniteHeightAlongSegment(
       anchor,
       desired,
-      sampleHeight,
+      activeSampleHeight,
       this.clearanceSamples,
     );
     const minimumCameraHeight = Number.isFinite(terrainHeight)
@@ -85,7 +94,12 @@ export class ChaseCameraRig {
     return this.snapshot();
   }
 
-  snapTo(target, yaw = 0, sampleHeight = () => Number.NEGATIVE_INFINITY) {
+  snapTo(target, yaw = 0, sampleHeight = this.lastSampleHeight) {
+    const safeAltitude = resolveRecoveryAltitude(target, sampleHeight, {
+      terrainClearance: this.recoveryClearance,
+      minimumAltitude: this.recoveryMinimumAltitude,
+    });
+    if (target && typeof target === "object") target.y = safeAltitude;
     this.initialized = false;
     return this.update({ target, yaw, dt: 0, sampleHeight });
   }
@@ -104,6 +118,24 @@ export class ChaseCameraRig {
   }
 }
 
+export function resolveRecoveryAltitude(
+  target,
+  sampleHeight,
+  { terrainClearance = 36, minimumAltitude = 72 } = {},
+) {
+  const baseAltitude = Number.isFinite(Number(target?.y)) ? Number(target.y) : 0;
+  const floorAltitude = finiteNonNegative(minimumAltitude, 72);
+  const clearance = finiteNonNegative(terrainClearance, 36);
+  if (!finiteHorizontal(target) || typeof sampleHeight !== "function") {
+    return Math.max(baseAltitude, floorAltitude);
+  }
+  const sampled = sampleHeight(Number(target.x), Number(target.z));
+  const terrainHeight = normalizeHeight(sampled);
+  return Number.isFinite(terrainHeight)
+    ? Math.max(baseAltitude, floorAltitude, terrainHeight + clearance)
+    : Math.max(baseAltitude, floorAltitude);
+}
+
 export function maximumFiniteHeightAlongSegment(start, end, sampleHeight, samples = 7) {
   if (!finiteVector(start) || !finiteVector(end) || typeof sampleHeight !== "function") {
     return Number.NEGATIVE_INFINITY;
@@ -114,12 +146,20 @@ export function maximumFiniteHeightAlongSegment(start, end, sampleHeight, sample
     const amount = index / (count - 1);
     const x = start.x + (end.x - start.x) * amount;
     const z = start.z + (end.z - start.z) * amount;
-    const sampled = sampleHeight(x, z);
-    if (sampled === null || sampled === undefined) continue;
-    const height = Number(sampled);
+    const height = normalizeHeight(sampleHeight(x, z));
     if (Number.isFinite(height)) maximum = Math.max(maximum, height);
   }
   return maximum;
+}
+
+function normalizeHeight(sampled) {
+  if (sampled === null || sampled === undefined) return Number.NEGATIVE_INFINITY;
+  if (typeof sampled === "object") {
+    const height = Number(sampled.height);
+    return Number.isFinite(height) ? height : Number.NEGATIVE_INFINITY;
+  }
+  const height = Number(sampled);
+  return Number.isFinite(height) ? height : Number.NEGATIVE_INFINITY;
 }
 
 function lerpVector(current, target, amount) {
@@ -128,11 +168,22 @@ function lerpVector(current, target, amount) {
   current.z += (target.z - current.z) * amount;
 }
 
+function finiteHorizontal(value) {
+  return Boolean(value)
+    && Number.isFinite(Number(value.x))
+    && Number.isFinite(Number(value.z));
+}
+
 function finiteVector(value) {
   return Boolean(value)
     && Number.isFinite(value.x)
     && Number.isFinite(value.y)
     && Number.isFinite(value.z);
+}
+
+function finiteNonNegative(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : fallback;
 }
 
 function clampInteger(value, minimum, maximum, fallback) {
