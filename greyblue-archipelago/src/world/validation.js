@@ -1,4 +1,6 @@
-export const WORLD_CONTRACT_VERSION = 2;
+export const WORLD_CONTRACT_VERSION = 3;
+
+const SEVERITY_ORDER = Object.freeze({ critical: 0, error: 1, warning: 2 });
 
 export function validateWorldContract(world) {
   const issues = [];
@@ -78,10 +80,7 @@ export function validateWorldContract(world) {
     }
   }
 
-  issues.sort((left, right) => left.code.localeCompare(right.code)
-    || left.subject.localeCompare(right.subject)
-    || left.invariant.localeCompare(right.invariant)
-    || left.message.localeCompare(right.message));
+  issues.sort(compareIssues);
 
   const diagnostics = summarizeIssues(issues);
   return {
@@ -118,17 +117,36 @@ function collectIds(records, kind, issues) {
 function summarizeIssues(issues) {
   const byCode = {};
   const byInvariant = {};
+  const bySeverity = {};
   for (const entry of issues) {
     byCode[entry.code] = (byCode[entry.code] || 0) + 1;
     byInvariant[entry.invariant] = (byInvariant[entry.invariant] || 0) + 1;
+    bySeverity[entry.severity] = (bySeverity[entry.severity] || 0) + 1;
   }
   return {
     issueCount: issues.length,
+    highestSeverity: issues[0]?.severity || null,
+    severities: Object.keys(bySeverity).sort((left, right) => SEVERITY_ORDER[left] - SEVERITY_ORDER[right]),
     codes: Object.keys(byCode).sort(),
     invariants: Object.keys(byInvariant).sort(),
+    bySeverity: Object.fromEntries(Object.entries(bySeverity).sort(([left], [right]) => SEVERITY_ORDER[left] - SEVERITY_ORDER[right])),
     byCode: Object.fromEntries(Object.entries(byCode).sort(([left], [right]) => left.localeCompare(right))),
     byInvariant: Object.fromEntries(Object.entries(byInvariant).sort(([left], [right]) => left.localeCompare(right))),
   };
+}
+
+function compareIssues(left, right) {
+  return SEVERITY_ORDER[left.severity] - SEVERITY_ORDER[right.severity]
+    || left.invariant.localeCompare(right.invariant)
+    || left.subject.localeCompare(right.subject)
+    || left.code.localeCompare(right.code)
+    || left.message.localeCompare(right.message);
+}
+
+function severityFor(invariant) {
+  if (/-(id-present|id-unique|region-known|origin-known|destination-known|distinct-endpoints|discovery-id|discovery-unique|discovery-endpoints)$/.test(invariant)) return "critical";
+  if (/-(finite|positive|bounded|altitude-band)$/.test(invariant)) return "error";
+  return "warning";
 }
 
 function validId(value) {
@@ -136,5 +154,5 @@ function validId(value) {
 }
 
 function issue(code, subject, message, invariant) {
-  return { code, subject: String(subject), invariant, message };
+  return { severity: severityFor(invariant), code, subject: String(subject), invariant, message };
 }
