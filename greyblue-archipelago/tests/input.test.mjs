@@ -48,6 +48,22 @@ const { FlightInput, normalizeGamepad } = await import(moduleUrl);
 }
 
 {
+  const noisyTriggers = Array.from({ length: 8 }, (_, index) => ({
+    value: index === 7 ? 0.03 : 0,
+    pressed: false,
+  }));
+  const normalized = normalizeGamepad({
+    axes: [0, 0, 0, -0.6],
+    buttons: noisyTriggers,
+  });
+  assert.ok(normalized.throttle > 0.4, "sub-deadzone trigger noise does not suppress stick throttle");
+
+  const triggerOnly = normalizeGamepad({ axes: [0, 0, 0, 0], buttons: noisyTriggers });
+  assert.equal(triggerOnly.throttle, 0, "sub-deadzone trigger noise remains neutral");
+  assert.equal(triggerOnly.active, false, "trigger noise does not claim active input");
+}
+
+{
   const input = new FlightInput();
   input.setGamepad({ axes: [0.8, 0.5, 0, 0], buttons: [] });
   let sample = input.sample();
