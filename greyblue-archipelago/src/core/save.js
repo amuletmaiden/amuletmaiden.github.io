@@ -22,9 +22,8 @@ export function saveGame(state, storage = localStorage, guidanceContext = null) 
     guidance: guidanceResult.guidance,
     settings: isPlainObject(state.settings) ? state.settings : {},
   };
-  if (guidanceResult.recovery) payload.guidanceRecovery = guidanceResult.recovery;
   storage.setItem(SAVE_KEY, JSON.stringify(payload));
-  return payload;
+  return { ...payload, guidanceRecovery: guidanceResult.recovery };
 }
 
 export function loadGame(storage = localStorage, guidanceContext = null) {
@@ -38,7 +37,6 @@ export function loadGame(storage = localStorage, guidanceContext = null) {
       ? { ...guidanceContext, discoveredRoutes: guidanceContext.discoveredRoutes ?? discoveredRoutes }
       : null;
     const guidanceResult = recoverGuidanceForWorld(parsed.guidance, context);
-    const guidanceRecovery = guidanceResult.recovery || normalizeRecoveryRecord(parsed.guidanceRecovery);
     return {
       ...parsed,
       version: CURRENT_VERSION,
@@ -47,7 +45,7 @@ export function loadGame(storage = localStorage, guidanceContext = null) {
       discovered: normalizeStringSet(parsed.discovered),
       discoveredRoutes,
       guidance: guidanceResult.guidance,
-      guidanceRecovery,
+      guidanceRecovery: guidanceResult.recovery,
       settings: isPlainObject(parsed.settings) ? parsed.settings : {},
       recoveredCorruptPosition: !isValidWorldPosition(parsed.position),
       migratedFromVersion: parsed.version === CURRENT_VERSION ? null : parsed.version,
@@ -135,26 +133,20 @@ function summarizeValidation(validation) {
   const issues = Array.isArray(validation.issues) ? validation.issues : [];
   const codes = normalizeStringSet(validation.diagnostics?.codes ?? issues.map((entry) => entry?.code));
   const invariants = normalizeStringSet(validation.diagnostics?.invariants ?? issues.map((entry) => entry?.invariant));
+  const severities = normalizeStringSet(validation.diagnostics?.severities ?? issues.map((entry) => entry?.severity));
+  const highestSeverity = typeof validation.diagnostics?.highestSeverity === "string"
+    ? validation.diagnostics.highestSeverity
+    : severities[0] ?? null;
   return {
     contractVersion: Number.isInteger(validation.contractVersion) ? validation.contractVersion : null,
     issueCount: Number.isInteger(validation.diagnostics?.issueCount)
       ? Math.max(0, validation.diagnostics.issueCount)
       : issues.length,
+    highestSeverity,
+    primaryInvariant: invariants[0] ?? null,
+    severities,
     codes: codes.sort(),
     invariants: invariants.sort(),
-  };
-}
-
-function normalizeRecoveryRecord(value) {
-  if (!isPlainObject(value)) return null;
-  const reasons = new Set(["malformed-guidance", "world-validation-failed", "unknown-route", "undiscovered-route"]);
-  if (!reasons.has(value.reason)) return null;
-  return {
-    reason: value.reason,
-    activeRouteId: typeof value.activeRouteId === "string" && value.activeRouteId.trim()
-      ? value.activeRouteId.trim()
-      : null,
-    validation: summarizeValidation(value.validation),
   };
 }
 
