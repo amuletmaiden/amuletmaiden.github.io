@@ -29,6 +29,7 @@ jobs:
           node greyblue-archipelago/tests/input.test.mjs
           node greyblue-archipelago/tests/app-collision-integration.test.mjs
           node greyblue-archipelago/tests/spawn-contract.test.mjs
+          node greyblue-archipelago/tests/save.test.mjs
 
   live-browser:
     needs: regression

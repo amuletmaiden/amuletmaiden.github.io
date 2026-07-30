@@ -1,5 +1,5 @@
 const SAVE_KEY = "greyblue-archipelago-save-v1";
-const DEFAULT_SPAWN = Object.freeze({ x: 0, y: 160, z: 220 });
+const DEFAULT_SPAWN = Object.freeze({ x: 0, y: 160, z: 0 });
 const WORLD_LIMIT = 24000;
 const ALTITUDE_MIN = -100;
 const ALTITUDE_MAX = 8000;
