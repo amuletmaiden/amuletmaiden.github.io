@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>search &#183; amuletmaiden</title>
+<link rel="stylesheet" href="style.css?v=7cba62b2">
+</head>
+<body class="index theme-emerald">
+<div class="veil"></div>
+<header class="hero hero-tag">
+  <a class="back" href="index.html">&#8592; archive</a>
+  <h1 class="hero-title">search</h1>
+  <div class="accent-line"></div>
+  <input id="q" class="searchbox" type="search" placeholder="search every post&#8230;" autocomplete="off" disabled>
+  <p class="hero-sub" id="cnt"></p>
+</header>
+<main class="archive"><div id="out"></div></main>
+<script>
+var IDX=[], q=document.getElementById('q'), out=document.getElementById('out'), cnt=document.getElementById('cnt');
+function esc(s){return (s||'').replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+fetch('search-index.json').then(function(r){return r.json();}).then(function(d){
+  IDX=d; q.disabled=false; q.focus();
+  var p=new URLSearchParams(location.search).get('q'); if(p){q.value=p; run();}
+});
+function run(){
+  var terms=q.value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  if(!terms.length){out.innerHTML=''; cnt.textContent=''; return;}
+  var res=IDX.filter(function(e){
+    return terms.every(function(t){
+      return e.b.indexOf(t)>=0 || e.g.some(function(g){return g.toLowerCase().indexOf(t)>=0;});
+    });
+  });
+  cnt.textContent=res.length+' result'+(res.length===1?'':'s');
+  out.innerHTML=res.slice(0,400).map(function(e){
+    var tags=e.g.map(function(g){return '<span class="tag">#'+esc(g)+'</span>';}).join(' ');
+    return '<a class="row" href="posts/'+e.s+'.html"><span class="row-body">'+
+      '<span class="row-ex">'+esc(e.x||'(image)')+'</span>'+
+      '<span class="row-date">'+esc(e.d)+' &#183; '+tags+'</span></span></a>';
+  }).join('');
+}
+q.addEventListener('input', run);
+</script>
+</body>
+</html>

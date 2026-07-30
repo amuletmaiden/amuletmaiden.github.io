@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title></title>
+  <style>
+    :root{
+      --bg0:#050003;
+      --bg1:#120006;
+      --bg2:#28000f;
+      --bg3:#420018;
+      --bg4:#1a0009;
+
+      --cur1:#120007;
+      --cur2:#26000e;
+      --cur3:#3b0017;
+      --cur4:#0a0004;
+
+      /* silhouette (DON'T darken it further) */
+      --ink:#0a0005;
+
+      /* faint halo BEHIND only */
+      --halo: rgba(255,45,85,.08);
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      overflow:hidden;
+      background:var(--bg0);
+    }
+
+    body::before{
+      content:"";
+      position:fixed; inset:-40vmax;
+      background:
+        radial-gradient(64vmax 60vmax at 18% 22%, rgba(190,0,60,.24), transparent 62%),
+        radial-gradient(62vmax 58vmax at 82% 38%, rgba(255,55,105,.12), transparent 66%),
+        radial-gradient(74vmax 64vmax at 52% 88%, rgba(140,0,45,.26), transparent 64%),
+        conic-gradient(from 210deg at 50% 50%, var(--bg1), var(--bg2), var(--bg3), var(--bg4), var(--bg2), var(--bg1));
+      filter:saturate(1.12) contrast(1.10);
+      animation:bgShift 20s linear infinite;
+      z-index:-5;
+      will-change: transform;
+    }
+
+    body::after{
+      content:"";
+      position:fixed; inset:0;
+      background: radial-gradient(closest-side at 50% 50%, transparent 58%, rgba(0,0,0,.54) 100%);
+      opacity:.55;
+      z-index:-4;
+      pointer-events:none;
+    }
+
+    @keyframes bgShift{
+      0%   { transform: translate3d(0,0,0) rotate(0deg) scale(1.06); }
+      50%  { transform: translate3d(3.8vmax,-2.8vmax,0) rotate(10deg) scale(1.085); }
+      100% { transform: translate3d(0,0,0) rotate(0deg) scale(1.06); }
+    }
+
+    .scene{
+      position:fixed;
+      inset:0;
+      display:grid;
+      place-items:center;
+      padding:min(5vmin, 36px);
+      isolation:isolate;
+    }
+
+    .curtain{
+      position:absolute;
+      top:-6%;
+      bottom:-6%;
+      width:min(340px, 34vw);
+      z-index:1;
+      opacity:.96;
+      will-change: transform, background-position, filter;
+      filter: drop-shadow(0 18px 30px rgba(0,0,0,.55));
+      background:
+        linear-gradient(90deg,
+          rgba(0,0,0,.70),
+          rgba(0,0,0,.12) 18%,
+          rgba(255,90,130,.07) 34%,
+          rgba(0,0,0,.16) 52%,
+          rgba(255,120,160,.055) 68%,
+          rgba(0,0,0,.38) 86%,
+          rgba(0,0,0,.75)
+        ),
+        repeating-linear-gradient(90deg,
+          rgba(255,255,255,.028) 0 2px,
+          rgba(0,0,0,.085) 2px 10px,
+          rgba(0,0,0,.00) 10px 18px
+        ),
+        linear-gradient(180deg, var(--cur4), var(--cur2) 35%, var(--cur3) 65%, var(--cur1));
+      background-size: 100% 100%, 140% 100%, 100% 100%;
+      background-position: 0% 0%, 0% 0%, 0% 0%;
+      border-radius: 22px;
+      border:1px solid rgba(255,160,190,.10);
+      mask-image: radial-gradient(110% 90% at 50% 50%, #000 66%, transparent 100%);
+      animation: curtainRipple 10s ease-in-out infinite;
+    }
+    .curtain::after{
+      content:"";
+      position:absolute; inset:0;
+      background:
+        radial-gradient(60% 90% at 30% 50%, rgba(0,0,0,.52), transparent 62%),
+        radial-gradient(60% 90% at 70% 50%, rgba(0,0,0,.58), transparent 62%);
+      mix-blend-mode:multiply;
+      opacity:.74;
+      pointer-events:none;
+    }
+    .curtain.left{ left:-2.5%; transform: skewY(-1.2deg); }
+    .curtain.right{ right:-2.5%; transform: skewY(1.2deg) scaleX(-1); }
+
+    @keyframes curtainRipple{
+      0%,100% { background-position: 0% 0%, 0% 0%, 0% 0%; transform: translateX(0) translateY(0) skewY(var(--sk, -1.2deg)); }
+      50%     { background-position: 0% 0%, 18% 0%, 0% 0%; transform: translateX(0) translateY(-0.6%) skewY(var(--sk, -1.2deg)); }
+    }
+
+    .stage{
+      position:relative;
+      width:min(560px, 90vw);
+      aspect-ratio: 1 / 1;
+      display:grid;
+      place-items:center;
+      z-index:2;
+    }
+
+    .floor{
+      position:absolute;
+      bottom:12%;
+      width:74%;
+      height:14%;
+      background: radial-gradient(closest-side, rgba(255,70,120,.16), transparent 74%);
+      filter: blur(12px);
+      opacity:.74;
+      z-index:0;
+      animation: floorPulse 3.4s ease-in-out infinite;
+      pointer-events:none;
+    }
+    @keyframes floorPulse{
+      0%,100% { transform: scaleX(1) scaleY(.9); opacity:.58; }
+      50%     { transform: scaleX(1.10) scaleY(1); opacity:.84; }
+    }
+
+    .dancer{
+      width: min(460px, 82vw);
+      height:auto;
+      z-index:1;
+      filter: drop-shadow(0 22px 30px rgba(0,0,0,.62));
+    }
+
+    .spin{
+      transform-origin: 50% 86%;
+      animation: pirouette 3.9s linear infinite, drift 5.6s ease-in-out infinite;
+      will-change: transform;
+    }
+    .bob{
+      transform-origin: 50% 86%;
+      animation: bob 1.25s ease-in-out infinite;
+      will-change: transform;
+    }
+
+    @keyframes pirouette{
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes drift{
+      0%,100% { transform: translateX(-1.0%) rotate(0deg); }
+      50%     { transform: translateX(1.0%)  rotate(0deg); }
+    }
+    @keyframes bob{
+      0%,100% { transform: translateY(0); }
+      50%     { transform: translateY(-2.0%); }
+    }
+
+    .scene:hover .spin{ animation-duration: 2.7s, 4.6s; }
+    .scene:hover .curtain{
+      animation-duration: 5.8s;
+      filter: drop-shadow(0 22px 38px rgba(0,0,0,.62)) saturate(1.08);
+    }
+    .scene:hover .curtain.left{
+      transform: translateX(-2.6%) skewY(-1.2deg);
+      background-position: 0% 0%, 36% 0%, 0% 0%;
+    }
+    .scene:hover .curtain.right{
+      transform: translateX(2.6%) skewY(1.2deg) scaleX(-1);
+      background-position: 0% 0%, 36% 0%, 0% 0%;
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      body::before, .curtain, .floor, .spin, .bob{ animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="scene">
+    <div class="curtain left" style="--sk:-1.2deg"></div>
+    <div class="curtain right" style="--sk:1.2deg"></div>
+
+    <div class="stage">
+      <div class="floor"></div>
+
+      <svg class="dancer" viewBox="0 0 280 420" role="img" aria-label="">
+        <defs>
+          <filter id="haloOnly" x="-90%" y="-90%" width="280%" height="280%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="b"/>
+            <feColorMatrix in="b" type="matrix"
+              values="1 0 0 0 0
+                      0 1 0 0 0
+                      0 0 1 0 0
+                      0 0 0 4.5 -2.1" result="m"/>
+            <feFlood flood-color="rgba(255,45,85,0.08)" result="c"/>
+            <feComposite in="c" in2="m" operator="in" result="halo"/>
+            <feMerge><feMergeNode in="halo"/></feMerge>
+          </filter>
+
+          <g id="sil">
+            <!-- head -->
+            <circle cx="140" cy="70" r="18.5" fill="var(--ink)"/>
+
+            <!-- hair -->
+            <circle cx="152" cy="58" r="8.5" fill="var(--ink)"/>
+            <path fill="var(--ink)" d="
+              M154 59
+              C166 76, 166 98, 156 116
+              C150 128, 148 140, 150 152
+              C152 164, 146 170, 138 162
+              C126 150, 122 132, 124 114
+              C126 96, 134 84, 128 72
+              C124 64, 130 54, 140 52
+              C148 50, 152 54, 154 59
+              Z"/>
+
+            <!-- neck -->
+            <path fill="var(--ink)" d="
+              M134 86
+              C137 98, 143 98, 146 86
+              L146 105
+              C143 112, 137 112, 134 105
+              Z"/>
+
+            <!-- torso -->
+            <path fill="var(--ink)" d="
+              M122 112
+              C128 104, 152 104, 158 112
+              C165 124, 166 140, 160 154
+              C155 166, 148 172, 140 172
+              C132 172, 125 166, 120 154
+              C114 140, 115 124, 122 112
+              Z"/>
+
+            <!-- arms -->
+            <path fill="var(--ink)" d="
+              M126 128
+              C100 144, 82 166, 84 184
+              C86 198, 102 202, 116 190
+              C128 180, 132 164, 138 152
+              C142 144, 136 126, 126 128
+              Z"/>
+            <path fill="var(--ink)" d="
+              M154 128
+              C180 144, 198 166, 196 184
+              C194 198, 178 202, 164 190
+              C152 180, 148 164, 142 152
+              C138 144, 144 126, 154 128
+              Z"/>
+
+            <!-- tutu (FIX: only one fill, no inner highlight = no bright splotch) -->
+            <path fill="var(--ink)" d="
+              M140 168
+              C168 168, 210 188, 214 214
+              C217 234, 198 248, 174 254
+              C163 257, 152 258, 140 258
+              C128 258, 117 257, 106 254
+              C82 248, 63 234, 66 214
+              C70 188, 112 168, 140 168
+              Z"/>
+
+            <!-- leg -->
+            <path fill="var(--ink)" d="
+              M136 258
+              C134 286, 133 314, 134 342
+              C135 360, 145 360, 146 342
+              C147 314, 146 286, 144 258
+              C143 250, 137 250, 136 258
+              Z"/>
+
+            <!-- feet -->
+            <path fill="var(--ink)" d="
+              M114 354
+              C104 356, 96 362, 94 366
+              C93 368, 96 370, 104 370
+              C125 370, 133 364, 133 360
+              C133 356, 122 352, 114 354
+              Z"/>
+            <path fill="var(--ink)" d="
+              M166 354
+              C158 352, 147 356, 147 360
+              C147 364, 155 370, 176 370
+              C184 370, 187 368, 186 366
+              C184 362, 176 356, 166 354
+              Z"/>
+          </g>
+        </defs>
+
+        <g class="bob">
+          <g class="spin">
+            <use href="#sil" filter="url(#haloOnly)"></use>
+            <use href="#sil"></use>
+          </g>
+        </g>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

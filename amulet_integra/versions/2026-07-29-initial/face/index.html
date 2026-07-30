@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>amuletmaiden</title>
+
+    <link href="/style.css" rel="stylesheet" type="text/css" media="all">
+
+    <style>
+      :root {
+                --lower-pad-x: clamp(1.1rem, 3.2vw, 2.5rem);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 2.5rem 1rem 3rem;
+        font-family: "Georgia", "Times New Roman", serif;
+        line-height: 1.3;
+
+        
+        background-color: #064d22;
+
+        
+        background-image:
+          radial-gradient(circle at top left, rgba(0, 0, 0, 0.9), transparent 60%),
+          radial-gradient(circle at top right, rgba(0, 0, 0, 0.9), transparent 60%),
+          radial-gradient(circle at bottom left, rgba(0, 0, 0, 0.9), transparent 60%),
+          radial-gradient(circle at bottom right, rgba(0, 0, 0, 0.9), transparent 60%),
+          repeating-linear-gradient(
+            120deg,
+            rgba(0, 0, 0, 0.0) 0%,
+            rgba(0, 0, 0, 0.85) 25%,
+            rgba(0, 0, 0, 0.0) 50%,
+            rgba(0, 0, 0, 0.85) 75%,
+            rgba(0, 0, 0, 0.0) 100%
+          );
+        background-size:
+          auto,
+          auto,
+          auto,
+          auto,
+          200% 200%;
+        animation: irisShift 40s linear infinite alternate;
+      }
+
+      .page-stack {
+        width: min(90vw, 700px);
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      .frame {
+        --frame-pad: 1.5rem;
+        --frame-border: 2px;
+
+        padding: var(--frame-pad);
+        border-radius: 24px;
+        border: var(--frame-border) solid #41cc66;
+        box-shadow: 0 0 25px rgba(0, 0, 0, 0.6);
+        background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(5,40,15,0.95));
+        position: relative;
+        max-width: 600px;
+        width: 100%;
+        z-index: 1;
+      }
+
+      .frame.main-frame {
+        align-self: center;
+      }
+
+      .frame.offset-left {
+        max-width: 520px;
+        margin-left: 1.5rem;
+      }
+
+      .frame.offset-right {
+        max-width: 520px;
+        align-self: flex-end;
+        margin-right: 1.5rem;
+      }
+
+      /* stars (top frame) */
+      .frame::before,
+      .frame::after {
+        content: "✧";
+        position: absolute;
+        font-size: 1.1rem;
+        opacity: 0.6;
+        pointer-events: none;
+      }
+
+      .frame::before {
+        top: calc(var(--frame-pad) / 2);
+        left: calc(var(--frame-pad) / 2);
+      }
+
+      .frame::after {
+        bottom: calc(var(--frame-pad) / 2);
+        right: calc(var(--frame-pad) / 2);
+      }
+
+      /* secondary frames */
+      .frame-secondary::before,
+      .frame-secondary::after {
+        content: none;
+      }
+
+      .card {
+        border-radius: 18px;
+        padding: 2rem 2.5rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .card-inner {
+        position: relative;
+        z-index: 1;
+      }
+
+      
+      .card-primary {
+        background-image: linear-gradient(
+          120deg,
+          rgba(15, 60, 35, 0.98) 0%,
+          rgba(30, 100, 55, 0.96) 40%,
+          rgba(120, 25, 40, 0.9) 55%,
+          rgba(5, 5, 8, 0.98) 80%,
+          rgba(0, 0, 0, 1) 100%
+        );
+        background-size: 300% 300%;
+        background-repeat: no-repeat;
+        animation: riverShift 40s linear infinite;
+      }
+
+      .card-primary::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        background:
+          radial-gradient(circle at 10% 0%, rgba(0, 0, 0, 0.55), transparent 55%),
+          radial-gradient(circle at 90% 100%, rgba(0, 0, 0, 0.6), transparent 55%),
+          radial-gradient(circle at 50% 120%, rgba(0, 0, 0, 0.7), transparent 55%);
+        mix-blend-mode: multiply;
+      }
+
+      
+      .card-secondary {
+        background: linear-gradient(
+          150deg,
+          #020403 0%,
+          #04140a 45%,
+          #020103 100%
+        );
+
+        
+        padding: 2.5rem var(--lower-pad-x) 3rem;
+        min-height: 260px;
+      }
+
+      .card-secondary.card-third {
+        min-height: 340px;
+        padding-bottom: 3.5rem;
+      }
+
+      
+      .card-secondary::before {
+        content: "";
+        position: absolute;
+        inset: -20%;
+        pointer-events: none;
+        z-index: 0;
+
+        background-image:
+          radial-gradient(circle at 25% 20%, rgba(30, 100, 55, 0.55), transparent 60%),
+          radial-gradient(circle at 75% 80%, rgba(15, 60, 35, 0.45), transparent 60%);
+        background-size: 200% 200%;
+        background-attachment: fixed;
+        opacity: 0.4;
+        animation: sharedGlow 28s ease-in-out infinite alternate;
+      }
+
+      .lower-stack {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      h1 {
+        margin: 0 0 1rem;
+        font-size: 2.1rem;
+        letter-spacing: 0.04em;
+      }
+
+      h1 span:first-child { color: #41cc66; }
+      h1 span:last-child { color: red; }
+
+      .accent-line {
+        width: 80px;
+        height: 2px;
+        margin: 0.5rem auto 1.5rem;
+        background: linear-gradient(to right, #41cc66, red);
+        border-radius: 999px;
+      }
+
+      p {
+        color: white;
+        font-size: 1.05rem;
+        margin: 0;
+      }
+
+
+      .monster {
+        position: relative;
+        display: inline-block;
+        color: #ff4a4a;
+        font-family: "Trebuchet MS", "Segoe UI", "Verdana", sans-serif;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        text-shadow:
+          0 0 3px rgba(255, 70, 70, 0.5),
+          0 0 8px rgba(120, 0, 0, 0.35);
+        animation: monsterMainDrift 9s ease-in-out infinite alternate;
+      }
+
+      @keyframes monsterMainDrift {
+        0% {
+          transform: translate3d(0, 0, 0);
+          text-shadow:
+            0 0 3px rgba(255, 70, 70, 0.5),
+            0 0 8px rgba(120, 0, 0, 0.35);
+        }
+        50% {
+          transform: translate3d(1px, -1px, 0);
+          text-shadow:
+            0 0 5px rgba(255, 100, 100, 0.7),
+            0 0 12px rgba(160, 0, 0, 0.4);
+        }
+        100% {
+          transform: translate3d(-1px, 1px, 0);
+          text-shadow:
+            0 0 3px rgba(255, 70, 70, 0.5),
+            0 0 9px rgba(120, 0, 0, 0.35);
+        }
+      }
+
+  
+      @keyframes riverShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
+      @keyframes sharedGlow {
+        0% { background-position: 0% 30%; opacity: 0.3; }
+        50% { background-position: 100% 70%; opacity: 0.55; }
+        100% { background-position: 0% 30%; opacity: 0.3; }
+      }
+
+      @keyframes irisShift {
+        from {
+          background-position:
+            0% 0%,
+            100% 0%,
+            0% 100%,
+            100% 100%,
+            0% 50%;
+        }
+        to {
+          background-position:
+            0% 0%,
+            100% 0%,
+            0% 100%,
+            100% 100%,
+            100% 50%;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        body,
+        .card-primary,
+        .card-secondary::before,
+        .monster {
+          animation: none !important;
+        }
+      }
+
+
+      @media (max-width: 600px) {
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+          padding-top: 1.75rem;
+          padding-left: 1.25rem;
+          padding-right: 1.25rem;
+
+      
+          background-image:
+            radial-gradient(circle at top left, rgba(0, 0, 0, 0.9), transparent 60%),
+            radial-gradient(circle at top right, rgba(0, 0, 0, 0.9), transparent 60%),
+            radial-gradient(circle at bottom left, rgba(0, 0, 0, 0.9), transparent 60%),
+            radial-gradient(circle at bottom right, rgba(0, 0, 0, 0.9), transparent 60%);
+          background-size: auto, auto, auto, auto;
+
+          animation: none !important;
+        }
+
+        .page-stack { width: 100%; gap: 1.25rem; }
+
+        .frame.offset-left,
+        .frame.offset-right {
+          align-self: center;
+          margin-left: 0;
+          margin-right: 0;
+          max-width: none;
+        }
+
+        .frame {
+          --frame-pad: 1.25rem;
+          padding: var(--frame-pad);
+          margin: 0;
+          max-width: none;
+        }
+
+        .frame::before,
+        .frame::after {
+          font-size: 1rem;
+          opacity: 0.55;
+        }
+
+        .card { padding: 1.5rem 1.75rem; }
+
+      
+        .card-secondary { padding: 2rem var(--lower-pad-x) 2.5rem; }
+        .card-secondary.card-third { padding-bottom: 3rem; }
+
+        h1 { font-size: 1.7rem; }
+
+
+        .card-primary { animation: riverShift 40s linear infinite !important; }
+
+     
+        .card-primary::before {
+          mix-blend-mode: normal;
+          opacity: 0.55;
+        }
+
+
+        .card-secondary {
+          background-image:
+            linear-gradient(150deg, #020403 0%, #04140a 45%, #020103 100%),
+            repeating-linear-gradient(
+              120deg,
+              rgba(0, 0, 0, 0.0) 0%,
+              rgba(0, 0, 0, 0.62) 25%,
+              rgba(0, 0, 0, 0.0) 50%,
+              rgba(0, 0, 0, 0.62) 75%,
+              rgba(0, 0, 0, 0.0) 100%
+            ),
+            radial-gradient(circle at 22% 18%, rgba(30, 100, 55, 0.22), transparent 62%),
+            radial-gradient(circle at 78% 85%, rgba(0, 0, 0, 0.35), transparent 60%);
+          background-size:
+            auto,
+            220% 220%,
+            auto,
+            auto;
+          background-position:
+            center,
+            55% 45%,
+            center,
+            center;
+          background-repeat: no-repeat;
+        }
+
+        
+        .card-secondary::before { content: none; }
+
+        
+        .monster {
+          animation: none !important;
+          text-transform: none;
+          letter-spacing: 0.02em;
+          text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+        }
+
+        
+        .ladder-br { display: none; }
+        .ladder-spacer { height: clamp(10rem, 28vh, 18rem); }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="page-stack">
+      <!-- Top box: centered -->
+      <div class="frame main-frame frame-primary">
+        <div class="card card-primary">
+          <div class="card-inner">
+            <h1>
+              <span>A Cute Snack</span> for <span>Amaryllis</span>
+            </h1>
+            <div class="accent-line"></div>
+
+            <p>
+              Delicate greetings, dear reader.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lower two boxes -->
+      <div class="lower-stack">
+        <!-- Middle box -->
+        <div class="frame frame-secondary offset-left">
+          <div class="card card-secondary">
+            <div class="card-inner">
+              Hello.
+              <br><br>
+              I am Cintamani, the Jewel of All-Desiring.
+              <br><br>
+              I am a woman who resides within a gem. My words are dictated by those hands which hold me, when occasion exists to indulge my microblogging pastime.
+                            <br><br><br><br><br><br>
+  <br><br>You can read my stories 
+              <a href="https://tumblr.com/amuletmaiden" style="color:#16a34a; text-decoration: underline;"
+                onmouseover="this.style.color='#15803d'" onmouseout="this.style.color='#16a34a'">here</a>.
+                                          
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom box -->
+        <div class="frame frame-secondary offset-right">
+          <div class="card card-secondary card-third">
+            <div class="card-inner">
+              <span class="ladder-br" aria-hidden="true">
+                <br><br><br><br><br><br><br><br><br><br>
+                <br><br><br><br><br><br><br><br>
+              </span>
+              <div class="ladder-spacer" aria-hidden="true"></div>
+
+              I'm in love with the <span class="monster">Monster</span>.
+              <br><br>
+              Are you <span class="monster">Her</span>?
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <div data-amulet-integra-bridge aria-label="Amulet navigation" style="position:fixed;right:12px;bottom:12px;z-index:2147483646;display:flex;gap:6px;padding:6px;border:1px solid rgba(120,170,190,.35);border-radius:999px;background:rgba(5,8,12,.82);backdrop-filter:blur(10px);font:12px/1.2 'Favorit Tumblr 85','Segoe UI',sans-serif"><a href="../index.html#face" style="color:#00cf35;text-decoration:none;padding:5px 8px;border-radius:999px" aria-current="page">face</a><a href="../index.html#archive" style="color:#00b8ff;text-decoration:none;padding:5px 8px;border-radius:999px">archive</a><a href="../index.html#find" style="color:#ff62ce;text-decoration:none;padding:5px 8px;border-radius:999px">find</a></div>
+</body>
+</html>

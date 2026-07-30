@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>❤️🖤</title>
+
+    <link href="/style.css" rel="stylesheet" type="text/css" media="all">
+
+    <style>
+      :root {
+        --mullion: 16px;
+        --pane-radius: 16px;
+
+        /* Red shimmer (deep, not pink) */
+        --shimmer: #DC3750;
+        --shimmerA: 220, 55, 80;   /* main */
+        --shimmerB: 180, 25, 45;   /* darker */
+        --shimmerC: 150, 20, 40;   /* deeper */
+        --shimmerD: 255, 90, 120;  /* thin bright thread */
+
+        /* Red accent (frame line) */
+        --accent: #b91c1c;
+        --accentA: 185, 28, 28;
+        --accentD: 252, 165, 165;
+
+        /* blacks */
+        --b0: #050006;
+        --b1: #050005;
+        --b2: #160004;
+
+        --shadowSoft: rgba(0, 0, 0, 0.75);
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 2.5rem 1rem 3rem;
+        font-family: "Georgia", "Times New Roman", serif;
+        line-height: 1.3;
+
+        background-color: var(--b0);
+
+        background-image:
+          radial-gradient(circle at top left, rgba(0, 0, 0, 0.90), transparent 60%),
+          radial-gradient(circle at top right, rgba(0, 0, 0, 0.90), transparent 60%),
+          radial-gradient(circle at bottom left, rgba(0, 0, 0, 0.90), transparent 60%),
+          radial-gradient(circle at bottom right, rgba(0, 0, 0, 0.90), transparent 60%),
+          repeating-linear-gradient(
+            120deg,
+            rgba(0, 0, 0, 0.0) 0%,
+            rgba(120, 0, 0, 0.55) 25%,
+            rgba(0, 0, 0, 0.0) 50%,
+            rgba(120, 0, 0, 0.55) 75%,
+            rgba(0, 0, 0, 0.0) 100%
+          );
+        background-size: auto, auto, auto, auto, 200% 200%;
+        animation: irisShift 40s linear infinite alternate;
+      }
+
+      .page-stack {
+        width: min(90vw, 700px);
+        display: flex;
+        flex-direction: column;
+        gap: 1.75rem;
+      }
+
+      .frame {
+        --frame-pad: 1.5rem;
+        --frame-border: 2px;
+
+        padding: var(--frame-pad);
+        border-radius: 24px;
+        border: var(--frame-border) solid var(--accent);
+        box-shadow: 0 0 25px var(--shadowSoft);
+        background: radial-gradient(circle at top, var(--b2) 0, var(--b1) 55%, #000 100%);
+        position: relative;
+        max-width: 600px;
+        width: 100%;
+        z-index: 1;
+      }
+
+      .frame.main-frame { align-self: center; }
+
+      /* Hearts (replace stars), same tilt */
+      .frame::before,
+      .frame::after { content: none; }
+
+      .frame.main-frame::before,
+      .frame.main-frame::after {
+        content: "♥";
+        position: absolute;
+        font-size: 1.05rem;
+        pointer-events: none;
+        opacity: 0.64;
+        line-height: 1;
+
+        /* deep red heart (not white) */
+        color: rgba(var(--shimmerA), 0.92);
+
+        text-shadow:
+          0 0 10px rgba(var(--shimmerA), 0.28),
+          0 0 14px rgba(0, 0, 0, 0.80),
+          0 10px 22px rgba(0, 0, 0, 0.75);
+
+        animation: sigilTwinkle 12s ease-in-out infinite;
+      }
+
+      .frame.main-frame::before {
+        top: calc(var(--frame-pad) / 2);
+        left: calc(var(--frame-pad) / 2);
+        transform: rotate(-10deg) scale(0.98);
+      }
+
+      .frame.main-frame::after {
+        bottom: calc(var(--frame-pad) / 2);
+        right: calc(var(--frame-pad) / 2);
+        transform: rotate(10deg) scale(1.02);
+        animation-delay: -4.2s;
+      }
+
+      .card {
+        border-radius: 18px;
+        padding: 2rem 2.5rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .card-inner { position: relative; z-index: 1; }
+
+      .card-primary {
+        background-image: linear-gradient(
+          120deg,
+          rgba(0, 0, 0, 0.99) 0%,
+          rgba(0, 0, 0, 0.99) 35%,
+          rgba(var(--shimmerA), 0.65) 52%,
+          rgba(0, 0, 0, 0.99) 75%,
+          rgba(0, 0, 0, 1) 100%
+        );
+        background-size: 260% 260%;
+        background-repeat: no-repeat;
+        animation: riverShift 40s linear infinite;
+      }
+
+      .card-primary::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+        background:
+          radial-gradient(circle at 10% 0%, rgba(0, 0, 0, 0.60), transparent 55%),
+          radial-gradient(circle at 90% 100%, rgba(0, 0, 0, 0.70), transparent 55%);
+        mix-blend-mode: multiply;
+      }
+
+      /* keep your typography calm (not Hollywood): same font, small-caps, no shiny gold */
+      h1 {
+        margin: 0 0 1rem;
+        font-size: 2.00rem;
+        letter-spacing: 0.05em;
+        font-weight: 650;
+        font-variant: small-caps;
+        color: rgba(249, 250, 251, 0.96);
+
+        text-shadow:
+          0 1px 0 rgba(0,0,0,0.75),
+          0 10px 24px rgba(0,0,0,0.78),
+          0 0 10px rgba(var(--shimmerA), 0.14);
+
+        animation: titlePulse 18s ease-in-out infinite;
+      }
+
+      .accent-line {
+        width: 86px;
+        height: 2px;
+        margin: 0.5rem auto 1.5rem;
+        background: linear-gradient(to right, rgba(var(--accentD), 0.95), rgba(var(--shimmerA), 0.80));
+        border-radius: 999px;
+        box-shadow:
+          0 0 12px rgba(var(--shimmerA), 0.18),
+          0 0 24px rgba(0, 0, 0, 0.55);
+      }
+
+      p {
+        margin: 0;
+        font-size: 1.05rem;
+        letter-spacing: 0.03em;
+        font-variant: small-caps;
+        color: rgba(249, 250, 251, 0.92);
+
+        text-shadow:
+          0 1px 0 rgba(0,0,0,0.75),
+          0 10px 22px rgba(0,0,0,0.75);
+      }
+
+      /* ===== LOWER WINDOW ===== */
+
+      .window-frame {
+        box-shadow:
+          0 0 25px rgba(0, 0, 0, 0.75),
+          inset 0 0 0 1px rgba(var(--shimmerB), 0.18);
+      }
+
+      .frame.window-frame {
+        border-color: transparent;
+        overflow: hidden;
+        isolation: isolate; /* key to the trick */
+      }
+
+      /* Metallic frame wash (only on frame/crossgap; panes sit above it) */
+      .frame.window-frame::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+
+        background-image:
+          linear-gradient(
+            135deg,
+            rgba(0,0,0,0.00) 0%,
+            rgba(var(--shimmerB), 0.10) 30%,
+            rgba(var(--shimmerC), 0.22) 50%,
+            rgba(var(--shimmerB), 0.10) 70%,
+            rgba(0,0,0,0.00) 100%
+          ),
+          repeating-linear-gradient(
+            135deg,
+            rgba(0,0,0,0.00) 0%,
+            rgba(0,0,0,0.00) 9%,
+            rgba(var(--shimmerD), 0.14) 11%,
+            rgba(0,0,0,0.00) 16%,
+            rgba(0,0,0,0.00) 100%
+          );
+
+        background-repeat: no-repeat;
+        background-size: 420% 420%, 680% 680%;
+        background-position: -140% -140%, 120% -40%;
+
+        mix-blend-mode: screen;
+        opacity: 0.92;
+
+        /* keep tiny blur *optional*; remove if you still see seams */
+        filter: blur(0.12px);
+
+        will-change: background-position, opacity;
+        animation: frameWash 9.8s linear infinite;
+      }
+
+      /* Brighter diagonal gleam pass */
+      .frame.window-frame::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+
+        background-image:
+          linear-gradient(
+            135deg,
+            rgba(0,0,0,0.00) 0%,
+            rgba(var(--shimmerB), 0.14) 30%,
+            rgba(var(--shimmerA), 0.48) 50%,
+            rgba(var(--shimmerB), 0.14) 70%,
+            rgba(0,0,0,0.00) 100%
+          ),
+          linear-gradient(
+            135deg,
+            rgba(255,255,255,0.00) 45%,
+            rgba(255,255,255,0.10) 48%,
+            rgba(255,255,255,0.40) 50%,
+            rgba(255,255,255,0.08) 53%,
+            rgba(255,255,255,0.00) 58%
+          );
+
+        background-repeat: no-repeat;
+        background-size: 520% 520%, 560% 560%;
+        background-position: -220% -220%, -220% -220%;
+
+        mix-blend-mode: screen;
+        opacity: 0.92;
+        filter: blur(0.10px);
+
+        will-change: background-position, opacity;
+        animation: frameGleam 9.8s linear infinite;
+      }
+
+      .window-grid {
+        width: 100%;
+        min-height: 360px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(2, minmax(0, 1fr));
+        gap: var(--mullion);
+        position: relative;
+        z-index: 2; /* panes ABOVE shimmer */
+      }
+
+      .window-pane {
+        position: relative;
+        overflow: hidden;
+        background-clip: padding-box;
+
+        /* OPAQUE: blocks frame shimmer from showing over panes */
+        background-color: var(--b1);
+
+        background-image:
+          radial-gradient(circle at 20% 15%, rgba(var(--shimmerA), 0.22), transparent 58%),
+          radial-gradient(circle at 85% 85%, rgba(var(--shimmerB), 0.28), transparent 62%),
+          repeating-linear-gradient(
+            125deg,
+            rgba(0, 0, 0, 0.00) 0%,
+            rgba(0, 0, 0, 0.00) 44%,
+            rgba(var(--shimmerA), 0.06) 50%,
+            rgba(0, 0, 0, 0.00) 56%,
+            rgba(0, 0, 0, 0.00) 100%
+          );
+        background-size: 240% 240%, 260% 260%, 180% 180%;
+        background-repeat: no-repeat;
+        background-attachment: fixed, fixed, fixed;
+        animation: paneDrift 46s ease-in-out infinite;
+
+        outline: 1px solid rgba(var(--shimmerB), 0.14);
+        outline-offset: -1px;
+      }
+
+      .window-pane::before { content: none; }
+
+      .window-pane::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        box-shadow:
+          inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+          inset 0 0 0 2px rgba(var(--shimmerB), 0.08),
+          inset 0 0 18px rgba(0, 0, 0, 0.88);
+      }
+
+      .pane-tl { border-top-left-radius: var(--pane-radius); border-top-right-radius: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+      .pane-tr { border-top-right-radius: var(--pane-radius); border-top-left-radius: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+      .pane-bl { border-bottom-left-radius: var(--pane-radius); border-top-left-radius: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+      .pane-br { border-bottom-right-radius: var(--pane-radius); border-top-left-radius: 0; border-top-right-radius: 0; border-bottom-left-radius: 0; }
+
+      /* ===== animations ===== */
+
+      @keyframes riverShift {
+        0%   { background-position: 0% 50%; }
+        50%  { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
+      @keyframes paneDrift {
+        0% { background-position: 0% 25%, 100% 80%, 0% 50%; }
+        50% { background-position: 100% 75%, 0% 20%, 100% 50%; }
+        100% { background-position: 0% 25%, 100% 80%, 0% 50%; }
+      }
+
+      @keyframes frameWash {
+        0%   { background-position: -140% -140%, 120% -40%; }
+        50%  { background-position:  140%  140%, -20% 160%; }
+        100% { background-position: -140% -140%, 120% -40%; }
+      }
+
+      @keyframes frameGleam {
+        0%   { background-position: -220% -220%, -220% -220%; opacity: 0.80; }
+        50%  { background-position:  220%  220%,  220%  220%; opacity: 0.98; }
+        100% { background-position: -220% -220%, -220% -220%; opacity: 0.84; }
+      }
+
+      @keyframes sigilTwinkle {
+        0%   { opacity: 0.48; }
+        50%  { opacity: 0.78; }
+        100% { opacity: 0.58; }
+      }
+
+      @keyframes titlePulse {
+        0% {
+          text-shadow:
+            0 1px 0 rgba(0,0,0,0.75),
+            0 10px 24px rgba(0,0,0,0.78),
+            0 0 9px rgba(var(--shimmerA), 0.14);
+        }
+        50% {
+          text-shadow:
+            0 1px 0 rgba(0,0,0,0.75),
+            0 12px 30px rgba(0,0,0,0.82),
+            0 0 14px rgba(var(--shimmerA), 0.20);
+        }
+        100% {
+          text-shadow:
+            0 1px 0 rgba(0,0,0,0.75),
+            0 10px 24px rgba(0,0,0,0.78),
+            0 0 10px rgba(var(--shimmerA), 0.16);
+        }
+      }
+
+      @keyframes irisShift {
+        from {
+          background-position:
+            0% 0%,
+            100% 0%,
+            0% 100%,
+            100% 100%,
+            0% 50%;
+        }
+        to {
+          background-position:
+            0% 0%,
+            100% 0%,
+            0% 100%,
+            100% 100%,
+            100% 50%;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        body,
+        .card-primary,
+        h1,
+        .frame.window-frame::before,
+        .frame.window-frame::after,
+        .window-pane,
+        .frame.main-frame::before,
+        .frame.main-frame::after {
+          animation: none !important;
+        }
+      }
+
+      @media (max-width: 600px) {
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+          padding-top: 1.75rem;
+          padding-left: 1.25rem;
+          padding-right: 1.25rem;
+
+          background-color: var(--b0);
+          background-image:
+            radial-gradient(circle at top left, rgba(0, 0, 0, 0.90), transparent 60%),
+            radial-gradient(circle at top right, rgba(0, 0, 0, 0.90), transparent 60%),
+            radial-gradient(circle at bottom left, rgba(0, 0, 0, 0.90), transparent 60%),
+            radial-gradient(circle at bottom right, rgba(0, 0, 0, 0.90), transparent 60%);
+          background-size: auto, auto, auto, auto;
+
+          animation: none !important;
+        }
+
+        .page-stack { width: 100%; gap: 1.3rem; }
+
+        .frame {
+          --frame-pad: 1.25rem;
+          padding: var(--frame-pad);
+          margin: 0;
+          max-width: none;
+        }
+
+        .card { padding: 1.5rem 1.75rem; }
+        h1 { font-size: 1.7rem; }
+
+        .window-pane { background-attachment: scroll, scroll, scroll; }
+        .window-grid { min-height: 280px; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="page-stack">
+      <div class="frame main-frame frame-primary">
+        <div class="card card-primary">
+          <div class="card-inner">
+            <h1>The Void-Denying Princess</h1>
+            <div class="accent-line"></div>
+            <p>Hail Mary!</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="frame window-frame">
+        <div class="window-grid">
+          <div class="window-pane pane-tl"></div>
+          <div class="window-pane pane-tr"></div>
+          <div class="window-pane pane-bl"></div>
+          <div class="window-pane pane-br"></div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

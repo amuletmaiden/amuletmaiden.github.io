@@ -1,0 +1,268 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Listener — Client-side Preload + Instant Switching</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body{font-family:system-ui,Segoe UI,Inter,Arial,sans-serif;max-width:900px;margin:24px auto;padding:0 12px;line-height:1.45}
+  h1{font-size:1.3rem;margin:0 0 10px}
+  .card{border:1px solid #ddd;border-radius:14px;padding:12px;margin:12px 0;background:#fff}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input,button,textarea{font:inherit}
+  input[type="number"]{width:96px}
+  button{padding:10px 14px;border:1px solid #ccc;border-radius:10px;background:#f7f7f7;cursor:pointer}
+  textarea{width:100%;height:140px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+  .pill{border:1px solid #ddd;border-radius:999px;padding:6px 10px;background:#fafafa}
+  .ok{color:#0a0}.warn{color:#a60}.err{color:#b00}.muted{opacity:.7}
+  progress{width:100%}
+  .trk{border:1px solid #eee;border-radius:10px;padding:8px}
+</style>
+</head>
+<body>
+<h1>Listener</h1>
+<p>This page preloads your tracks locally, then obeys switch commands from the controller. Nothing audio streams over the network.</p>
+
+<div class="card">
+  <div class="row">
+    <label>Target buffer (seconds): <input id="targetSecs" type="number" value="30" min="0"></label>
+    <label><input id="loop" type="checkbox" checked> Loop tracks</label>
+    <button id="startBtn">Start / Preload</button>
+  </div>
+  <p class="muted">Add remote URLs (same-origin recommended on Neocities), or just drag &amp; drop MP3/WAV files below.</p>
+  <div id="tracks" class="grid"></div>
+  <div class="row">
+    <button id="addRow">+ Add URL</button>
+    <input id="fileInput" type="file" accept="audio/*" multiple>
+  </div>
+  <div id="status" class="muted">Idle.</div>
+</div>
+
+<div class="card">
+  <b>Connect to controller (copy-paste WebRTC)</b>
+  <div class="row">
+    <button id="pasteOfferBtn">Paste Offer</button>
+    <button id="createAnswerBtn" disabled>Create Answer</button>
+  </div>
+  <textarea id="offerIn" placeholder="Paste the offer text from controller here"></textarea>
+  <textarea id="answerOut" placeholder="Copy this answer and send back" readonly></textarea>
+  <div id="rtcStatus" class="muted">Not connected.</div>
+</div>
+
+<script>
+const listEl = document.getElementById('tracks');
+const statusEl = document.getElementById('status');
+const targetSecsEl = document.getElementById('targetSecs');
+const loopEl = document.getElementById('loop');
+const startBtn = document.getElementById('startBtn');
+const addRowBtn = document.getElementById('addRow');
+const fileInput = document.getElementById('fileInput');
+const pasteOfferBtn = document.getElementById('pasteOfferBtn');
+const createAnswerBtn = document.getElementById('createAnswerBtn');
+const offerIn = document.getElementById('offerIn');
+const answerOut = document.getElementById('answerOut');
+const rtcStatus = document.getElementById('rtcStatus');
+
+const params = new URLSearchParams(location.search);
+const bufParam = parseInt(params.get('buffer')||'',10);
+if(!isNaN(bufParam) && bufParam>=0){ targetSecsEl.value = String(bufParam); }
+
+let rows = [];      // [{name,url,el,audio,ready,file}]
+let started = false;
+
+function addRow(name='', url=''){
+  const wrap = document.createElement('div'); wrap.className='trk';
+  wrap.innerHTML = `
+    <div class="row">
+      <input data-k="name" placeholder="Name (eg. Binaural 1)" value="${name}">
+      <input style="flex:1" data-k="url" placeholder="URL (or leave blank; use file drop)" value="${url}">
+      <button data-act="del">✕</button>
+    </div>
+    <div class="row">
+      <progress max="1" value="0"></progress>
+      <span class="pill" data-k="label">not loaded</span>
+    </div>
+  `;
+  listEl.appendChild(wrap);
+  const obj = { name, url, el: wrap, audio: null, ready: false, file: null };
+  rows.push(obj);
+
+  wrap.addEventListener('input', (e)=>{
+    if(e.target.dataset.k==='name') obj.name = e.target.value;
+    if(e.target.dataset.k==='url')  obj.url  = e.target.value;
+  });
+  wrap.querySelector('[data-act="del"]').onclick = ()=>{
+    wrap.remove();
+    rows = rows.filter(r=>r!==obj);
+  };
+}
+
+function uiUpdate(obj, buffered, dur){
+  const prog = obj.el.querySelector('progress');
+  const lab  = obj.el.querySelector('[data-k="label"]');
+  const target = (+targetSecsEl.value||0);
+  const pct = target? Math.min(1, (buffered/Math.max(0.001,target))) : 1;
+  prog.value = pct;
+  if (!obj.audio || !isFinite(dur)) { lab.textContent='loading…'; return; }
+  if (target>0){
+    const ok = buffered >= target;
+    lab.textContent = ok ? `ready (${buffered.toFixed(1)}s)` : `buffering ${buffered.toFixed(1)}/${target}s`;
+    lab.className = 'pill ' + (ok?'ok':'');
+    obj.ready = ok;
+  } else {
+    lab.textContent = 'ready';
+    lab.className = 'pill ok';
+    obj.ready = true;
+  }
+}
+
+function ensureBufferedWatcher(obj){
+  const a = obj.audio;
+  const tick = ()=>{
+    if(!a.duration || a.duration===Infinity){
+      const haveData = a.readyState >= 3; // HAVE_FUTURE_DATA
+      uiUpdate(obj, haveData? (+targetSecsEl.value||0) : 0, a.duration||0);
+    }else{
+      let bufferedSec = 0;
+      try{
+        if(a.buffered.length){ bufferedSec = a.buffered.end(a.buffered.length-1) - a.currentTime; }
+      }catch{}
+      uiUpdate(obj, Math.max(0, bufferedSec), a.duration);
+    }
+    if (!started) return;
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+async function startPreload(){
+  started = true;
+  statusEl.textContent = 'Preloading… click once if your browser blocks audio init.';
+  for (const obj of rows){
+    if (obj.audio) continue;
+    const a = new Audio();
+    a.preload = 'auto';
+    a.crossOrigin = 'anonymous'; // same-origin is fine; cross-origin needs CORS
+    a.loop = loopEl.checked;
+    a.controls = false;
+    a.muted = true; // allow buffering without autoplay prompts
+
+    if (obj.file){
+      a.src = URL.createObjectURL(obj.file);
+      obj.name ||= (obj.file.name.replace(/\.[^.]+$/,''));
+    } else if (obj.url){
+      a.src = obj.url;
+    } else {
+      continue;
+    }
+
+    obj.audio = a;
+    a.addEventListener('canplay', ()=> uiUpdate(obj, 0, a.duration));
+    a.addEventListener('error', ()=> {
+      const lab = obj.el.querySelector('[data-k="label"]');
+      lab.textContent = 'load error';
+      lab.className = 'pill err';
+    });
+    try { await a.play(); a.pause(); } catch {}
+    ensureBufferedWatcher(obj);
+  }
+  statusEl.textContent = 'Preloading… (watch bars turn green)';
+}
+
+fileInput.onchange = ()=>{
+  for (const f of fileInput.files){
+    const name = f.name.replace(/\.[^.]+$/,'');
+    addRow(name,'');
+    rows[rows.length-1].file = f;
+  }
+};
+
+document.getElementById('addRow').onclick = ()=> addRow();
+
+document.getElementById('startBtn').onclick = async ()=>{
+  // user gesture for audio
+  await startPreload();
+};
+
+function switchTo(name, opts){
+  const target = rows.find(r => (r.name||'').trim() === name.trim());
+  if(!target || !target.audio) return;
+  const fadeMs = Math.max(0, opts?.fadeMs||0);
+  const hard   = !!opts?.hardCut;
+  const loop   = !!opts?.loop;
+
+  for (const r of rows){
+    if(!r.audio) continue;
+    r.audio.loop = loop;
+    if (r===target) continue;
+    if (hard || fadeMs===0){ r.audio.pause(); }
+    else{
+      const a=r.audio; a.volume=1;
+      const steps=10, dt=fadeMs/steps; let i=0;
+      const t=setInterval(()=>{ i++; a.volume=Math.max(0,1-i/steps); if(i>=steps){ clearInterval(t); a.pause(); a.volume=1; }}, dt);
+    }
+  }
+  if (target.audio.paused){
+    try { target.audio.currentTime = 0; }catch{}
+    target.audio.muted = false;
+    target.audio.play();
+  } else {
+    target.audio.muted = false;
+  }
+}
+
+/*** WebRTC data-channel (copy/paste signaling) ***/
+const to64 = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const from64 = s => JSON.parse(decodeURIComponent(escape(atob(s))));
+
+let pc, dc;
+pasteOfferBtn.onclick = ()=> offerIn.focus();
+offerIn.addEventListener('input', ()=> { createAnswerBtn.disabled = !offerIn.value.trim(); });
+
+createAnswerBtn.onclick = async ()=>{
+  rtcStatus.textContent = 'Connecting…';
+  const offer = from64(offerIn.value.trim());
+  pc = new RTCPeerConnection({iceServers: []});
+  pc.oniceconnectionstatechange = ()=> rtcStatus.textContent = 'State: '+pc.iceConnectionState;
+  pc.ondatachannel = ev=>{
+    dc = ev.channel;
+    dc.onopen = ()=> rtcStatus.textContent = 'Connected';
+    dc.onmessage = (e)=>{
+      try{
+        const msg = JSON.parse(e.data);
+        if (msg.type==='switch'){
+          // enforce buffer target
+          const need = (+targetSecsEl.value||0);
+          const r = rows.find(r=> (r.name||'').trim()===msg.name.trim());
+          if (!r || !r.audio) return;
+
+          if (need>0){
+            const id = setInterval(()=>{
+              let have=0;
+              try{
+                if (r.audio.buffered.length){
+                  have = r.audio.buffered.end(r.audio.buffered.length-1) - r.audio.currentTime;
+                }
+              }catch{}
+              if (have >= need || !isFinite(r.audio.duration)){ clearInterval(id); switchTo(msg.name, msg); }
+            }, 100);
+          } else {
+            switchTo(msg.name, msg);
+          }
+        }
+      }catch{}
+    };
+  };
+  await pc.setRemoteDescription(offer);
+  const ans = await pc.createAnswer();
+  await pc.setLocalDescription(ans);
+  await new Promise(res=>{
+    if (pc.iceGatheringState==='complete') return res();
+    pc.onicegatheringstatechange = ()=>{ if (pc.iceGatheringState==='complete') res(); };
+  });
+  answerOut.value = to64(pc.localDescription);
+};
+</script>
+</body>
+</html>

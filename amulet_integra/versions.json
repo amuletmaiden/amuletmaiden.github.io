@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "policy": "append-only",
+  "versions": [
+    {
+      "id": "2026-07-29-initial",
+      "path": "versions/2026-07-29-initial/",
+      "created_at": "2026-07-30T04:46:43.906Z",
+      "status": "immutable",
+      "summary": "First non-destructive integration of the Neocities Face and generated Tumblr Archive, with preserved snapshots, shared navigation, and searchable archive metadata.",
+      "manifest": "versions/2026-07-29-initial/version.json",
+      "file_count": 1968
+    }
+  ]
+}
