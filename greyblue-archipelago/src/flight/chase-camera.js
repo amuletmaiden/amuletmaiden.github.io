@@ -5,6 +5,8 @@ export class ChaseCameraRig {
     lookAhead = 10,
     terrainClearance = 5,
     clearanceSamples = 7,
+    clearanceProbeSpacing = 0.5,
+    maximumClearanceSamples = 129,
     recoveryClearance = 36,
     recoveryMinimumAltitude = 72,
     smoothing = 7.5,
@@ -14,6 +16,8 @@ export class ChaseCameraRig {
     this.lookAhead = lookAhead;
     this.terrainClearance = terrainClearance;
     this.clearanceSamples = clampInteger(clearanceSamples, 2, 33, 7);
+    this.clearanceProbeSpacing = finitePositive(clearanceProbeSpacing, 0.5);
+    this.maximumClearanceSamples = clampInteger(maximumClearanceSamples, 2, 513, 129);
     this.recoveryClearance = finiteNonNegative(recoveryClearance, 36);
     this.recoveryMinimumAltitude = finiteNonNegative(recoveryMinimumAltitude, 72);
     this.smoothing = smoothing;
@@ -58,6 +62,10 @@ export class ChaseCameraRig {
       desired,
       activeSampleHeight,
       this.clearanceSamples,
+      {
+        maximumSpacing: this.clearanceProbeSpacing,
+        maximumSamples: this.maximumClearanceSamples,
+      },
     );
     const minimumCameraHeight = Number.isFinite(terrainHeight)
       ? terrainHeight + this.terrainClearance
@@ -135,11 +143,26 @@ export function resolveRecoveryAltitude(
     : Math.max(baseAltitude, floorAltitude);
 }
 
-export function maximumFiniteHeightAlongSegment(start, end, sampleHeight, samples = 7) {
+export function maximumFiniteHeightAlongSegment(
+  start,
+  end,
+  sampleHeight,
+  samples = 7,
+  { maximumSpacing = Number.POSITIVE_INFINITY, maximumSamples = 513 } = {},
+) {
   if (!finiteVector(start) || !finiteVector(end) || typeof sampleHeight !== "function") {
     return Number.NEGATIVE_INFINITY;
   }
-  const count = clampInteger(samples, 2, 33, 7);
+  const minimumCount = clampInteger(samples, 2, 513, 7);
+  const distance = Math.hypot(end.x - start.x, end.z - start.z);
+  const spacing = finitePositive(maximumSpacing, Number.POSITIVE_INFINITY);
+  const adaptiveCount = Number.isFinite(spacing)
+    ? Math.ceil(distance / spacing) + 1
+    : minimumCount;
+  const count = Math.min(
+    clampInteger(maximumSamples, 2, 4097, 513),
+    Math.max(minimumCount, adaptiveCount),
+  );
   let maximum = Number.NEGATIVE_INFINITY;
   for (let index = 0; index < count; index += 1) {
     const amount = index / (count - 1);
@@ -192,6 +215,11 @@ function finiteVector(value) {
 function finiteNonNegative(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : fallback;
+}
+
+function finitePositive(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
 function clampInteger(value, minimum, maximum, fallback) {
