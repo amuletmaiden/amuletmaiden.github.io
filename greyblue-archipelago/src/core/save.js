@@ -14,6 +14,7 @@ export function saveGame(state, storage = localStorage) {
     position: normalizePosition(state.position),
     discovered: normalizeStringSet(state.discovered),
     discoveredRoutes: normalizeStringSet(state.discoveredRoutes),
+    guidance: normalizeGuidance(state.guidance),
     settings: isPlainObject(state.settings) ? state.settings : {},
   };
   storage.setItem(SAVE_KEY, JSON.stringify(payload));
@@ -33,6 +34,7 @@ export function loadGame(storage = localStorage) {
       position: normalizePosition(parsed.position),
       discovered: normalizeStringSet(parsed.discovered),
       discoveredRoutes: normalizeStringSet(parsed.discoveredRoutes),
+      guidance: normalizeGuidance(parsed.guidance),
       settings: isPlainObject(parsed.settings) ? parsed.settings : {},
       recoveredCorruptPosition: !isValidWorldPosition(parsed.position),
       migratedFromVersion: parsed.version === CURRENT_VERSION ? null : parsed.version,
@@ -88,6 +90,19 @@ function normalizeStringSet(values) {
       .filter(Boolean)
       .slice(0, MAX_DISCOVERY_RECORDS),
   )];
+}
+
+function normalizeGuidance(guidance) {
+  if (!isPlainObject(guidance)) return null;
+  const activeRouteId = typeof guidance.activeRouteId === "string"
+    ? guidance.activeRouteId.trim()
+    : "";
+  if (!activeRouteId) return null;
+  const numericProgress = Number(guidance.progress);
+  const progress = Number.isFinite(numericProgress)
+    ? Math.max(0, Math.min(1, numericProgress))
+    : 0;
+  return { activeRouteId, progress };
 }
 
 function isPlainObject(value) {
