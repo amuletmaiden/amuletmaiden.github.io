@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { FlightController } from "./flight/controller.js";
+import { ChaseCameraRig } from "./flight/chase-camera.js";
 import { DragonRuntime } from "./dragon/runtime.js";
 import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
 import { loadGame, saveGame, safeRespawn } from "./core/save.js";
@@ -42,6 +43,7 @@ const position = new THREE.Vector3(
 
 const controller = new FlightController();
 controller.airborne = true;
+const chaseCamera = new ChaseCameraRig({ distance: save?.settings?.cameraDistance ?? 24 });
 const keys = new Set();
 let toggleFlight = false;
 let dragon = null;
@@ -154,6 +156,7 @@ function recover() {
   Object.assign(controller.velocity, recovered.velocity);
   controller.airborne = recovered.airborne;
   controller.landingRequested = recovered.landingRequested;
+  chaseCamera.snapTo(position, controller.yaw);
 }
 
 function persist() {
@@ -161,7 +164,7 @@ function persist() {
     seed,
     position: { x: position.x, y: position.y, z: position.z },
     discovered,
-    settings: { cameraDistance: 24 },
+    settings: { cameraDistance: chaseCamera.distance },
   });
   lastSaveAt = performance.now();
 }
@@ -259,10 +262,16 @@ function frame(now) {
   }
   const clip = dragonRuntime?.updateFromFlight(controller.snapshot()) || null;
 
-  const forward = new THREE.Vector3(Math.sin(controller.yaw), 0, Math.cos(controller.yaw));
-  const chase = position.clone().addScaledVector(forward, -24).add(new THREE.Vector3(0, 10, 0));
-  camera.position.lerp(chase, 1 - Math.pow(0.002, dt));
-  camera.lookAt(position.clone().addScaledVector(forward, 10).add(new THREE.Vector3(0, 3.5, 0)));
+  const cameraState = chaseCamera.update({
+    target: position,
+    yaw: controller.yaw,
+    bank: controller.bank,
+    speed: flight.speed,
+    dt,
+    sampleHeight: terrainHeightAt,
+  });
+  camera.position.set(cameraState.position.x, cameraState.position.y, cameraState.position.z);
+  camera.lookAt(cameraState.lookTarget.x, cameraState.lookTarget.y, cameraState.lookTarget.z);
   dragonRuntime?.update(dt);
 
   if (now - lastSaveAt > 12000) persist();
@@ -278,6 +287,7 @@ function frame(now) {
     position: { x: position.x, y: position.y, z: position.z },
     flight: controller.snapshot(),
     animation: dragonRuntime?.telemetry || null,
+    camera: cameraState,
     activeIslandCount: islandMeshes.size,
     activeIslandIds: active.map((island) => island.id),
     discoveredCount: discovered.size,
