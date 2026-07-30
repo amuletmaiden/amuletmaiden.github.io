@@ -11,4 +11,4 @@ It waits for GitHub Pages to publish the current collision entrypoint, then veri
 - the deployed collision module catches swept terrain impact, requests recovery on water contact, and accepts a safe touchdown;
 - no critical JavaScript or GLB request fails and no uncaught page error occurs.
 
-Source-only regression tests remain separate and cover collision, flight controller, chase camera, input and entrypoint integration contracts.
+Source-only regression tests remain separate and cover collision, flight controller, chase camera, input and entrypoint integration contracts. A Greyblue acceptance PR is not merged until the deployed browser smoke succeeds.
