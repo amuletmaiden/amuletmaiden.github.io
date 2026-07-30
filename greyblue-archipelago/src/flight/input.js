@@ -101,7 +101,9 @@ export function normalizeGamepad(gamepad, deadzone = 0.14) {
   const climb = deadzoneAxis(-(axes[1] || 0), deadzone);
   const rightTrigger = buttons[7] || 0;
   const leftTrigger = buttons[6] || 0;
-  const throttle = clamp(rightTrigger - leftTrigger || -(axes[3] || 0), -1, 1);
+  const triggerThrottle = deadzoneAxis(rightTrigger - leftTrigger, deadzone);
+  const stickThrottle = deadzoneAxis(-(axes[3] || 0), deadzone);
+  const throttle = triggerThrottle !== 0 ? triggerThrottle : stickThrottle;
   const active = [steer, climb, throttle].some((value) => Math.abs(value) > 0.001)
     || buttons.some((value) => value > 0.5);
   return {
