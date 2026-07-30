@@ -15,10 +15,10 @@ export function saveGame(state, storage = localStorage, guidanceContext = null) 
     position: normalizePosition(state.position),
     discovered: normalizeStringSet(state.discovered),
     discoveredRoutes,
-    guidance: normalizeGuidanceForWorld(state.guidance, {
-      ...guidanceContext,
-      discoveredRoutes: guidanceContext?.discoveredRoutes ?? discoveredRoutes,
-    }),
+    guidance: normalizeGuidanceForWorld(
+      state.guidance,
+      guidanceContext ? { ...guidanceContext, discoveredRoutes: guidanceContext.discoveredRoutes ?? discoveredRoutes } : null,
+    ),
     settings: isPlainObject(state.settings) ? state.settings : {},
   };
   storage.setItem(SAVE_KEY, JSON.stringify(payload));
@@ -39,10 +39,10 @@ export function loadGame(storage = localStorage, guidanceContext = null) {
       position: normalizePosition(parsed.position),
       discovered: normalizeStringSet(parsed.discovered),
       discoveredRoutes,
-      guidance: normalizeGuidanceForWorld(parsed.guidance, {
-        ...guidanceContext,
-        discoveredRoutes: guidanceContext?.discoveredRoutes ?? discoveredRoutes,
-      }),
+      guidance: normalizeGuidanceForWorld(
+        parsed.guidance,
+        guidanceContext ? { ...guidanceContext, discoveredRoutes: guidanceContext.discoveredRoutes ?? discoveredRoutes } : null,
+      ),
       settings: isPlainObject(parsed.settings) ? parsed.settings : {},
       recoveredCorruptPosition: !isValidWorldPosition(parsed.position),
       migratedFromVersion: parsed.version === CURRENT_VERSION ? null : parsed.version,
