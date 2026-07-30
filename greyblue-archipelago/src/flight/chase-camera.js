@@ -4,12 +4,14 @@ export class ChaseCameraRig {
     height = 10,
     lookAhead = 10,
     terrainClearance = 5,
+    clearanceSamples = 7,
     smoothing = 7.5,
   } = {}) {
     this.distance = distance;
     this.height = height;
     this.lookAhead = lookAhead;
     this.terrainClearance = terrainClearance;
+    this.clearanceSamples = clampInteger(clearanceSamples, 2, 33, 7);
     this.smoothing = smoothing;
     this.position = { x: 0, y: 0, z: 0 };
     this.lookTarget = { x: 0, y: 0, z: 0 };
@@ -42,7 +44,12 @@ export class ChaseCameraRig {
       z: anchor.z - forward.z * desiredDistance - right.z * bankOffset,
     };
 
-    const terrainHeight = Number(sampleHeight(desired.x, desired.z));
+    const terrainHeight = maximumFiniteHeightAlongSegment(
+      anchor,
+      desired,
+      sampleHeight,
+      this.clearanceSamples,
+    );
     const minimumCameraHeight = Number.isFinite(terrainHeight)
       ? terrainHeight + this.terrainClearance
       : Number.NEGATIVE_INFINITY;
@@ -97,6 +104,22 @@ export class ChaseCameraRig {
   }
 }
 
+export function maximumFiniteHeightAlongSegment(start, end, sampleHeight, samples = 7) {
+  if (!finiteVector(start) || !finiteVector(end) || typeof sampleHeight !== "function") {
+    return Number.NEGATIVE_INFINITY;
+  }
+  const count = clampInteger(samples, 2, 33, 7);
+  let maximum = Number.NEGATIVE_INFINITY;
+  for (let index = 0; index < count; index += 1) {
+    const amount = index / (count - 1);
+    const x = start.x + (end.x - start.x) * amount;
+    const z = start.z + (end.z - start.z) * amount;
+    const height = Number(sampleHeight(x, z));
+    if (Number.isFinite(height)) maximum = Math.max(maximum, height);
+  }
+  return maximum;
+}
+
 function lerpVector(current, target, amount) {
   current.x += (target.x - current.x) * amount;
   current.y += (target.y - current.y) * amount;
@@ -108,6 +131,11 @@ function finiteVector(value) {
     && Number.isFinite(value.x)
     && Number.isFinite(value.y)
     && Number.isFinite(value.z);
+}
+
+function clampInteger(value, minimum, maximum, fallback) {
+  const number = Number(value);
+  return Number.isInteger(number) ? clamp(number, minimum, maximum) : fallback;
 }
 
 function clamp(value, minimum, maximum) {
