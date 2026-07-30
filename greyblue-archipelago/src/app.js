@@ -7,6 +7,7 @@ import { FlightCollisionResolver } from "./flight/collision.js";
 import { createIsleTerrainSampler } from "./flight/isle-terrain-sampler.js";
 import { DragonRuntime } from "./dragon/runtime.js";
 import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
+import { selectRouteGuidance } from "./core/route-guidance.js";
 import { loadGame, saveGame, safeRespawn } from "./core/save.js";
 
 const ASSETS = Object.freeze({
@@ -48,7 +49,6 @@ const seed = Number.isInteger(save?.seed) ? save.seed : 1337;
 const world = buildArchipelago({ seed, count: 64, radius: 11000, minGap: 390 });
 const discovered = new Set(save?.discovered || []);
 const discoveredRoutes = new Set(save?.discoveredRoutes || []);
-const islandById = new Map(world.islands.map((island) => [island.id, island]));
 const position = new THREE.Vector3(
   save?.position?.x ?? FALLBACK_SPAWN.x,
   save?.position?.y ?? FALLBACK_SPAWN.y,
@@ -76,6 +76,7 @@ let latestDiscovery = null;
 let currentRegion = null;
 let currentFogProfile = { ...DEFAULT_FOG };
 let currentRouteGuidance = null;
+let preferredRouteId = save?.guidance?.activeRouteId || null;
 const islandMeshes = new Map();
 const loader = new GLTFLoader();
 
@@ -189,6 +190,10 @@ function recover() {
     landingRequested: controller.landingRequested,
     discovered,
     discoveredRoutes,
+    guidance: {
+      activeRouteId: preferredRouteId,
+      progress: currentRouteGuidance?.progress ?? 0,
+    },
   }, FALLBACK_SPAWN);
   position.set(recovered.position.x, recovered.position.y, recovered.position.z);
   Object.assign(controller.velocity, recovered.velocity);
@@ -206,6 +211,10 @@ function persist() {
     position: { x: position.x, y: position.y, z: position.z },
     discovered,
     discoveredRoutes,
+    guidance: {
+      activeRouteId: preferredRouteId,
+      progress: currentRouteGuidance?.progress ?? 0,
+    },
     settings: { cameraDistance: chaseCamera.distance },
   });
   lastSaveAt = performance.now();
@@ -257,38 +266,33 @@ function updateRouteGuidance(proximity) {
     return null;
   }
 
-  let best = null;
-  for (const routeId of proximity.island.routeIds || []) {
-    if (!discoveredRoutes.has(routeId)) continue;
-    const route = world.routes.find((candidate) => candidate.id === routeId);
-    if (!route?.navigation) continue;
-    const forward = route.fromIslandId === proximity.island.id;
-    const destinationId = forward ? route.toIslandId : route.fromIslandId;
-    const destination = islandById.get(destinationId);
-    if (!destination) continue;
-    const remainingDistance = Math.hypot(position.x - destination.x, position.z - destination.z);
-    if (!best || remainingDistance < best.remainingDistance) {
-      const bearing = forward ? route.navigation.bearingFrom : route.navigation.bearingTo;
-      const headingError = normalizeAngle(bearing - controller.yaw);
-      best = {
-        routeId: route.id,
-        kind: route.kind,
-        destinationId,
-        destinationName: destination.name,
-        destinationRegionId: destination.regionId,
-        bearing,
-        headingError,
-        turn: Math.abs(headingError) < 0.12 ? "ahead" : headingError > 0 ? "right" : "left",
-        remainingDistance,
-        minimumAltitude: route.navigation.minimumAltitude,
-        cruiseAltitude: route.navigation.cruiseAltitude,
-        altitudeMargin: position.y - route.navigation.minimumAltitude,
-        fogRisk: route.navigation.fogRisk,
-      };
-    }
+  const selection = selectRouteGuidance({
+    world,
+    island: {
+      ...proximity.island,
+      position: { x: position.x, z: position.z },
+    },
+    discoveredRouteIds: discoveredRoutes,
+    altitude: position.y,
+    preferredRouteId,
+    preferredRegionId: currentRegion?.id || null,
+  });
+  preferredRouteId = selection.preferredRouteId;
+
+  if (!selection.guidance) {
+    currentRouteGuidance = null;
+    return null;
   }
-  currentRouteGuidance = best;
-  return best;
+
+  const headingError = normalizeAngle(selection.guidance.bearing - controller.yaw);
+  currentRouteGuidance = {
+    ...selection.guidance,
+    destinationId: selection.guidance.destinationIslandId,
+    headingError,
+    turn: Math.abs(headingError) < 0.12 ? "ahead" : headingError > 0 ? "right" : "left",
+    altitudeMargin: position.y - selection.guidance.minimumAltitude,
+  };
+  return currentRouteGuidance;
 }
 
 function normalizeAngle(angle) {
@@ -315,6 +319,8 @@ function publishPausedState() {
     collision: lastCollision,
     surface,
     camera: lastCameraState,
+    routeGuidance: currentRouteGuidance,
+    guidancePreference: preferredRouteId,
     world: {
       ...(globalThis.__greyblueState?.world || {}),
       heroTerrain: heroTerrain?.telemetry || null,
@@ -499,6 +505,7 @@ function frame(now) {
     camera: cameraState,
     fog: currentFogProfile,
     routeGuidance: currentRouteGuidance,
+    guidancePreference: preferredRouteId,
     activeIslandCount: islandMeshes.size,
     activeIslandIds: active.map((island) => island.id),
     discoveredCount: discovered.size,
