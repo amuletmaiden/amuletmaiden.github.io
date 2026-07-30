@@ -27,7 +27,7 @@ export class ChaseCameraRig {
     dt = 1 / 60,
     sampleHeight = () => Number.NEGATIVE_INFINITY,
   }) {
-    const anchor = finiteVector(target) ? target : { x: 0, y: 160, z: 220 };
+    const anchor = finiteVector(target) ? target : { x: 0, y: 160, z: 0 };
     const safeYaw = Number.isFinite(yaw) ? yaw : 0;
     const safeBank = Number.isFinite(bank) ? bank : 0;
     const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0;
@@ -85,9 +85,9 @@ export class ChaseCameraRig {
     return this.snapshot();
   }
 
-  snapTo(target, yaw = 0) {
+  snapTo(target, yaw = 0, sampleHeight = () => Number.NEGATIVE_INFINITY) {
     this.initialized = false;
-    return this.update({ target, yaw, dt: 0 });
+    return this.update({ target, yaw, dt: 0, sampleHeight });
   }
 
   snapshot() {
