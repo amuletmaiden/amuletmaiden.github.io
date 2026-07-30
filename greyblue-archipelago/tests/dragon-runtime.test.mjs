@@ -171,10 +171,9 @@ function flight(overrides = {}) {
   const readiness = mixer.actions.get("Dragon_Wing_Readiness_Test");
   assert.ok(readiness.calls.some(([name, value]) => name === "fadeIn" && value === 0.18));
   assert.ok(readiness.calls.some(([name, value]) => name === "rate" && value === 1.35));
-  runtime.update(0.65);
-  runtime.updateFromFlight(flight({ speed: 10000 }));
+  runtime.choose("flight", { speed: 10000 });
   assert.equal(runtime.telemetry.playbackRate, 1.55, "powered-flight rate clamps at the production ceiling");
-  runtime.updateFromFlight(flight({ speed: -10000 }));
+  runtime.choose("flight", { speed: -10000 });
   assert.equal(runtime.telemetry.playbackRate, 0.78, "powered-flight rate clamps at the production floor");
 }
 
