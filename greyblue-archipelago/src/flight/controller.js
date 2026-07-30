@@ -17,7 +17,7 @@ export class FlightController {
 
     if (input.toggleFlight) {
       if (this.airborne) {
-        this.landingRequested = true;
+        this.landingRequested = !this.landingRequested;
       } else {
         this.airborne = true;
         this.landingRequested = false;
@@ -50,7 +50,10 @@ export class FlightController {
 
     if (this.airborne) {
       let targetVertical = climb * 17 - 1.6 - this.stallFactor * 4.5;
-      if (this.landingRequested) targetVertical = Math.min(targetVertical, -6.5);
+      // A landing request is an intentional approach, not a barely faster glide.
+      // Fourteen units per second still reads as controlled, while allowing a
+      // high-altitude player to reach the ground in a useful amount of time.
+      if (this.landingRequested) targetVertical = Math.min(targetVertical, -14);
       const verticalResponse = 1 - Math.exp(-2.8 * frame);
       this.velocity.y += (targetVertical - this.velocity.y) * verticalResponse;
       this.velocity.y = clamp(this.velocity.y, -18, 24);
