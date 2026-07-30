@@ -59,6 +59,7 @@ for (let a = 0; a < first.islands.length; a += 1) {
 }
 
 const islandById = new Map(first.islands.map((island) => [island.id, island]));
+const regionById = new Map(first.regions.map((region) => [region.id, region]));
 assert(first.routes.length >= first.islands.length - first.regions.length, "regional route chains should connect the world");
 for (const route of first.routes) {
   assert(islandById.has(route.fromIslandId), `${route.id} has unknown origin`);
@@ -68,7 +69,21 @@ for (const route of first.routes) {
   assert.equal(route.discovery.endpointIslandIds[1], route.toIslandId);
   assert(route.discovery.revealRadius >= 360 && route.discovery.revealRadius <= 520);
   assert(Number.isFinite(route.discovery.midpoint.x) && Number.isFinite(route.discovery.midpoint.z));
+
+  const navigation = route.navigation;
+  assert(navigation.distance > 0 && Number.isFinite(navigation.distance));
+  assert(navigation.bearingFrom >= 0 && navigation.bearingFrom < Math.PI * 2);
+  assert(navigation.bearingTo >= 0 && navigation.bearingTo < Math.PI * 2);
+  const reciprocalDelta = Math.abs((((navigation.bearingTo - navigation.bearingFrom) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - Math.PI);
+  assert(reciprocalDelta < 1e-10, `${route.id} bearings are not reciprocal`);
+  assert(navigation.minimumAltitude >= 90);
+  assert(navigation.cruiseAltitude > navigation.minimumAltitude);
+  assert(["low", "moderate", "high"].includes(navigation.fogRisk.level));
+  assert(navigation.fogRisk.score >= 0 && navigation.fogRisk.score <= 1);
+  assert.equal(route.fromRegionId, islandById.get(route.fromIslandId).regionId);
+  assert.equal(route.toRegionId, islandById.get(route.toIslandId).regionId);
 }
+
 for (const region of first.regions) {
   assert(region.islandIds.every((id) => islandById.get(id)?.regionId === region.id));
   if (region.islandIds.length) assert(region.anchorIslandId);
@@ -77,7 +92,17 @@ for (const region of first.regions) {
   assert(fog.near > 0 && fog.far > fog.near);
   assert(fog.density > 0 && fog.density < 0.001);
   assert(fog.altitudeThinning > 0 && fog.transitionDistance > 0);
+  assert.deepEqual([...region.adjacentRegionIds].sort(), region.adjacentRegionIds, "adjacency is deterministic and sorted");
+  for (const neighborId of region.adjacentRegionIds) {
+    const neighbor = regionById.get(neighborId);
+    assert(neighbor, `${region.id} has unknown adjacent region ${neighborId}`);
+    assert(neighbor.adjacentRegionIds.includes(region.id), `${region.id} adjacency with ${neighborId} is not symmetric`);
+  }
 }
+
+const crossRegionRoutes = first.routes.filter((route) => route.fromRegionId !== route.toRegionId);
+assert(crossRegionRoutes.length > 0, "far-ring routes should create cross-region guidance");
+assert(first.regions.every((region) => region.adjacentRegionIds.length >= 2), "the regional ring should expose both neighboring regions");
 
 const target = first.islands[0];
 assert.deepEqual(activeIslands(first, { x: target.x, z: target.z }, 1).map((island) => island.id), [target.id]);
