@@ -1,0 +1,30 @@
+name: Greyblue collision integration
+
+on:
+  pull_request:
+    paths:
+      - "greyblue-archipelago/src/app.js"
+      - "greyblue-archipelago/src/flight/**"
+      - "greyblue-archipelago/tests/**"
+      - ".github/workflows/greyblue-collision.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate syntax and Greyblue flight stack
+        run: |
+          node --check greyblue-archipelago/src/app.js
+          node greyblue-archipelago/tests/collision.test.mjs
+          node greyblue-archipelago/tests/flight-controller.test.mjs
+          node greyblue-archipelago/tests/chase-camera.test.mjs
+          node greyblue-archipelago/tests/input.test.mjs
+          node greyblue-archipelago/tests/app-collision-integration.test.mjs
