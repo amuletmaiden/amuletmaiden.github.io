@@ -114,7 +114,9 @@ export function maximumFiniteHeightAlongSegment(start, end, sampleHeight, sample
     const amount = index / (count - 1);
     const x = start.x + (end.x - start.x) * amount;
     const z = start.z + (end.z - start.z) * amount;
-    const height = Number(sampleHeight(x, z));
+    const sampled = sampleHeight(x, z);
+    if (sampled === null || sampled === undefined) continue;
+    const height = Number(sampled);
     if (Number.isFinite(height)) maximum = Math.max(maximum, height);
   }
   return maximum;
