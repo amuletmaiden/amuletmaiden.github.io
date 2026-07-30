@@ -86,14 +86,19 @@ const poweredFlight = {
 {
   const runtime = new DragonRuntime({}, new FakeMixer());
   runtime.bindClips([readiness]);
-  assert.equal(runtime.telemetry.clip, readiness.name, "flight-only partial list remains bootable");
-  assert.equal(runtime.telemetry.fallback, true);
+  assert.equal(runtime.telemetry.state, "grounded-idle");
+  assert.equal(runtime.telemetry.clip, null, "flight-only partial list must not masquerade as a grounded pose");
+  assert(runtime.telemetry.missing.includes("grounded-idle"));
+
   runtime.updateFromFlight(poweredFlight);
   assert.equal(runtime.telemetry.clip, readiness.name);
+  assert.equal(runtime.telemetry.state, "flight");
+  assert.deepEqual(runtime.telemetry.missing, ["grounded-idle"]);
+
   runtime.bindClips(complete);
   assert.equal(runtime.telemetry.state, "grounded-idle");
   assert.equal(runtime.telemetry.clip, idle.name);
-  assert.deepEqual(runtime.telemetry.missing, []);
+  assert.deepEqual(runtime.telemetry.missing, [], "complete-list rebind clears partial-list failure telemetry");
 }
 
 console.log("dragon-runtime rebind tests passed");
