@@ -8,6 +8,10 @@ const MAX_DISCOVERY_RECORDS = 2048;
 
 export function saveGame(state, storage = localStorage, guidanceContext = null) {
   const discoveredRoutes = normalizeStringSet(state.discoveredRoutes);
+  const context = guidanceContext
+    ? { ...guidanceContext, discoveredRoutes: guidanceContext.discoveredRoutes ?? discoveredRoutes }
+    : null;
+  const guidanceResult = recoverGuidanceForWorld(state.guidance, context);
   const payload = {
     version: CURRENT_VERSION,
     savedAt: new Date().toISOString(),
@@ -15,12 +19,10 @@ export function saveGame(state, storage = localStorage, guidanceContext = null) 
     position: normalizePosition(state.position),
     discovered: normalizeStringSet(state.discovered),
     discoveredRoutes,
-    guidance: normalizeGuidanceForWorld(
-      state.guidance,
-      guidanceContext ? { ...guidanceContext, discoveredRoutes: guidanceContext.discoveredRoutes ?? discoveredRoutes } : null,
-    ),
+    guidance: guidanceResult.guidance,
     settings: isPlainObject(state.settings) ? state.settings : {},
   };
+  if (guidanceResult.recovery) payload.guidanceRecovery = guidanceResult.recovery;
   storage.setItem(SAVE_KEY, JSON.stringify(payload));
   return payload;
 }
@@ -32,6 +34,11 @@ export function loadGame(storage = localStorage, guidanceContext = null) {
     const parsed = JSON.parse(raw);
     if (!parsed || !isPlainObject(parsed) || ![1, CURRENT_VERSION].includes(parsed.version)) return null;
     const discoveredRoutes = normalizeStringSet(parsed.discoveredRoutes);
+    const context = guidanceContext
+      ? { ...guidanceContext, discoveredRoutes: guidanceContext.discoveredRoutes ?? discoveredRoutes }
+      : null;
+    const guidanceResult = recoverGuidanceForWorld(parsed.guidance, context);
+    const guidanceRecovery = guidanceResult.recovery || normalizeRecoveryRecord(parsed.guidanceRecovery);
     return {
       ...parsed,
       version: CURRENT_VERSION,
@@ -39,10 +46,8 @@ export function loadGame(storage = localStorage, guidanceContext = null) {
       position: normalizePosition(parsed.position),
       discovered: normalizeStringSet(parsed.discovered),
       discoveredRoutes,
-      guidance: normalizeGuidanceForWorld(
-        parsed.guidance,
-        guidanceContext ? { ...guidanceContext, discoveredRoutes: guidanceContext.discoveredRoutes ?? discoveredRoutes } : null,
-      ),
+      guidance: guidanceResult.guidance,
+      guidanceRecovery,
       settings: isPlainObject(parsed.settings) ? parsed.settings : {},
       recoveredCorruptPosition: !isValidWorldPosition(parsed.position),
       migratedFromVersion: parsed.version === CURRENT_VERSION ? null : parsed.version,
@@ -77,18 +82,80 @@ export function isValidWorldPosition(position) {
 }
 
 export function normalizeGuidanceForWorld(guidance, context = null) {
+  return recoverGuidanceForWorld(guidance, context).guidance;
+}
+
+export function recoverGuidanceForWorld(guidance, context = null) {
   const normalized = normalizeGuidance(guidance);
-  if (!normalized) return null;
-  if (!context) return normalized;
-  if (context.validation && context.validation.valid !== true) return null;
+  if (!normalized) {
+    return {
+      guidance: null,
+      recovery: context && guidance != null
+        ? recoveryRecord("malformed-guidance", null, context.validation)
+        : null,
+    };
+  }
+  if (!context) return { guidance: normalized, recovery: null };
+  if (context.validation && context.validation.valid !== true) {
+    return {
+      guidance: null,
+      recovery: recoveryRecord("world-validation-failed", normalized.activeRouteId, context.validation),
+    };
+  }
 
   const routeIds = normalizeIdLookup(context.routeIds);
-  if (routeIds && !routeIds.has(normalized.activeRouteId)) return null;
+  if (routeIds && !routeIds.has(normalized.activeRouteId)) {
+    return {
+      guidance: null,
+      recovery: recoveryRecord("unknown-route", normalized.activeRouteId, context.validation),
+    };
+  }
 
   const discoveredRoutes = normalizeIdLookup(context.discoveredRoutes);
-  if (discoveredRoutes && !discoveredRoutes.has(normalized.activeRouteId)) return null;
+  if (discoveredRoutes && !discoveredRoutes.has(normalized.activeRouteId)) {
+    return {
+      guidance: null,
+      recovery: recoveryRecord("undiscovered-route", normalized.activeRouteId, context.validation),
+    };
+  }
 
-  return normalized;
+  return { guidance: normalized, recovery: null };
+}
+
+function recoveryRecord(reason, activeRouteId, validation) {
+  return {
+    reason,
+    activeRouteId,
+    validation: summarizeValidation(validation),
+  };
+}
+
+function summarizeValidation(validation) {
+  if (!isPlainObject(validation)) return null;
+  const issues = Array.isArray(validation.issues) ? validation.issues : [];
+  const codes = normalizeStringSet(validation.diagnostics?.codes ?? issues.map((entry) => entry?.code));
+  const invariants = normalizeStringSet(validation.diagnostics?.invariants ?? issues.map((entry) => entry?.invariant));
+  return {
+    contractVersion: Number.isInteger(validation.contractVersion) ? validation.contractVersion : null,
+    issueCount: Number.isInteger(validation.diagnostics?.issueCount)
+      ? Math.max(0, validation.diagnostics.issueCount)
+      : issues.length,
+    codes: codes.sort(),
+    invariants: invariants.sort(),
+  };
+}
+
+function normalizeRecoveryRecord(value) {
+  if (!isPlainObject(value)) return null;
+  const reasons = new Set(["malformed-guidance", "world-validation-failed", "unknown-route", "undiscovered-route"]);
+  if (!reasons.has(value.reason)) return null;
+  return {
+    reason: value.reason,
+    activeRouteId: typeof value.activeRouteId === "string" && value.activeRouteId.trim()
+      ? value.activeRouteId.trim()
+      : null,
+    validation: summarizeValidation(value.validation),
+  };
 }
 
 function normalizePosition(position) {
