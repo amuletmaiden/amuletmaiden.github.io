@@ -9,9 +9,6 @@ export class DragonRuntime {
     this.currentClip = null;
     this.state = "grounded-idle";
     this.stateAge = 0;
-    this.pendingState = null;
-    this.pendingAge = 0;
-    this.lastAirborne = false;
     this.telemetry = {
       state: this.state,
       clip: null,
@@ -19,7 +16,7 @@ export class DragonRuntime {
       available: [],
       missing: [],
       stateAge: 0,
-      pendingState: null,
+      heldState: false,
     };
   }
 
@@ -50,7 +47,7 @@ export class DragonRuntime {
     return keys;
   }
 
-  choose(state, flight = {}, force = false) {
+  choose(state, flight = {}, force = false, heldState = false) {
     const key = this.roles.get(state) || null;
     const clip = key ? this.clips.get(key) : null;
     const action = key ? this.actions.get(key) : null;
@@ -60,6 +57,7 @@ export class DragonRuntime {
       : Math.hypot(flight.velocity?.x || 0, flight.velocity?.z || 0);
     const rate = playbackRate(state, speed);
     const stateChanged = state !== this.state;
+
     if (action && action !== this.currentAction) {
       action.reset();
       action.enabled = true;
@@ -73,10 +71,9 @@ export class DragonRuntime {
     } else if (action) {
       action.setEffectiveTimeScale?.(rate);
     }
+
     if (stateChanged || force) this.stateAge = 0;
     this.state = state;
-    this.pendingState = null;
-    this.pendingAge = 0;
     const missing = key
       ? this.telemetry.missing.filter((value) => value !== state)
       : [...new Set([...this.telemetry.missing, state])];
@@ -88,34 +85,16 @@ export class DragonRuntime {
       available: [...this.clips.keys()],
       missing,
       stateAge: this.stateAge,
-      pendingState: null,
+      heldState,
     };
     return clip?.name || null;
   }
 
   updateFromFlight(flight = {}) {
-    const desired = desiredState(flight, this.state, this.lastAirborne);
-    this.lastAirborne = Boolean(flight.airborne);
-    if (desired === this.state) {
-      this.pendingState = null;
-      this.pendingAge = 0;
-      return this.choose(this.state, flight);
-    }
-    if (this.stateAge < minimumHold(this.state)) {
-      this.pendingState = desired;
-      this.pendingAge = 0;
-      this.telemetry.pendingState = desired;
-      return this.choose(this.state, flight);
-    }
-    if (this.pendingState !== desired) {
-      this.pendingState = desired;
-      this.pendingAge = 0;
-      this.telemetry.pendingState = desired;
-      return this.choose(this.state, flight);
-    }
-    if (this.pendingAge < transitionDebounce(desired)) {
-      this.telemetry.pendingState = desired;
-      return this.choose(this.state, flight);
+    const desired = desiredState(flight, this.state);
+    const hold = minimumHold(this.state);
+    if (desired !== this.state && hold > 0 && this.stateAge < hold) {
+      return this.choose(this.state, flight, false, true);
     }
     return this.choose(desired, flight);
   }
@@ -123,20 +102,20 @@ export class DragonRuntime {
   update(dt) {
     if (!Number.isFinite(dt) || dt <= 0) return;
     this.stateAge += dt;
-    if (this.pendingState) this.pendingAge += dt;
     this.telemetry.stateAge = this.stateAge;
-    this.telemetry.pendingState = this.pendingState;
     this.mixer?.update(dt);
   }
 }
 
-function desiredState(flight, currentState, lastAirborne) {
+function desiredState(flight, currentState) {
   if (!flight.airborne) return "grounded-idle";
-  if (flight.landingRequested) return "landing";
+  if (flight.landingRequested || flight.mode === "landing") return "landing";
   if (flight.mode === "recovery") return "recovery";
-  if (!lastAirborne || flight.mode === "takeoff") return "takeoff";
+  if (flight.mode === "takeoff") return "takeoff";
+
   const bank = Math.abs(flight.bank || 0);
   if (bank > 0.42 || (currentState === "turn" && bank > 0.24)) return "turn";
+
   const speed = Number.isFinite(flight.speed) ? flight.speed : 0;
   if (flight.mode === "glide" || speed > 44 || (currentState === "glide" && speed > 38)) return "glide";
   return "flight";
@@ -146,11 +125,7 @@ function minimumHold(state) {
   if (state === "takeoff") return 0.65;
   if (state === "landing") return 0.45;
   if (state === "recovery") return 0.7;
-  return 0.08;
-}
-
-function transitionDebounce(state) {
-  return state === "turn" || state === "glide" ? 0.12 : 0.06;
+  return 0;
 }
 
 function firstMatch(keys, aliases) {
