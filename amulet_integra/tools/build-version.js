@@ -64,6 +64,7 @@ if (fs.existsSync(versionRoot)) throw new Error(`Refusing to overwrite existing 
 
 const faceDest = path.join(versionRoot, 'face');
 const archiveDest = path.join(versionRoot, 'archive');
+fs.mkdirSync(path.dirname(versionRoot), { recursive: true });
 fs.mkdirSync(versionRoot, { recursive: false });
 fs.cpSync(faceSource, faceDest, { recursive: true, force: false, errorOnExist: true });
 fs.cpSync(archiveSource, archiveDest, { recursive: true, force: false, errorOnExist: true });
