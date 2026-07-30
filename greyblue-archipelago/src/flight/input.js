@@ -10,6 +10,8 @@ const DEFAULT_BINDINGS = Object.freeze({
   pause: ["Escape", "KeyP"],
 });
 
+const GAMEPAD_ACTIONS = Object.freeze(["toggleFlight", "recover", "pause"]);
+
 export class FlightInput {
   constructor({ bindings = DEFAULT_BINDINGS, deadzone = 0.14 } = {}) {
     this.bindings = bindings;
@@ -17,6 +19,8 @@ export class FlightInput {
     this.keys = new Set();
     this.edges = new Set();
     this.gamepad = null;
+    this.gamepadButtons = { toggleFlight: false, recover: false, pause: false };
+    this.gamepadEdges = new Set();
     this.enabled = true;
   }
 
@@ -31,13 +35,27 @@ export class FlightInput {
   }
 
   setGamepad(gamepad) {
-    this.gamepad = normalizeGamepad(gamepad, this.deadzone);
+    const normalized = normalizeGamepad(gamepad, this.deadzone);
+    const nextButtons = {
+      toggleFlight: Boolean(normalized?.toggleFlight),
+      recover: Boolean(normalized?.recover),
+      pause: Boolean(normalized?.pause),
+    };
+    for (const action of GAMEPAD_ACTIONS) {
+      if (nextButtons[action] && !this.gamepadButtons[action]) {
+        this.gamepadEdges.add(action);
+      }
+    }
+    this.gamepadButtons = nextButtons;
+    this.gamepad = normalized;
   }
 
   clear() {
     this.keys.clear();
     this.edges.clear();
     this.gamepad = null;
+    this.gamepadButtons = { toggleFlight: false, recover: false, pause: false };
+    this.gamepadEdges.clear();
   }
 
   setEnabled(enabled) {
@@ -53,21 +71,18 @@ export class FlightInput {
       climb: axis(this.keys, this.bindings.climb, this.bindings.descend),
     };
     const pad = this.gamepad || neutralSample();
-    const sample = {
+    return {
       throttle: dominantAxis(keyboard.throttle, pad.throttle),
       steer: dominantAxis(keyboard.steer, pad.steer),
       climb: dominantAxis(keyboard.climb, pad.climb),
-      toggleFlight: this.#consumeEdge(this.bindings.toggleFlight) || Boolean(pad.toggleFlight),
-      recover: this.#consumeEdge(this.bindings.recover) || Boolean(pad.recover),
-      pause: this.#consumeEdge(this.bindings.pause) || Boolean(pad.pause),
+      toggleFlight: this.#consumeEdge(this.bindings.toggleFlight)
+        || this.gamepadEdges.delete("toggleFlight"),
+      recover: this.#consumeEdge(this.bindings.recover)
+        || this.gamepadEdges.delete("recover"),
+      pause: this.#consumeEdge(this.bindings.pause)
+        || this.gamepadEdges.delete("pause"),
       source: pad.active ? (keyboardActive(keyboard) ? "mixed" : "gamepad") : "keyboard",
     };
-    if (this.gamepad) {
-      this.gamepad.toggleFlight = false;
-      this.gamepad.recover = false;
-      this.gamepad.pause = false;
-    }
-    return sample;
   }
 
   #consumeEdge(codes = []) {
