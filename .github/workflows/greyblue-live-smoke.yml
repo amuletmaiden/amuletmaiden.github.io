@@ -6,13 +6,17 @@ on:
     paths:
       - "greyblue-archipelago/**"
       - ".github/workflows/greyblue-live-smoke.yml"
+  pull_request:
+    paths:
+      - "greyblue-archipelago/**"
+      - ".github/workflows/greyblue-live-smoke.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: greyblue-live-smoke
+  group: greyblue-live-smoke-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
