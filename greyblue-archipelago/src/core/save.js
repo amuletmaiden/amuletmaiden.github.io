@@ -1,10 +1,12 @@
 const SAVE_KEY = "greyblue-archipelago-save-v1";
 const CURRENT_VERSION = 2;
+const EXPLORATION_VERSION = 1;
 const DEFAULT_SPAWN = Object.freeze({ x: 0, y: 160, z: 0 });
 const WORLD_LIMIT = 24000;
 const ALTITUDE_MIN = -100;
 const ALTITUDE_MAX = 8000;
 const MAX_DISCOVERY_RECORDS = 2048;
+const EXPLORATION_EVENT_KINDS = new Set(["region-entered", "landmark-reached", "route-completed"]);
 
 export function saveGame(state, storage = localStorage, guidanceContext = null) {
   const discoveredRoutes = normalizeStringSet(state.discoveredRoutes);
@@ -20,6 +22,7 @@ export function saveGame(state, storage = localStorage, guidanceContext = null) 
     discovered: normalizeStringSet(state.discovered),
     discoveredRoutes,
     guidance: guidanceResult.guidance,
+    exploration: normalizeExploration(state.exploration),
     settings: isPlainObject(state.settings) ? state.settings : {},
   };
   storage.setItem(SAVE_KEY, JSON.stringify(payload));
@@ -37,6 +40,8 @@ export function loadGame(storage = localStorage, guidanceContext = null) {
       ? { ...guidanceContext, discoveredRoutes: guidanceContext.discoveredRoutes ?? discoveredRoutes }
       : null;
     const guidanceResult = recoverGuidanceForWorld(parsed.guidance, context);
+    const hadExplorationField = Object.hasOwn(parsed, "exploration");
+    const exploration = normalizeExploration(parsed.exploration);
     return {
       ...parsed,
       version: CURRENT_VERSION,
@@ -46,6 +51,12 @@ export function loadGame(storage = localStorage, guidanceContext = null) {
       discoveredRoutes,
       guidance: guidanceResult.guidance,
       guidanceRecovery: guidanceResult.recovery,
+      exploration,
+      explorationRecovery: {
+        hadExplorationField,
+        restoredEventCount: exploration.events.length,
+        recoveredEmpty: !hadExplorationField || exploration.events.length === 0,
+      },
       settings: isPlainObject(parsed.settings) ? parsed.settings : {},
       recoveredCorruptPosition: !isValidWorldPosition(parsed.position),
       migratedFromVersion: parsed.version === CURRENT_VERSION ? null : parsed.version,
@@ -190,6 +201,38 @@ function normalizeGuidance(guidance) {
     ? Math.max(0, Math.min(1, numericProgress))
     : 0;
   return { activeRouteId, progress };
+}
+
+function normalizeExploration(exploration) {
+  const source = isPlainObject(exploration) && Array.isArray(exploration.events)
+    ? exploration.events
+    : [];
+  const byKey = new Map();
+  for (const candidate of source.slice(0, MAX_DISCOVERY_RECORDS)) {
+    if (!isPlainObject(candidate) || !EXPLORATION_EVENT_KINDS.has(candidate.kind)) continue;
+    const id = typeof candidate.id === "string" ? candidate.id.trim() : "";
+    if (!id) continue;
+    const key = `${candidate.kind}:${id}`;
+    const event = {
+      key,
+      kind: candidate.kind,
+      id,
+      occurredAt: Number.isFinite(candidate.occurredAt) && candidate.occurredAt >= 0
+        ? Math.floor(candidate.occurredAt)
+        : 0,
+    };
+    for (const field of ["regionId", "routeId", "landmarkId"]) {
+      const value = typeof candidate[field] === "string" ? candidate[field].trim() : "";
+      if (value) event[field] = value;
+    }
+    const previous = byKey.get(key);
+    if (!previous || event.occurredAt < previous.occurredAt) byKey.set(key, event);
+  }
+  return {
+    version: EXPLORATION_VERSION,
+    events: [...byKey.values()].sort((left, right) =>
+      left.occurredAt - right.occurredAt || left.key.localeCompare(right.key)),
+  };
 }
 
 function isPlainObject(value) {
