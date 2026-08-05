@@ -9,6 +9,7 @@ import { DragonRuntime } from "./dragon/runtime.js";
 import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
 import { selectRouteGuidance } from "./core/route-guidance.js";
 import { loadGame, saveGame, safeRespawn } from "./core/save.js";
+import { startThreeLiveBoot } from "./core/three-live-boot-adapter.js";
 
 const ASSETS = Object.freeze({
   dragon: "../greyblue-dragon-flight-m1/dragon.glb",
@@ -69,6 +70,8 @@ let heroIsle = null;
 let heroBounds = null;
 let heroTerrain = null;
 let paused = false;
+let frameStarted = false;
+let bootTelemetry = null;
 let lastCameraState = null;
 let lastSaveAt = performance.now();
 let lastFrameAt = performance.now();
@@ -309,7 +312,8 @@ function publishPausedState() {
   stateLine.textContent = `PAUSED · ${controller.airborne ? "FLIGHT" : "LANDED"} · Greyblue Archipelago`;
   globalThis.__greyblueState = {
     ...(globalThis.__greyblueState || {}),
-    ready: Boolean(dragon && heroIsle),
+    boot: bootTelemetry,
+    ready: Boolean(bootTelemetry?.playable && dragon && heroIsle),
     dragonLoaded: Boolean(dragon),
     isleLoaded: Boolean(heroIsle),
     paused: true,
@@ -340,42 +344,71 @@ addEventListener("resize", () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
-async function boot() {
-  const [dragonGltf, isleGltf] = await Promise.all([loadGltf(ASSETS.dragon), loadGltf(ASSETS.isle)]);
-  dragon = dragonGltf.scene;
-  heroIsle = isleGltf.scene;
-  scene.add(heroIsle, dragon);
-
+function configureIsle(root) {
+  heroIsle = root;
   heroIsle.traverse((object) => {
     if (object.isMesh) {
       object.castShadow = true;
       object.receiveShadow = true;
     }
   });
-  dragon.traverse((object) => {
-    if (object.isMesh) object.castShadow = true;
-  });
-
   const isleBox = new THREE.Box3().setFromObject(heroIsle);
   const isleCenter = isleBox.getCenter(new THREE.Vector3());
   heroIsle.position.sub(isleCenter);
   heroBounds = new THREE.Box3().setFromObject(heroIsle);
   heroTerrain = createIsleTerrainSampler({ THREE, root: heroIsle, bounds: heroBounds });
+}
 
+function configureDragon(root, asset) {
+  dragon = root;
+  dragon.traverse((object) => {
+    if (object.isMesh) object.castShadow = true;
+  });
   const dragonBox = new THREE.Box3().setFromObject(dragon);
-  const isleSize = heroBounds.getSize(new THREE.Vector3());
+  const isleSize = heroBounds?.getSize(new THREE.Vector3()) || new THREE.Vector3(320, 250, 320);
   const dragonSize = dragonBox.getSize(new THREE.Vector3());
-  const dragonScale = Math.max(1, Math.min(isleSize.x, isleSize.y, isleSize.z) / Math.max(dragonSize.x, dragonSize.y, dragonSize.z) * 0.018);
-  dragon.scale.setScalar(dragonScale);
-
-  mixer = dragonGltf.animations.length ? new THREE.AnimationMixer(dragon) : null;
+  const maximumDragonExtent = Math.max(dragonSize.x, dragonSize.y, dragonSize.z, 1);
+  const dragonScale = Math.max(1, Math.min(isleSize.x, isleSize.y, isleSize.z) / maximumDragonExtent * 0.018);
+  if (!dragon.userData?.greyblueFallback) dragon.scale.setScalar(dragonScale);
+  const animations = Array.isArray(asset?.animations) ? asset.animations : [];
+  mixer = animations.length ? new THREE.AnimationMixer(dragon) : null;
   dragonRuntime = new DragonRuntime(dragon, mixer);
-  dragonRuntime.bindClips(dragonGltf.animations);
+  dragonRuntime.bindClips(animations);
+}
+
+function startFrameLoopOnce() {
+  if (frameStarted) return false;
+  frameStarted = true;
+  lastFrameAt = performance.now();
+  requestAnimationFrame(frame);
+  return true;
+}
+
+async function boot() {
+  globalThis.__greyblueState = globalThis.__greyblueState || {};
+  const result = await startThreeLiveBoot({
+    THREE,
+    scene,
+    saveSchema: 2,
+    stateTarget: globalThis.__greyblueState,
+    loadDragon: () => loadGltf(ASSETS.dragon),
+    loadIsle: () => loadGltf(ASSETS.isle),
+    onIsle: configureIsle,
+    onDragon: configureDragon,
+  });
+  bootTelemetry = result.boot;
+  if (!result.playable || !dragon || !heroIsle) {
+    const codes = result.boot?.failureCodes || [];
+    throw new Error(codes.length ? codes.join(", ") : "live-boot-blocked");
+  }
   collisionResolver.reset(position);
   lastCollision = { ...collisionResolver.telemetry };
-
-  stateLine.textContent = "FLIGHT · Greyblue Archipelago";
-  requestAnimationFrame(frame);
+  const fallbackCount = Number(result.boot?.dragonSource === "fallback") + Number(result.boot?.isleSource === "fallback");
+  stateLine.textContent = fallbackCount
+    ? `FLIGHT · Greyblue Archipelago · ${fallbackCount} fallback${fallbackCount === 1 ? "" : "s"}`
+    : "FLIGHT · Greyblue Archipelago";
+  errorLine.textContent = "";
+  startFrameLoopOnce();
 }
 
 function frame(now) {
@@ -486,7 +519,8 @@ function frame(now) {
 
   const surface = sampleSurfaceAt(position.x, position.z);
   globalThis.__greyblueState = {
-    ready: Boolean(dragon && heroIsle),
+    boot: bootTelemetry,
+    ready: Boolean(bootTelemetry?.playable && dragon && heroIsle),
     dragonLoaded: Boolean(dragon),
     isleLoaded: Boolean(heroIsle),
     paused: false,
@@ -541,5 +575,10 @@ boot().catch((error) => {
   console.error(error);
   stateLine.textContent = "BOOT FAILED";
   errorLine.textContent = error instanceof Error ? error.message : String(error);
-  globalThis.__greyblueState = { ready: false, error: errorLine.textContent };
+  globalThis.__greyblueState = {
+    ...(globalThis.__greyblueState || {}),
+    boot: bootTelemetry || globalThis.__greyblueState?.boot || null,
+    ready: false,
+    error: errorLine.textContent,
+  };
 });
