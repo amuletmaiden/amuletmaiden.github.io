@@ -1,12 +1,17 @@
 import { buildArchipelago } from '../world/archipelago.js';
+import { investigatedLandmarkIdsFromExploration } from './exploration-lifecycle.js';
 import { createLandmarkEncounterState, selectLandmarkEncounter, activateLandmarkEncounter } from './landmark-encounter-model.js';
+import { loadGame } from './save.js';
 
 const host = document.querySelector('#hud') ?? document.body;
 const priorDescriptor = Object.getOwnPropertyDescriptor(globalThis, '__greyblueState');
 const priorGet = typeof priorDescriptor?.get === 'function' ? priorDescriptor.get.bind(globalThis) : null;
 const priorSet = typeof priorDescriptor?.set === 'function' ? priorDescriptor.set.bind(globalThis) : null;
 let currentState = priorGet ? priorGet() : globalThis.__greyblueState ?? null;
-let encounterState = createLandmarkEncounterState();
+const restoredExploration = loadGame()?.exploration ?? null;
+let encounterState = createLandmarkEncounterState({
+  visitedIds: investigatedLandmarkIdsFromExploration(restoredExploration),
+});
 let encounterView = null;
 let world = null;
 let worldSeed = null;
@@ -80,6 +85,13 @@ function revealEncounter() {
   announcement.textContent = `${result.reveal.title}. ${result.reveal.text}`;
   promptNode.textContent = 'Encounter remembered';
   panel.dataset.available = 'false';
+  globalThis.dispatchEvent?.(new CustomEvent('greyblue:landmark-investigated', {
+    detail: {
+      landmarkId: result.reveal.landmarkId,
+      regionId: currentState?.currentRegion?.id ?? null,
+      occurredAt: Date.now(),
+    },
+  }));
   if (revealTimer) clearTimeout(revealTimer);
   revealTimer = setTimeout(() => {
     if (!disposed) revealNode.hidden = true;
