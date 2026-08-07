@@ -1,5 +1,5 @@
 const EXPLORATION_VERSION = 1;
-const VALID_KINDS = new Set(["region-entered", "landmark-reached", "route-completed"]);
+const VALID_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "route-completed"]);
 
 function cleanId(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -24,6 +24,18 @@ function normalizeEvent(candidate) {
     if (value) event[field] = value;
   }
   return event;
+}
+
+export function investigatedLandmarkIdsFromExploration(exploration = null) {
+  const source = Array.isArray(exploration?.events) ? exploration.events : [];
+  const ids = [];
+  for (const candidate of source) {
+    const event = normalizeEvent(candidate);
+    if (event?.kind !== "landmark-investigated") continue;
+    const landmarkId = cleanId(event.landmarkId || event.id);
+    if (landmarkId) ids.push(landmarkId);
+  }
+  return [...new Set(ids)].slice(0, 256);
 }
 
 export function createExplorationLifecycle(initialExploration = null) {
@@ -65,6 +77,18 @@ export function createExplorationLifecycle(initialExploration = null) {
       });
     },
 
+    recordLandmarkInvestigation(landmarkId, regionId = null, occurredAt = Date.now()) {
+      const id = cleanId(landmarkId);
+      if (!id) return false;
+      return record({
+        kind: "landmark-investigated",
+        id,
+        landmarkId: id,
+        regionId: cleanId(regionId),
+        occurredAt,
+      });
+    },
+
     recordRouteCompletion(routeId, occurredAt = Date.now()) {
       const id = cleanId(routeId);
       if (!id) return false;
@@ -93,6 +117,7 @@ export function createExplorationLifecycle(initialExploration = null) {
         eventCount: values.length,
         regionCount: values.filter((event) => event.kind === "region-entered").length,
         landmarkCount: values.filter((event) => event.kind === "landmark-reached").length,
+        landmarkInvestigationCount: values.filter((event) => event.kind === "landmark-investigated").length,
         routeCompletionCount: values.filter((event) => event.kind === "route-completed").length,
         dirty,
       };
