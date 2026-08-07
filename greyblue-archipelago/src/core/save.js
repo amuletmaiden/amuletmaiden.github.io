@@ -7,6 +7,8 @@ const ALTITUDE_MIN = -100;
 const ALTITUDE_MAX = 8000;
 const MAX_DISCOVERY_RECORDS = 2048;
 const EXPLORATION_EVENT_KINDS = new Set(["region-entered", "landmark-reached", "route-completed"]);
+let runtimeRecoveryCheckpoint = null;
+let holdRecoveryCheckpointOnce = false;
 
 export function saveGame(state, storage = localStorage, guidanceContext = null) {
   const discoveredRoutes = normalizeStringSet(state.discoveredRoutes);
@@ -17,11 +19,21 @@ export function saveGame(state, storage = localStorage, guidanceContext = null) 
   const previousExploration = state.exploration === undefined
     ? readStoredExploration(storage)
     : null;
+  const position = normalizePosition(state.position);
+  const previousPosition = readStoredPosition(storage);
+  if (holdRecoveryCheckpointOnce) {
+    holdRecoveryCheckpointOnce = false;
+  } else if (previousPosition) {
+    runtimeRecoveryCheckpoint = previousPosition;
+  } else {
+    runtimeRecoveryCheckpoint = position;
+  }
   const payload = {
     version: CURRENT_VERSION,
     savedAt: new Date().toISOString(),
     seed: Number.isInteger(state.seed) ? state.seed : 1337,
-    position: normalizePosition(state.position),
+    position,
+    recoveryCheckpoint: normalizePosition(runtimeRecoveryCheckpoint ?? position),
     discovered: normalizeStringSet(state.discovered),
     discoveredRoutes,
     guidance: guidanceResult.guidance,
@@ -45,11 +57,17 @@ export function loadGame(storage = localStorage, guidanceContext = null) {
     const guidanceResult = recoverGuidanceForWorld(parsed.guidance, context);
     const hadExplorationField = Object.hasOwn(parsed, "exploration");
     const exploration = normalizeExploration(parsed.exploration);
+    const position = normalizePosition(parsed.position);
+    runtimeRecoveryCheckpoint = isValidWorldPosition(parsed.recoveryCheckpoint)
+      ? normalizePosition(parsed.recoveryCheckpoint)
+      : position;
+    holdRecoveryCheckpointOnce = false;
     return {
       ...parsed,
       version: CURRENT_VERSION,
       seed: Number.isInteger(parsed.seed) ? parsed.seed : 1337,
-      position: normalizePosition(parsed.position),
+      position,
+      recoveryCheckpoint: { ...runtimeRecoveryCheckpoint },
       discovered: normalizeStringSet(parsed.discovered),
       discoveredRoutes,
       guidance: guidanceResult.guidance,
@@ -62,6 +80,7 @@ export function loadGame(storage = localStorage, guidanceContext = null) {
       },
       settings: isPlainObject(parsed.settings) ? parsed.settings : {},
       recoveredCorruptPosition: !isValidWorldPosition(parsed.position),
+      recoveredCorruptCheckpoint: Object.hasOwn(parsed, "recoveryCheckpoint") && !isValidWorldPosition(parsed.recoveryCheckpoint),
       migratedFromVersion: parsed.version === CURRENT_VERSION ? null : parsed.version,
     };
   } catch {
@@ -71,12 +90,20 @@ export function loadGame(storage = localStorage, guidanceContext = null) {
 
 export function clearSave(storage = localStorage) {
   storage.removeItem(SAVE_KEY);
+  runtimeRecoveryCheckpoint = null;
+  holdRecoveryCheckpointOnce = false;
 }
 
 export function safeRespawn(state, spawn = DEFAULT_SPAWN) {
+  const target = isValidWorldPosition(runtimeRecoveryCheckpoint)
+    ? runtimeRecoveryCheckpoint
+    : spawn;
+  const position = normalizePosition(target);
+  runtimeRecoveryCheckpoint = { ...position };
+  holdRecoveryCheckpointOnce = true;
   return {
     ...state,
-    position: normalizePosition(spawn),
+    position,
     velocity: { x: 0, y: 0, z: 0 },
     airborne: true,
     landingRequested: false,
@@ -204,6 +231,19 @@ function normalizeGuidance(guidance) {
     ? Math.max(0, Math.min(1, numericProgress))
     : 0;
   return { activeRouteId, progress };
+}
+
+function readStoredPosition(storage) {
+  try {
+    const raw = storage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return isPlainObject(parsed) && isValidWorldPosition(parsed.position)
+      ? normalizePosition(parsed.position)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function readStoredExploration(storage) {
