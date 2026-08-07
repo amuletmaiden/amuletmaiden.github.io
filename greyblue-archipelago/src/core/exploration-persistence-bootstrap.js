@@ -84,6 +84,23 @@ function onRouteCompleted(event) {
   if (lifecycle.recordRouteCompletion(routeId, occurredAt)) flush('route-completed');
 }
 
+function onLandmarkInvestigated(event) {
+  if (disposed) return;
+  const landmarkId = typeof event?.detail?.landmarkId === 'string'
+    ? event.detail.landmarkId.trim().slice(0, 120)
+    : '';
+  if (!landmarkId) return;
+  const regionId = typeof event?.detail?.regionId === 'string'
+    ? event.detail.regionId.trim().slice(0, 120)
+    : null;
+  const occurredAt = Number.isFinite(event?.detail?.occurredAt)
+    ? Math.max(0, Math.floor(event.detail.occurredAt))
+    : Date.now();
+  if (lifecycle.recordLandmarkInvestigation(landmarkId, regionId, occurredAt)) {
+    flush('landmark-investigated');
+  }
+}
+
 function decorate(state) {
   if (!state || typeof state !== 'object') return state;
   return {
@@ -117,6 +134,7 @@ if (!priorDescriptor || priorDescriptor.configurable) {
 }
 
 globalThis.addEventListener?.('greyblue:route-completed', onRouteCompleted);
+globalThis.addEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
 consume(currentState);
 
 function flushIfDirty(reason) {
@@ -128,6 +146,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   flushIfDirty('beforeunload');
   disposed = true;
   globalThis.removeEventListener?.('greyblue:route-completed', onRouteCompleted);
+  globalThis.removeEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
 }, { once: true });
 document.addEventListener?.('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushIfDirty('hidden');

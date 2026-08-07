@@ -6,7 +6,7 @@ const WORLD_LIMIT = 24000;
 const ALTITUDE_MIN = -100;
 const ALTITUDE_MAX = 8000;
 const MAX_DISCOVERY_RECORDS = 2048;
-const EXPLORATION_EVENT_KINDS = new Set(["region-entered", "landmark-reached", "route-completed"]);
+const EXPLORATION_EVENT_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "route-completed"]);
 let runtimeRecoveryCheckpoint = null;
 let holdRecoveryCheckpointOnce = false;
 
