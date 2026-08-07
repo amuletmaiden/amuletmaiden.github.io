@@ -1,8 +1,10 @@
 import { createExplorationLifecycle } from './exploration-lifecycle.js';
+import { createLandingRecoveryAnchor } from './landing-recovery-anchor.js';
 import { loadGame, saveGame } from './save.js';
 
 const restored = loadGame();
 const lifecycle = createExplorationLifecycle(restored?.exploration);
+const landingRecoveryAnchor = createLandingRecoveryAnchor({ loadGame, saveGame });
 const recovery = restored?.explorationRecovery ?? null;
 const priorDescriptor = Object.getOwnPropertyDescriptor(globalThis, '__greyblueState');
 const priorGet = typeof priorDescriptor?.get === 'function' ? priorDescriptor.get.bind(globalThis) : null;
@@ -67,6 +69,7 @@ function consume(state) {
     ) || changed;
   }
   if (changed) flush('discovery');
+  landingRecoveryAnchor.consume(state);
 }
 
 function onRouteCompleted(event) {
@@ -93,6 +96,7 @@ function decorate(state) {
       lastFlushReason,
       error: flushError,
     },
+    landingRecovery: landingRecoveryAnchor.telemetry(),
   };
 }
 
