@@ -11,15 +11,24 @@
     #hud{position:fixed;z-index:2;left:14px;top:14px;max-width:460px;padding:10px 12px;background:#0b1118d9;border:1px solid #a7c0c866;border-radius:8px;line-height:1.45;pointer-events:none;backdrop-filter:blur(5px)}
     #state{font-weight:700;letter-spacing:.04em}
     #error{color:#ffd7d7;white-space:pre-wrap}
+    #greyblue-destination-guidance{display:grid;gap:2px;margin-top:9px;padding-top:8px;border-top:1px solid #a7c0c84d}
+    #greyblue-destination-guidance[hidden]{display:none}
+    #greyblue-destination-guidance [data-greyblue-guidance-eyebrow]{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#c3d5d9}
+    #greyblue-destination-guidance-label{font-size:16px;line-height:1.25}
+    #greyblue-destination-guidance-status{font-size:12px;color:#d4e2e5}
+    #greyblue-destination-guidance[data-guidance-layout="compact"] #greyblue-destination-guidance-label{font-size:14px}
+    [data-visually-hidden]{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+    @media (max-width:560px){#hud{left:8px;right:8px;top:8px;max-width:none}}
   </style>
   <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
 </head>
 <body>
-  <div id="hud">
+  <div id="hud" data-greyblue-overlay>
     <div id="state">Waking the archipelago…</div>
     <div>W/S power · A/D bank · Space/Shift climb · E takeoff/land · R recover</div>
     <div id="error"></div>
   </div>
+  <script type="module" src="./src/interface/live-guidance-bootstrap.js"></script>
   <script type="module" src="./src/app.js"></script>
 </body>
 </html>
