@@ -8,6 +8,7 @@ import { createIsleTerrainSampler } from "./flight/isle-terrain-sampler.js";
 import { DragonRuntime } from "./dragon/runtime.js";
 import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
 import { selectRouteGuidance } from "./core/route-guidance.js";
+import { cycleRouteChoice } from "./core/route-choice.js";
 import { loadGame, saveGame, safeRespawn } from "./core/save.js";
 
 const ASSETS = Object.freeze({
@@ -16,6 +17,8 @@ const ASSETS = Object.freeze({
 });
 const STREAMING_RANGES = Object.freeze({ activateRange: 2400, deactivateRange: 3000 });
 const FALLBACK_SPAWN = Object.freeze({ x: 0, y: 160, z: 0 });
+const ROUTE_CHOICE_RADIUS = 320;
+const CROSSING_COMMIT_PROGRESS = 0.1;
 const DEFAULT_FOG = Object.freeze({
   color: "#71848b",
   near: 120,
@@ -27,6 +30,7 @@ const DEFAULT_FOG = Object.freeze({
 
 const stateLine = document.querySelector("#state");
 const errorLine = document.querySelector("#error");
+const routeChoiceStatus = document.querySelector("#route-choice-status");
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(DEFAULT_FOG.color);
 scene.fog = new THREE.FogExp2(DEFAULT_FOG.color, DEFAULT_FOG.density);
@@ -77,6 +81,8 @@ let currentRegion = null;
 let currentFogProfile = { ...DEFAULT_FOG };
 let currentRouteGuidance = null;
 let preferredRouteId = save?.guidance?.activeRouteId || null;
+let activeCrossingRouteId = null;
+let routeChoiceTelemetry = Object.freeze({ available: false, reason: "not-at-departure", preferredRouteId });
 const islandMeshes = new Map();
 const loader = new GLTFLoader();
 
@@ -202,6 +208,7 @@ function recover() {
   collisionResolver.reset(recovered.position);
   lastCollision = { ...collisionResolver.telemetry };
   chaseCamera.snapTo(position, controller.yaw);
+  activeCrossingRouteId = null;
   persist();
 }
 
@@ -295,6 +302,49 @@ function updateRouteGuidance(proximity) {
   return currentRouteGuidance;
 }
 
+function setRouteChoiceStatus(message) {
+  if (routeChoiceStatus) routeChoiceStatus.textContent = String(message || "").slice(0, 180);
+}
+
+function chooseNextRoute() {
+  const proximity = nearestIsland();
+  if (!proximity || proximity.distance > ROUTE_CHOICE_RADIUS) {
+    routeChoiceTelemetry = Object.freeze({ available: false, reason: "not-at-departure", preferredRouteId });
+    setRouteChoiceStatus("Route choice is available near a discovered departure.");
+    return false;
+  }
+
+  const result = cycleRouteChoice({
+    world,
+    islandId: proximity.island.id,
+    discoveredRouteIds: discoveredRoutes,
+    preferredRouteId,
+    activeCrossingRouteId,
+  });
+  routeChoiceTelemetry = Object.freeze({
+    available: result.choices.length > 0,
+    reason: result.reason,
+    preferredRouteId: result.preferredRouteId,
+    choiceCount: result.choices.length,
+    departureIslandId: proximity.island.id,
+  });
+
+  if (result.reason === "active-crossing") {
+    setRouteChoiceStatus("Finish or clear the active crossing before choosing another route.");
+    return false;
+  }
+  if (result.reason === "no-eligible-routes") {
+    setRouteChoiceStatus("No discovered crossing leaves this island yet.");
+    return false;
+  }
+
+  preferredRouteId = result.preferredRouteId;
+  updateRouteGuidance(proximity);
+  persist();
+  setRouteChoiceStatus(result.destinationName ? `Route set for ${result.destinationName}.` : "Route selected.");
+  return result.changed;
+}
+
 function normalizeAngle(angle) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
@@ -321,6 +371,7 @@ function publishPausedState() {
     camera: lastCameraState,
     routeGuidance: currentRouteGuidance,
     guidancePreference: preferredRouteId,
+    routeChoice: routeChoiceTelemetry,
     world: {
       ...(globalThis.__greyblueState?.world || {}),
       heroTerrain: heroTerrain?.telemetry || null,
@@ -329,7 +380,18 @@ function publishPausedState() {
 }
 
 addEventListener("keydown", (event) => {
+  if (!event.defaultPrevented && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    if (event.code === "KeyC") chooseNextRoute();
+    if (event.code === "KeyX") {
+      activeCrossingRouteId = null;
+      routeChoiceTelemetry = Object.freeze({ ...routeChoiceTelemetry, reason: "crossing-cleared" });
+    }
+  }
   flightInput.keyDown(event.code, event.repeat);
+});
+addEventListener("greyblue:route-completed", () => {
+  activeCrossingRouteId = null;
+  routeChoiceTelemetry = Object.freeze({ ...routeChoiceTelemetry, reason: "crossing-completed" });
 });
 addEventListener("keyup", (event) => flightInput.keyUp(event.code));
 addEventListener("blur", () => flightInput.clear());
@@ -455,6 +517,10 @@ function frame(now) {
   }
   discoverRoutes();
   const routeGuidance = updateRouteGuidance(proximity);
+  if (!activeCrossingRouteId && routeGuidance?.routeId && routeGuidance.progress >= CROSSING_COMMIT_PROGRESS) {
+    activeCrossingRouteId = routeGuidance.routeId;
+    routeChoiceTelemetry = Object.freeze({ ...routeChoiceTelemetry, reason: "active-crossing", preferredRouteId });
+  }
 
   if (dragon) {
     dragon.position.copy(position);
@@ -506,6 +572,7 @@ function frame(now) {
     fog: currentFogProfile,
     routeGuidance: currentRouteGuidance,
     guidancePreference: preferredRouteId,
+    routeChoice: routeChoiceTelemetry,
     activeIslandCount: islandMeshes.size,
     activeIslandIds: active.map((island) => island.id),
     discoveredCount: discovered.size,
