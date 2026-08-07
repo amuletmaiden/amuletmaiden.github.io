@@ -41,6 +41,13 @@
     .greyblue-crossing-track{height:3px;overflow:hidden;border-radius:2px;background:#b8ccd033}
     .greyblue-crossing-track i{display:block;width:100%;height:100%;transform:scaleX(0);transform-origin:left center;background:currentColor}
     #greyblue-crossing-objective[data-phase="arrived"] [data-greyblue-crossing-title]{font-size:16px}
+    #greyblue-listening-pulse{display:grid;gap:2px;margin-top:9px;padding-top:8px;border-top:1px solid #a7c0c84d}
+    #greyblue-listening-pulse[hidden]{display:none}
+    #greyblue-listening-pulse [data-greyblue-listening-eyebrow]{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:#c3d5d9}
+    #greyblue-listening-pulse [data-greyblue-listening-title]{font-size:15px;line-height:1.2}
+    #greyblue-listening-pulse [data-greyblue-listening-status]{font-size:12px;color:#d4e2e5;font-variant-numeric:tabular-nums}
+    #greyblue-listening-pulse[data-intensity="distant"] [data-greyblue-listening-title]{font-weight:550}
+    #greyblue-listening-pulse[data-found="false"] [data-greyblue-listening-title]{font-style:italic;font-weight:550}
     #greyblue-exploration-journal{display:grid;gap:5px;margin-top:9px;padding-top:8px;border-top:1px solid #a7c0c84d}
     #greyblue-exploration-journal[hidden]{display:none}
     .greyblue-journal-heading{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#c3d5d9}
@@ -63,7 +70,7 @@
 <body>
   <div id="hud" data-greyblue-overlay>
     <div id="state">Waking the archipelago…</div>
-    <div>W/S power · A/D bank · Space/Shift climb · E takeoff/land · F investigate · R recover · J journal · X clear crossing</div>
+    <div>W/S power · A/D bank · Space/Shift climb · E takeoff/land · Q listen · F investigate · R recover · J journal · X clear crossing</div>
     <div id="error"></div>
   </div>
   <script type="module" src="./src/interface/live-guidance-bootstrap.js"></script>
@@ -72,6 +79,7 @@
   <script type="module" src="./src/interface/live-landing-approach-bootstrap.js"></script>
   <script type="module" src="./src/core/landmark-encounter-bootstrap.js"></script>
   <script type="module" src="./src/core/crossing-objective-bootstrap.js"></script>
+  <script type="module" src="./src/core/listening-pulse-bootstrap.js"></script>
   <script type="module" src="./src/app.js"></script>
 </body>
 </html>
