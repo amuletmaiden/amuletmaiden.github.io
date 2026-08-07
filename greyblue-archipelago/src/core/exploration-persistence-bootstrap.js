@@ -69,6 +69,18 @@ function consume(state) {
   if (changed) flush('discovery');
 }
 
+function onRouteCompleted(event) {
+  if (disposed) return;
+  const routeId = typeof event?.detail?.routeId === 'string'
+    ? event.detail.routeId.trim().slice(0, 120)
+    : '';
+  if (!routeId) return;
+  const occurredAt = Number.isFinite(event?.detail?.occurredAt)
+    ? Math.max(0, Math.floor(event.detail.occurredAt))
+    : Date.now();
+  if (lifecycle.recordRouteCompletion(routeId, occurredAt)) flush('route-completed');
+}
+
 function decorate(state) {
   if (!state || typeof state !== 'object') return state;
   return {
@@ -100,6 +112,7 @@ if (!priorDescriptor || priorDescriptor.configurable) {
   });
 }
 
+globalThis.addEventListener?.('greyblue:route-completed', onRouteCompleted);
 consume(currentState);
 
 function flushIfDirty(reason) {
@@ -110,6 +123,7 @@ globalThis.addEventListener?.('pagehide', () => flushIfDirty('pagehide'));
 globalThis.addEventListener?.('beforeunload', () => {
   flushIfDirty('beforeunload');
   disposed = true;
+  globalThis.removeEventListener?.('greyblue:route-completed', onRouteCompleted);
 }, { once: true });
 document.addEventListener?.('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushIfDirty('hidden');
