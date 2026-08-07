@@ -14,6 +14,9 @@ export function saveGame(state, storage = localStorage, guidanceContext = null) 
     ? { ...guidanceContext, discoveredRoutes: guidanceContext.discoveredRoutes ?? discoveredRoutes }
     : null;
   const guidanceResult = recoverGuidanceForWorld(state.guidance, context);
+  const previousExploration = state.exploration === undefined
+    ? readStoredExploration(storage)
+    : null;
   const payload = {
     version: CURRENT_VERSION,
     savedAt: new Date().toISOString(),
@@ -22,7 +25,7 @@ export function saveGame(state, storage = localStorage, guidanceContext = null) 
     discovered: normalizeStringSet(state.discovered),
     discoveredRoutes,
     guidance: guidanceResult.guidance,
-    exploration: normalizeExploration(state.exploration),
+    exploration: normalizeExploration(state.exploration ?? previousExploration),
     settings: isPlainObject(state.settings) ? state.settings : {},
   };
   storage.setItem(SAVE_KEY, JSON.stringify(payload));
@@ -201,6 +204,17 @@ function normalizeGuidance(guidance) {
     ? Math.max(0, Math.min(1, numericProgress))
     : 0;
   return { activeRouteId, progress };
+}
+
+function readStoredExploration(storage) {
+  try {
+    const raw = storage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return isPlainObject(parsed) ? parsed.exploration ?? null : null;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeExploration(exploration) {
