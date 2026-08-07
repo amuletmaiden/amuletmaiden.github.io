@@ -25,7 +25,7 @@ export function saveGame(state, storage = localStorage, guidanceContext = null) 
     holdRecoveryCheckpointOnce = false;
   } else if (previousPosition) {
     runtimeRecoveryCheckpoint = previousPosition;
-  } else if (!runtimeRecoveryCheckpoint) {
+  } else {
     runtimeRecoveryCheckpoint = position;
   }
   const payload = {
