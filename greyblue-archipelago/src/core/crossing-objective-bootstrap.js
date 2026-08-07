@@ -12,6 +12,7 @@ let worldSeed = null;
 let disposed = false;
 let clearTimer = 0;
 let lastAnnouncement = '';
+let lastCompletedRouteId = null;
 
 const panel = document.createElement('section');
 panel.id = 'greyblue-crossing-objective';
@@ -54,6 +55,16 @@ function announce(text) {
   announcement.textContent = bounded;
 }
 
+function publishRouteCompletion(routeId) {
+  const boundedRouteId = String(routeId ?? '').trim().slice(0, 120);
+  if (!boundedRouteId || boundedRouteId === lastCompletedRouteId) return false;
+  lastCompletedRouteId = boundedRouteId;
+  globalThis.dispatchEvent?.(new CustomEvent('greyblue:route-completed', {
+    detail: Object.freeze({ routeId: boundedRouteId, occurredAt: Date.now() }),
+  }));
+  return true;
+}
+
 function render(state) {
   if (disposed || !state?.ready) {
     panel.hidden = true;
@@ -89,6 +100,7 @@ function render(state) {
   } else if (view.phase === 'approach') {
     announce(`Approaching ${view.destinationName}.`);
   } else if (view.arrived) {
+    publishRouteCompletion(view.routeId);
     announce(`Crossing complete. ${view.destinationName}.`);
     if (!clearTimer) {
       clearTimer = setTimeout(() => {
