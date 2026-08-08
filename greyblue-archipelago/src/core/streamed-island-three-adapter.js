@@ -1,10 +1,40 @@
+import {
+  clearStreamedIslandTransition,
+  resetStreamedIslandTransition,
+  streamedIslandMistOpacity,
+} from './streamed-island-mist-transition.js';
+
 const COLORS = Object.freeze({ ordinary: 0x536e64, landmark: 0x607f74 });
 
 function isMeshLike(value) {
   return Boolean(value && value.position && value.scale && value.userData && value.geometry && value.material);
 }
 
-export function createStreamedIslandThreeAdapter({ THREE, scene, islandMeshes } = {}) {
+function defaultNow() {
+  return typeof performance?.now === 'function' ? performance.now() : 0;
+}
+
+function defaultReducedMotion() {
+  return typeof globalThis.matchMedia === 'function'
+    ? Boolean(globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    : false;
+}
+
+function cameraDistance(mesh, camera) {
+  const cameraPosition = camera?.position;
+  if (!cameraPosition) return 0;
+  const dx = Number(mesh.position?.x ?? mesh.position?.values?.[0] ?? 0) - Number(cameraPosition.x ?? cameraPosition.values?.[0] ?? 0);
+  const dz = Number(mesh.position?.z ?? mesh.position?.values?.[2] ?? 0) - Number(cameraPosition.z ?? cameraPosition.values?.[2] ?? 0);
+  return Math.hypot(Number.isFinite(dx) ? dx : 0, Number.isFinite(dz) ? dz : 0);
+}
+
+export function createStreamedIslandThreeAdapter({
+  THREE,
+  scene,
+  islandMeshes,
+  now = defaultNow,
+  reducedMotion = defaultReducedMotion,
+} = {}) {
   if (!THREE?.ConeGeometry || !THREE?.MeshStandardMaterial || !THREE?.Mesh) {
     throw new TypeError('streamed island Three adapter requires THREE geometry/material/mesh constructors');
   }
@@ -13,6 +43,9 @@ export function createStreamedIslandThreeAdapter({ THREE, scene, islandMeshes } 
   }
   if (!(islandMeshes instanceof Map)) {
     throw new TypeError('streamed island Three adapter requires islandMeshes Map');
+  }
+  if (typeof now !== 'function' || typeof reducedMotion !== 'function') {
+    throw new TypeError('streamed island Three adapter requires functional time/accessibility adapters');
   }
 
   function create(kind) {
@@ -28,6 +61,25 @@ export function createStreamedIslandThreeAdapter({ THREE, scene, islandMeshes } 
     mesh.receiveShadow = true;
     mesh.visible = false;
     mesh.userData = {};
+    mesh.onBeforeRender = (_renderer, renderScene, camera) => {
+      const transition = mesh.userData?.streamTransition;
+      if (!mesh.visible || !transition || !mesh.material) return;
+      const fogDensity = Number(renderScene?.fog?.density ?? scene?.fog?.density ?? 0);
+      const ageMs = Math.max(0, Number(now()) - Number(transition.activatedAtMs || 0));
+      const result = streamedIslandMistOpacity({
+        ageMs,
+        distance: cameraDistance(mesh, camera),
+        fogDensity: Number.isFinite(fogDensity) ? fogDensity : 0,
+        reducedMotion: Boolean(reducedMotion()),
+      });
+      mesh.material.transparent = result.opacity < 0.999;
+      mesh.material.opacity = result.opacity;
+      mesh.userData.streamTransition = Object.freeze({
+        activatedAtMs: transition.activatedAtMs,
+        opacity: result.opacity,
+        transitioning: result.transitioning,
+      });
+    };
     return mesh;
   }
 
@@ -41,6 +93,7 @@ export function createStreamedIslandThreeAdapter({ THREE, scene, islandMeshes } 
 
     scene.remove(mesh);
     mesh.visible = false;
+    clearStreamedIslandTransition(mesh);
     mesh.userData = {};
 
     if (!island) {
@@ -52,6 +105,7 @@ export function createStreamedIslandThreeAdapter({ THREE, scene, islandMeshes } 
     mesh.position.set(island.x, 0, island.z);
     mesh.scale.set(island.scale, island.height, island.scale);
     mesh.userData = { island, presentationClass: kind };
+    resetStreamedIslandTransition(mesh, now());
     mesh.visible = true;
     islandMeshes.set(island.id, mesh);
     scene.add(mesh);
@@ -63,6 +117,7 @@ export function createStreamedIslandThreeAdapter({ THREE, scene, islandMeshes } 
     if (id && islandMeshes.get(id) === mesh) islandMeshes.delete(id);
     scene.remove(mesh);
     mesh.visible = false;
+    clearStreamedIslandTransition(mesh);
     mesh.userData = {};
     mesh.geometry.dispose?.();
     mesh.material.dispose?.();
@@ -71,4 +126,4 @@ export function createStreamedIslandThreeAdapter({ THREE, scene, islandMeshes } 
   return Object.freeze({ create, reset, dispose });
 }
 
-export const streamedIslandThreeAdapterInternals = Object.freeze({ COLORS, isMeshLike });
+export const streamedIslandThreeAdapterInternals = Object.freeze({ COLORS, isMeshLike, cameraDistance });
