@@ -1,5 +1,7 @@
 import { buildArchipelago } from '../world/archipelago.js';
 import { createApproachChallengeState, selectApproachCorridor, advanceApproachChallenge } from './approach-challenge.js';
+import { masteredApproachIdsFromExploration } from './exploration-lifecycle.js';
+import { loadGame } from './save.js';
 
 const host = document.querySelector('#hud') ?? document.body;
 const priorDescriptor = Object.getOwnPropertyDescriptor(globalThis, '__greyblueState');
@@ -13,6 +15,7 @@ let resetTimer = 0;
 let invalidatedByRecovery = false;
 let invalidatedByCancellation = false;
 let disposed = false;
+const masteredCorridors = new Set(masteredApproachIdsFromExploration(loadGame()?.exploration));
 
 const panel = document.createElement('section');
 panel.id = 'greyblue-approach-challenge';
@@ -32,6 +35,7 @@ announcement.setAttribute('aria-live', 'polite');
 announcement.setAttribute('aria-atomic', 'true');
 host.append(panel, announcement);
 
+const eyebrowNode = panel.querySelector('[data-greyblue-approach-eyebrow]');
 const titleNode = panel.querySelector('[data-greyblue-approach-title]');
 const statusNode = panel.querySelector('[data-greyblue-approach-status]');
 
@@ -48,6 +52,7 @@ function nearestCandidate(state) {
   const position = state?.position;
   if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.z)) return null;
   const discovered = Array.isArray(state.discovered) ? state.discovered : [];
+  const mastered = [...masteredCorridors];
   const candidates = [];
   for (const island of getWorld(state).islands) {
     const corridor = selectApproachCorridor({
@@ -55,12 +60,16 @@ function nearestCandidate(state) {
       position,
       heading: state.flight?.yaw,
       discoveredIslandIds: discovered,
+      masteredCorridorIds: mastered,
     });
     if (!corridor) continue;
     const distance = Math.hypot(position.x - corridor.entry.x, position.z - corridor.entry.z);
-    candidates.push({ island, corridor, distance });
+    candidates.push({ island, corridor, distance, mastered: masteredCorridors.has(corridor.id) });
   }
-  candidates.sort((a, b) => a.distance - b.distance || a.island.id.localeCompare(b.island.id) || a.corridor.id.localeCompare(b.corridor.id));
+  candidates.sort((a, b) => Number(a.mastered) - Number(b.mastered)
+    || a.distance - b.distance
+    || a.island.id.localeCompare(b.island.id)
+    || a.corridor.id.localeCompare(b.corridor.id));
   return candidates[0] ?? null;
 }
 
@@ -71,11 +80,12 @@ function landingZoneFor(island, corridor) {
   return zones.find((zone) => String(zone?.id ?? '').endsWith(`landing-${suffix}`)) ?? zones[0];
 }
 
-function phaseText(phase, islandName, reason) {
-  if (phase === 'armed') return `Enter ${islandName}'s approach from the mist`;
-  if (phase === 'in-corridor') return `Hold the corridor toward ${islandName}`;
-  if (phase === 'final') return `Final approach to ${islandName}`;
-  if (phase === 'succeeded') return `Clean approach · ${islandName}`;
+function phaseText(phase, islandName, reason, remembered) {
+  const prefix = remembered ? 'Remembered line · ' : '';
+  if (phase === 'armed') return `${prefix}Enter ${islandName}'s approach from the mist`;
+  if (phase === 'in-corridor') return `${prefix}Hold the corridor toward ${islandName}`;
+  if (phase === 'final') return `${prefix}Final approach to ${islandName}`;
+  if (phase === 'succeeded') return `${remembered ? 'Known clean approach' : 'Clean approach'} · ${islandName}`;
   if (phase === 'broken') {
     const reasons = {
       recovery: 'approach broken by recovery',
@@ -143,17 +153,19 @@ function render(state) {
   }
 
   const name = String(island.name || island.id).slice(0, 120);
+  const remembered = masteredCorridors.has(corridor.id);
   panel.hidden = false;
   panel.dataset.phase = challenge.phase;
-  titleNode.textContent = phaseText(challenge.phase, name, challenge.reason);
+  eyebrowNode.textContent = remembered ? 'Remembered approach' : 'Clean approach';
+  titleNode.textContent = phaseText(challenge.phase, name, challenge.reason, remembered);
   statusNode.textContent = challenge.phase === 'armed'
-    ? 'Optional line · enter cleanly'
+    ? remembered ? 'A familiar line through the mist' : 'Optional line · enter cleanly'
     : challenge.phase === 'in-corridor'
-      ? 'Stay aligned and above the corridor floor'
+      ? remembered ? 'The old line still holds' : 'Stay aligned and above the corridor floor'
       : challenge.phase === 'final'
-        ? 'Carry the line to the landing shelf'
+        ? remembered ? 'Carry the remembered line to the shelf' : 'Carry the line to the landing shelf'
         : challenge.phase === 'succeeded'
-          ? 'The route answered cleanly.'
+          ? remembered ? 'The familiar route answered cleanly.' : 'The route answered cleanly.'
           : 'Break away and try another approach.';
 
   if (challenge.sequence > priorSequence && (challenge.phase === 'succeeded' || challenge.phase === 'broken')) {
@@ -176,7 +188,7 @@ function render(state) {
 function decoratedState() {
   const base = priorGet ? priorGet() : currentState;
   if (!base || typeof base !== 'object') return base;
-  return { ...base, approachChallenge: challenge };
+  return { ...base, approachChallenge: challenge, masteredApproachCount: masteredCorridors.size };
 }
 
 function onKeyDown(event) {
@@ -185,7 +197,15 @@ function onKeyDown(event) {
   if (event.code === 'KeyX') invalidatedByCancellation = true;
 }
 
+function onApproachMastered(event) {
+  const corridorId = typeof event?.detail?.corridorId === 'string'
+    ? event.detail.corridorId.trim().slice(0, 120)
+    : '';
+  if (corridorId) masteredCorridors.add(corridorId);
+}
+
 globalThis.addEventListener?.('keydown', onKeyDown);
+globalThis.addEventListener?.('greyblue:approach-mastered', onApproachMastered);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
@@ -208,6 +228,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
   if (resetTimer) clearTimeout(resetTimer);
   globalThis.removeEventListener?.('keydown', onKeyDown);
+  globalThis.removeEventListener?.('greyblue:approach-mastered', onApproachMastered);
   panel.remove();
   announcement.remove();
 }, { once: true });

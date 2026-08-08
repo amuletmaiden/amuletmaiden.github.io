@@ -79,6 +79,28 @@ assert.equal(
   'a-corridor',
   'equal corridor candidates resolve with stable id ordering',
 );
+assert.equal(
+  selectApproachCorridor({
+    island: multiIsland,
+    position: { x: 0, z: 360 },
+    heading: Math.PI,
+    discoveredIslandIds: ['isle-a'],
+    masteredCorridorIds: ['a-corridor'],
+  })?.id,
+  'z-corridor',
+  'an unmastered authored corridor is preferred over an equally valid mastered line',
+);
+assert.equal(
+  selectApproachCorridor({
+    island: multiIsland,
+    position: { x: 0, z: 360 },
+    heading: Math.PI,
+    discoveredIslandIds: ['isle-a'],
+    masteredCorridorIds: ['a-corridor', 'z-corridor'],
+  })?.id,
+  'a-corridor',
+  'when every valid corridor is mastered, stable ordinary ordering remains available',
+);
 
 assert.equal(selectApproachCorridor({ island: { id: 'bad', approachCorridors: [{}] }, position: { x: 0, z: 0 }, heading: 0, discoveredIslandIds: ['bad'] }), null, 'malformed metadata fails closed');
 const before = JSON.stringify(island);

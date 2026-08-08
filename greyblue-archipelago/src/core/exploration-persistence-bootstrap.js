@@ -1,4 +1,5 @@
 import { createExplorationLifecycle } from './exploration-lifecycle.js';
+import { masteryFromChallengeEvent } from './approach-mastery.js';
 import { createLandingRecoveryAnchor } from './landing-recovery-anchor.js';
 import { loadGame, saveGame } from './save.js';
 
@@ -101,6 +102,23 @@ function onLandmarkInvestigated(event) {
   }
 }
 
+function onApproachChallenge(event) {
+  if (disposed) return;
+  const mastery = masteryFromChallengeEvent({
+    eventDetail: event?.detail,
+    discoveredIslandIds: currentState?.discovered,
+    approachChallenge: currentState?.approachChallenge,
+  });
+  if (!mastery) return;
+
+  if (lifecycle.recordApproachMastery(mastery.islandId, mastery.corridorId, Date.now())) {
+    flush('approach-mastered');
+    globalThis.dispatchEvent?.(new CustomEvent('greyblue:approach-mastered', {
+      detail: Object.freeze({ ...mastery, soundHook: 'approach-mastery' }),
+    }));
+  }
+}
+
 function decorate(state) {
   if (!state || typeof state !== 'object') return state;
   return {
@@ -135,6 +153,7 @@ if (!priorDescriptor || priorDescriptor.configurable) {
 
 globalThis.addEventListener?.('greyblue:route-completed', onRouteCompleted);
 globalThis.addEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
+globalThis.addEventListener?.('greyblue:approach-challenge', onApproachChallenge);
 consume(currentState);
 
 function flushIfDirty(reason) {
@@ -147,6 +166,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
   globalThis.removeEventListener?.('greyblue:route-completed', onRouteCompleted);
   globalThis.removeEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
+  globalThis.removeEventListener?.('greyblue:approach-challenge', onApproachChallenge);
 }, { once: true });
 document.addEventListener?.('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushIfDirty('hidden');

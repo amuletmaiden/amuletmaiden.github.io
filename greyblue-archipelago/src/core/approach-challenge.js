@@ -68,9 +68,10 @@ export function createApproachChallengeState() {
   });
 }
 
-export function selectApproachCorridor({ island, position, heading, discoveredIslandIds } = {}) {
+export function selectApproachCorridor({ island, position, heading, discoveredIslandIds, masteredCorridorIds } = {}) {
   const islandId = boundedId(island?.id);
   const discovered = new Set(Array.isArray(discoveredIslandIds) ? discoveredIslandIds.map(boundedId).filter(Boolean) : []);
+  const mastered = new Set(Array.isArray(masteredCorridorIds) ? masteredCorridorIds.map(boundedId).filter(Boolean) : []);
   if (!islandId || !discovered.has(islandId) || !position || !Number.isFinite(position.x) || !Number.isFinite(position.z)) return null;
   const corridors = Array.isArray(island?.approachCorridors) ? island.approachCorridors : [];
   const zones = Array.isArray(island?.landingZones) ? island.landingZones : [];
@@ -81,9 +82,12 @@ export function selectApproachCorridor({ island, position, heading, discoveredIs
     const g = geometry(corridor, position);
     const headingError = angleDelta(heading, corridor.heading);
     if (g.progress > 0.14 || g.entryDistance > Math.max(240, corridor.width * 2.2)) continue;
-    candidates.push({ corridor, entryDistance: g.entryDistance, headingError });
+    candidates.push({ corridor, mastered: mastered.has(corridor.id), entryDistance: g.entryDistance, headingError });
   }
-  candidates.sort((a, b) => a.entryDistance - b.entryDistance || a.headingError - b.headingError || a.corridor.id.localeCompare(b.corridor.id));
+  candidates.sort((a, b) => Number(a.mastered) - Number(b.mastered)
+    || a.entryDistance - b.entryDistance
+    || a.headingError - b.headingError
+    || a.corridor.id.localeCompare(b.corridor.id));
   return candidates[0]?.corridor ?? null;
 }
 
