@@ -10,6 +10,7 @@ const OPTIONAL_SURFACES = [
   ["listening-pulse", () => import("./listening-pulse-bootstrap.js")],
   ["approach-challenge", () => import("./approach-challenge-bootstrap.js")],
   ["soundscape", () => import("./soundscape-bootstrap.js")],
+  ["familiar-mist", () => import("./familiar-mist-bootstrap.js")],
 ].map(([id, load]) => ({ id, load }));
 
 const readiness = createOptionalSurfaceReadiness(OPTIONAL_SURFACES);
