@@ -1,7 +1,8 @@
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
 
 function finite(value, fallback = 0) {
-  return Number.isFinite(value) ? value : fallback;
+  if (Number.isFinite(value)) return value;
+  return Number.isFinite(fallback) ? fallback : 0;
 }
 
 function boundedText(value, maximum = 96) {
