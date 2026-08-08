@@ -1,6 +1,7 @@
 import { buildArchipelago } from '../world/archipelago.js';
 import { investigatedLandmarkIdsFromExploration } from './exploration-lifecycle.js';
-import { createLandmarkEncounterState, selectLandmarkEncounter, activateLandmarkEncounter } from './landmark-encounter-model.js';
+import { createLandmarkEncounterState, activateLandmarkEncounter } from './landmark-encounter-model.js';
+import { evaluateLandmarkFlightApproach } from './landmark-flight-approach.js';
 import { loadGame } from './save.js';
 
 const host = document.querySelector('#hud') ?? document.body;
@@ -13,10 +14,12 @@ let encounterState = createLandmarkEncounterState({
   visitedIds: investigatedLandmarkIdsFromExploration(restoredExploration),
 });
 let encounterView = null;
+let approachTelemetry = Object.freeze({ visible: false, status: 'hidden', reason: 'not-ready', shouldInvestigate: false });
 let world = null;
 let worldSeed = null;
 let disposed = false;
 let revealTimer = 0;
+const lastTriggeredAt = new Map();
 
 const panel = document.createElement('section');
 panel.id = 'greyblue-landmark-encounter';
@@ -52,34 +55,29 @@ function getWorld(state) {
   return world;
 }
 
-function render(state) {
-  if (disposed || !state?.ready) {
-    panel.hidden = true;
-    encounterView = null;
-    return;
-  }
+function statusText(view) {
+  if (!view?.visible) return '';
+  const distance = Number.isFinite(view.distance) ? `${Math.round(view.distance)}m` : 'nearby';
+  if (view.status === 'too-low') return `${distance} · climb to ${Math.round(view.minimumAltitude)}m`;
+  if (view.status === 'aligned') return `${distance} · approach aligned`;
+  if (view.status === 'awakened') return `${distance} · ${view.encounterClass || 'threshold'} awakened`;
+  return `${distance} · seek the approach`;
+}
 
-  const selection = selectLandmarkEncounter({
-    world: getWorld(state),
-    position: state.position,
-    altitude: state.position?.y,
-  }, encounterState);
-  encounterState = selection.state;
-  encounterView = selection.view;
-  panel.hidden = !encounterView.visible;
-  if (!encounterView.visible) return;
-
-  titleNode.textContent = encounterView.title;
-  statusNode.textContent = encounterView.status;
-  promptNode.textContent = encounterView.prompt;
-  panel.dataset.encounterClass = encounterView.encounterClass || 'threshold';
-  panel.dataset.available = encounterView.available ? 'true' : 'false';
+function promptText(view) {
+  if (!view?.visible) return '';
+  if (view.status === 'too-low') return 'Climb through the mist';
+  if (view.status === 'aligned') return 'Hold course into the landmark';
+  if (view.status === 'awakened') return view.alreadyInvestigated ? 'Encounter remembered' : 'Landmark awakened';
+  return 'Find its bearing and approach with speed';
 }
 
 function revealEncounter() {
   const result = activateLandmarkEncounter(encounterState, encounterView);
-  if (!result.changed || !result.reveal) return;
+  if (!result.changed || !result.reveal) return false;
   encounterState = result.state;
+  const occurredAt = Date.now();
+  lastTriggeredAt.set(result.reveal.landmarkId, occurredAt);
   revealNode.hidden = false;
   revealNode.textContent = result.reveal.text;
   announcement.textContent = `${result.reveal.title}. ${result.reveal.text}`;
@@ -89,28 +87,83 @@ function revealEncounter() {
     detail: {
       landmarkId: result.reveal.landmarkId,
       regionId: currentState?.currentRegion?.id ?? null,
-      occurredAt: Date.now(),
+      encounterClass: approachTelemetry?.encounterClass ?? null,
+      source: 'flight-approach',
+      occurredAt,
     },
   }));
   if (revealTimer) clearTimeout(revealTimer);
   revealTimer = setTimeout(() => {
     if (!disposed) revealNode.hidden = true;
   }, 9000);
+  return true;
 }
 
-function onKeyDown(event) {
-  if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
-  if (event.code === 'KeyF') revealEncounter();
+function render(state) {
+  if (disposed || !state?.ready) {
+    panel.hidden = true;
+    encounterView = null;
+    approachTelemetry = Object.freeze({ visible: false, status: 'hidden', reason: 'not-ready', shouldInvestigate: false });
+    return;
+  }
+
+  const investigatedIds = encounterState.visitedIds;
+  approachTelemetry = evaluateLandmarkFlightApproach({
+    world: getWorld(state),
+    discoveredIslandIds: state.discovered,
+    investigatedLandmarkIds: investigatedIds,
+    position: state.position,
+    altitude: state.position?.y,
+    heading: state.flight?.yaw,
+    forwardSpeed: state.flight?.speed,
+    lastTriggeredAt: encounterView?.landmarkId ? lastTriggeredAt.get(encounterView.landmarkId) ?? null : null,
+  });
+
+  if (!approachTelemetry.visible) {
+    panel.hidden = true;
+    encounterView = null;
+    return;
+  }
+
+  encounterView = Object.freeze({
+    visible: true,
+    available: approachTelemetry.shouldInvestigate,
+    visited: approachTelemetry.alreadyInvestigated,
+    landmarkId: approachTelemetry.landmarkId,
+    islandId: approachTelemetry.islandId,
+    title: approachTelemetry.title,
+    encounterClass: approachTelemetry.encounterClass,
+    distance: approachTelemetry.distance,
+    minimumAltitude: approachTelemetry.minimumAltitude,
+    prompt: promptText(approachTelemetry),
+    status: statusText(approachTelemetry),
+    reveal: null,
+    revealText: approachTelemetry.revealText,
+  });
+
+  panel.hidden = false;
+  titleNode.textContent = encounterView.title;
+  statusNode.textContent = encounterView.status;
+  promptNode.textContent = encounterView.prompt;
+  panel.dataset.encounterClass = encounterView.encounterClass || 'threshold';
+  panel.dataset.available = encounterView.available ? 'true' : 'false';
+  panel.dataset.flightStatus = approachTelemetry.status;
+
+  if (approachTelemetry.shouldInvestigate) revealEncounter();
 }
 
-globalThis.addEventListener?.('keydown', onKeyDown);
+function decoratedState() {
+  const base = priorGet ? priorGet() : currentState;
+  if (!base || typeof base !== 'object') return base;
+  return { ...base, landmarkFlightApproach: approachTelemetry };
+}
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
     configurable: true,
     enumerable: true,
     get() {
-      return priorGet ? priorGet() : currentState;
+      return decoratedState();
     },
     set(value) {
       if (priorSet) priorSet(value);
@@ -125,7 +178,6 @@ render(currentState);
 globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
   if (revealTimer) clearTimeout(revealTimer);
-  globalThis.removeEventListener?.('keydown', onKeyDown);
   panel.remove();
   announcement.remove();
 }, { once: true });
