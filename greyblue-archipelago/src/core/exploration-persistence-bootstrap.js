@@ -101,6 +101,32 @@ function onLandmarkInvestigated(event) {
   }
 }
 
+function onApproachChallenge(event) {
+  if (disposed || event?.detail?.kind !== 'succeeded') return;
+  const islandId = typeof event?.detail?.islandId === 'string'
+    ? event.detail.islandId.trim().slice(0, 120)
+    : '';
+  const corridorId = typeof event?.detail?.corridorId === 'string'
+    ? event.detail.corridorId.trim().slice(0, 120)
+    : '';
+  if (!islandId || !corridorId) return;
+
+  const discovered = new Set(Array.isArray(currentState?.discovered) ? currentState.discovered : []);
+  const active = currentState?.approachChallenge;
+  const matchesTruthfulSuccess = discovered.has(islandId)
+    && active?.phase === 'succeeded'
+    && active?.islandId === islandId
+    && active?.corridorId === corridorId;
+  if (!matchesTruthfulSuccess) return;
+
+  if (lifecycle.recordApproachMastery(islandId, corridorId, Date.now())) {
+    flush('approach-mastered');
+    globalThis.dispatchEvent?.(new CustomEvent('greyblue:approach-mastered', {
+      detail: Object.freeze({ islandId, corridorId, soundHook: 'approach-mastery' }),
+    }));
+  }
+}
+
 function decorate(state) {
   if (!state || typeof state !== 'object') return state;
   return {
@@ -135,6 +161,7 @@ if (!priorDescriptor || priorDescriptor.configurable) {
 
 globalThis.addEventListener?.('greyblue:route-completed', onRouteCompleted);
 globalThis.addEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
+globalThis.addEventListener?.('greyblue:approach-challenge', onApproachChallenge);
 consume(currentState);
 
 function flushIfDirty(reason) {
@@ -147,6 +174,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
   globalThis.removeEventListener?.('greyblue:route-completed', onRouteCompleted);
   globalThis.removeEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
+  globalThis.removeEventListener?.('greyblue:approach-challenge', onApproachChallenge);
 }, { once: true });
 document.addEventListener?.('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushIfDirty('hidden');
