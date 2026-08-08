@@ -14,7 +14,7 @@ export function traversedRouteIdsFromExploration(exploration = null) {
   const ids = [];
   for (const event of source) {
     if (event?.kind !== 'route-completed') continue;
-    const routeId = boundedId(event.routeId || event.id);
+    const routeId = boundedId(event.routeId) || boundedId(event.id);
     if (routeId) ids.push(routeId);
   }
   return Object.freeze([...new Set(ids)]);
@@ -84,12 +84,13 @@ export function cycleRouteChoice({
   const currentIndex = choices.findIndex((choice) => choice.routeId === current);
   const nextIndex = choices.length === 1 ? 0 : (currentIndex + 1 + choices.length) % choices.length;
   const selected = choices[nextIndex];
+  const familiarity = selected.traversed ? 'familiar' : 'unfamiliar';
   return Object.freeze({
     changed: selected.routeId !== current,
     preferredRouteId: selected.routeId,
     reason: choices.length === 1 ? 'single-route' : 'cycled',
     choices,
-    destinationName: selected.destinationName,
-    familiarity: selected.traversed ? 'familiar' : 'unfamiliar',
+    destinationName: `${selected.destinationName} · ${familiarity} crossing`,
+    familiarity,
   });
 }
