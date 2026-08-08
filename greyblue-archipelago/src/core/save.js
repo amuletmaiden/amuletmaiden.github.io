@@ -6,7 +6,7 @@ const WORLD_LIMIT = 24000;
 const ALTITUDE_MIN = -100;
 const ALTITUDE_MAX = 8000;
 const MAX_DISCOVERY_RECORDS = 2048;
-const EXPLORATION_EVENT_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "route-completed"]);
+const EXPLORATION_EVENT_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "route-completed", "approach-mastered", "roost-established"]);
 let runtimeRecoveryCheckpoint = null;
 let holdRecoveryCheckpointOnce = false;
 
@@ -95,9 +95,12 @@ export function clearSave(storage = localStorage) {
 }
 
 export function safeRespawn(state, spawn = DEFAULT_SPAWN) {
-  const target = isValidWorldPosition(runtimeRecoveryCheckpoint)
-    ? runtimeRecoveryCheckpoint
-    : spawn;
+  const earned = globalThis.__greyblueRoostRecovery;
+  const earnedTarget = earned?.source === "earned-roost" && isValidWorldPosition(earned?.position)
+    ? earned.position
+    : null;
+  const target = earnedTarget
+    ?? (isValidWorldPosition(runtimeRecoveryCheckpoint) ? runtimeRecoveryCheckpoint : spawn);
   const position = normalizePosition(target);
   runtimeRecoveryCheckpoint = { ...position };
   holdRecoveryCheckpointOnce = true;
@@ -107,6 +110,8 @@ export function safeRespawn(state, spawn = DEFAULT_SPAWN) {
     velocity: { x: 0, y: 0, z: 0 },
     airborne: true,
     landingRequested: false,
+    recoverySource: earnedTarget ? "earned-roost" : "checkpoint",
+    recoveryHeading: earnedTarget && Number.isFinite(earned?.heading) ? Number(earned.heading) : null,
   };
 }
 
@@ -275,7 +280,7 @@ function normalizeExploration(exploration) {
         ? Math.floor(candidate.occurredAt)
         : 0,
     };
-    for (const field of ["regionId", "routeId", "landmarkId"]) {
+    for (const field of ["regionId", "routeId", "landmarkId", "islandId", "corridorId", "landingZoneId"]) {
       const value = typeof candidate[field] === "string" ? candidate[field].trim() : "";
       if (value) event[field] = value;
     }
