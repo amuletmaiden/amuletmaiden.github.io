@@ -1,5 +1,5 @@
 const EXPLORATION_VERSION = 1;
-const VALID_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "route-completed", "approach-mastered", "roost-established"]);
+const VALID_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "landmark-flight-encounter", "route-completed", "approach-mastered", "roost-established"]);
 
 function cleanId(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -19,7 +19,7 @@ function normalizeEvent(candidate) {
     id,
     occurredAt: cleanTime(candidate.occurredAt),
   };
-  for (const field of ["regionId", "routeId", "landmarkId", "islandId", "corridorId", "landingZoneId"]) {
+  for (const field of ["regionId", "routeId", "landmarkId", "islandId", "corridorId", "landingZoneId", "encounterClass"]) {
     const value = cleanId(candidate[field]);
     if (value) event[field] = value;
   }
@@ -32,6 +32,18 @@ export function investigatedLandmarkIdsFromExploration(exploration = null) {
   for (const candidate of source) {
     const event = normalizeEvent(candidate);
     if (event?.kind !== "landmark-investigated") continue;
+    const landmarkId = cleanId(event.landmarkId || event.id);
+    if (landmarkId) ids.push(landmarkId);
+  }
+  return [...new Set(ids)].slice(0, 256);
+}
+
+export function completedLandmarkFlightEncounterIdsFromExploration(exploration = null) {
+  const source = Array.isArray(exploration?.events) ? exploration.events : [];
+  const ids = [];
+  for (const candidate of source) {
+    const event = normalizeEvent(candidate);
+    if (event?.kind !== "landmark-flight-encounter") continue;
     const landmarkId = cleanId(event.landmarkId || event.id);
     if (landmarkId) ids.push(landmarkId);
   }
@@ -116,6 +128,21 @@ export function createExplorationLifecycle(initialExploration = null) {
       });
     },
 
+    recordLandmarkFlightEncounter(landmarkId, islandId, regionId = null, encounterClass = null, occurredAt = Date.now()) {
+      const landmark = cleanId(landmarkId);
+      const island = cleanId(islandId);
+      if (!landmark || !island) return false;
+      return record({
+        kind: "landmark-flight-encounter",
+        id: landmark,
+        landmarkId: landmark,
+        islandId: island,
+        regionId: cleanId(regionId),
+        encounterClass: cleanId(encounterClass),
+        occurredAt,
+      });
+    },
+
     recordRouteCompletion(routeId, occurredAt = Date.now()) {
       const id = cleanId(routeId);
       if (!id) return false;
@@ -171,6 +198,7 @@ export function createExplorationLifecycle(initialExploration = null) {
         regionCount: values.filter((event) => event.kind === "region-entered").length,
         landmarkCount: values.filter((event) => event.kind === "landmark-reached").length,
         landmarkInvestigationCount: values.filter((event) => event.kind === "landmark-investigated").length,
+        landmarkFlightEncounterCount: values.filter((event) => event.kind === "landmark-flight-encounter").length,
         routeCompletionCount: values.filter((event) => event.kind === "route-completed").length,
         approachMasteryCount: values.filter((event) => event.kind === "approach-mastered").length,
         roostCount: values.filter((event) => event.kind === "roost-established").length,

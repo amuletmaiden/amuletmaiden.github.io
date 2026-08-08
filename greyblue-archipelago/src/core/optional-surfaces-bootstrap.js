@@ -6,6 +6,7 @@ const OPTIONAL_SURFACES = [
   ["flight-instruments", () => import("../interface/live-flight-instruments-bootstrap.js")],
   ["landing-approach", () => import("../interface/live-landing-approach-bootstrap.js")],
   ["landmark-encounter", () => import("./landmark-encounter-bootstrap.js")],
+  ["landmark-flight-encounter", () => import("./landmark-flight-encounter-bootstrap.js")],
   ["crossing-objective", () => import("./crossing-objective-bootstrap.js")],
   ["listening-pulse", () => import("./listening-pulse-bootstrap.js")],
   ["approach-challenge", () => import("./approach-challenge-bootstrap.js")],

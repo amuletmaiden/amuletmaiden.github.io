@@ -104,19 +104,12 @@ function ensureRoostAnnouncement() {
 function announceRoost(state, event) {
   const node = ensureRoostAnnouncement();
   if (!node) return;
-  const name = state?.nearestIsland?.id === event.islandId
-    ? state.nearestIsland?.name
-    : null;
+  const name = state?.nearestIsland?.id === event.islandId ? state.nearestIsland?.name : null;
   node.textContent = name ? `Roost established at ${name}.` : 'Roost established.';
   node.hidden = false;
   announcementUntil = performance.now() + 4500;
   globalThis.dispatchEvent?.(new CustomEvent('greyblue:roost-established', {
-    detail: Object.freeze({
-      islandId: event.islandId,
-      landingZoneId: event.landingZoneId,
-      islandName: name ?? null,
-      occurredAt: event.occurredAt,
-    }),
+    detail: Object.freeze({ islandId: event.islandId, landingZoneId: event.landingZoneId, islandName: name ?? null, occurredAt: event.occurredAt }),
   }));
 }
 
@@ -149,16 +142,10 @@ function stepRoost(state) {
 function consume(state) {
   if (!state || typeof state !== 'object') return;
   let changed = false;
-  if (state.ready && state.currentRegion?.id) {
-    changed = lifecycle.recordRegion(state.currentRegion, Date.now()) || changed;
-  }
+  if (state.ready && state.currentRegion?.id) changed = lifecycle.recordRegion(state.currentRegion, Date.now()) || changed;
   const discovery = state.latestDiscovery;
   if (discovery?.landmark?.id) {
-    changed = lifecycle.recordLandmark(
-      discovery.landmark,
-      discovery.regionId ?? state.currentRegion?.id ?? null,
-      discovery.discoveredAt ?? Date.now(),
-    ) || changed;
+    changed = lifecycle.recordLandmark(discovery.landmark, discovery.regionId ?? state.currentRegion?.id ?? null, discovery.discoveredAt ?? Date.now()) || changed;
   }
   if (changed) flush('discovery');
   landingRecoveryAnchor.consume(state);
@@ -170,49 +157,47 @@ function consume(state) {
   }
 }
 
+function boundedId(value) {
+  return typeof value === 'string' ? value.trim().slice(0, 120) : '';
+}
+
+function eventTime(event) {
+  return Number.isFinite(event?.detail?.occurredAt) ? Math.max(0, Math.floor(event.detail.occurredAt)) : Date.now();
+}
+
 function onRouteCompleted(event) {
   if (disposed) return;
-  const routeId = typeof event?.detail?.routeId === 'string'
-    ? event.detail.routeId.trim().slice(0, 120)
-    : '';
-  if (!routeId) return;
-  const occurredAt = Number.isFinite(event?.detail?.occurredAt)
-    ? Math.max(0, Math.floor(event.detail.occurredAt))
-    : Date.now();
-  if (lifecycle.recordRouteCompletion(routeId, occurredAt)) flush('route-completed');
+  const routeId = boundedId(event?.detail?.routeId);
+  if (routeId && lifecycle.recordRouteCompletion(routeId, eventTime(event))) flush('route-completed');
 }
 
 function onLandmarkInvestigated(event) {
   if (disposed) return;
-  const landmarkId = typeof event?.detail?.landmarkId === 'string'
-    ? event.detail.landmarkId.trim().slice(0, 120)
-    : '';
+  const landmarkId = boundedId(event?.detail?.landmarkId);
   if (!landmarkId) return;
-  const regionId = typeof event?.detail?.regionId === 'string'
-    ? event.detail.regionId.trim().slice(0, 120)
-    : null;
-  const occurredAt = Number.isFinite(event?.detail?.occurredAt)
-    ? Math.max(0, Math.floor(event.detail.occurredAt))
-    : Date.now();
-  if (lifecycle.recordLandmarkInvestigation(landmarkId, regionId, occurredAt)) {
-    flush('landmark-investigated');
+  const regionId = boundedId(event?.detail?.regionId) || null;
+  if (lifecycle.recordLandmarkInvestigation(landmarkId, regionId, eventTime(event))) flush('landmark-investigated');
+}
+
+function onLandmarkFlightEncounter(event) {
+  if (disposed) return;
+  const landmarkId = boundedId(event?.detail?.landmarkId);
+  const islandId = boundedId(event?.detail?.islandId);
+  if (!landmarkId || !islandId) return;
+  const regionId = boundedId(event?.detail?.regionId) || null;
+  const encounterClass = boundedId(event?.detail?.encounterClass) || null;
+  if (lifecycle.recordLandmarkFlightEncounter(landmarkId, islandId, regionId, encounterClass, eventTime(event))) {
+    flush('landmark-flight-encounter');
   }
 }
 
 function onApproachChallenge(event) {
   if (disposed) return;
-  const mastery = masteryFromChallengeEvent({
-    eventDetail: event?.detail,
-    discoveredIslandIds: currentState?.discovered,
-    approachChallenge: currentState?.approachChallenge,
-  });
+  const mastery = masteryFromChallengeEvent({ eventDetail: event?.detail, discoveredIslandIds: currentState?.discovered, approachChallenge: currentState?.approachChallenge });
   if (!mastery) return;
-
   if (lifecycle.recordApproachMastery(mastery.islandId, mastery.corridorId, Date.now())) {
     flush('approach-mastered');
-    globalThis.dispatchEvent?.(new CustomEvent('greyblue:approach-mastered', {
-      detail: Object.freeze({ ...mastery, soundHook: 'approach-mastery' }),
-    }));
+    globalThis.dispatchEvent?.(new CustomEvent('greyblue:approach-mastered', { detail: Object.freeze({ ...mastery, soundHook: 'approach-mastery' }) }));
   }
 }
 
@@ -242,27 +227,19 @@ if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
     configurable: true,
     enumerable: true,
-    get() {
-      const value = priorGet ? priorGet() : currentState;
-      return decorate(value);
-    },
-    set(value) {
-      if (priorSet) priorSet(value);
-      currentState = priorGet ? priorGet() : value;
-      consume(currentState);
-    },
+    get() { const value = priorGet ? priorGet() : currentState; return decorate(value); },
+    set(value) { if (priorSet) priorSet(value); currentState = priorGet ? priorGet() : value; consume(currentState); },
   });
 }
 
 globalThis.addEventListener?.('greyblue:route-completed', onRouteCompleted);
 globalThis.addEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
+globalThis.addEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
 globalThis.addEventListener?.('greyblue:approach-challenge', onApproachChallenge);
 consume(currentState);
 publishRecoveryPlan(currentState ?? restored);
 
-function flushIfDirty(reason) {
-  if (!disposed && lifecycle.dirty) flush(reason);
-}
+function flushIfDirty(reason) { if (!disposed && lifecycle.dirty) flush(reason); }
 
 globalThis.addEventListener?.('pagehide', () => flushIfDirty('pagehide'));
 globalThis.addEventListener?.('beforeunload', () => {
@@ -270,10 +247,9 @@ globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
   globalThis.removeEventListener?.('greyblue:route-completed', onRouteCompleted);
   globalThis.removeEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
+  globalThis.removeEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
   globalThis.removeEventListener?.('greyblue:approach-challenge', onApproachChallenge);
   roostAnnouncement?.remove();
   delete globalThis.__greyblueRoostRecovery;
 }, { once: true });
-document.addEventListener?.('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') flushIfDirty('hidden');
-});
+document.addEventListener?.('visibilitychange', () => { if (document.visibilityState === 'hidden') flushIfDirty('hidden'); });
