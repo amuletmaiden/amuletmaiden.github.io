@@ -1,3 +1,4 @@
+import './landmark-manifestation-bootstrap.js';
 import { buildArchipelago } from '../world/archipelago.js';
 import { investigatedLandmarkIdsFromExploration } from './exploration-lifecycle.js';
 import { createLandmarkEncounterState, activateLandmarkEncounter } from './landmark-encounter-model.js';
