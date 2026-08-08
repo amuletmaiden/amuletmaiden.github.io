@@ -1,4 +1,5 @@
 import { createExplorationLifecycle } from './exploration-lifecycle.js';
+import { masteryFromChallengeEvent } from './approach-mastery.js';
 import { createLandingRecoveryAnchor } from './landing-recovery-anchor.js';
 import { loadGame, saveGame } from './save.js';
 
@@ -102,27 +103,18 @@ function onLandmarkInvestigated(event) {
 }
 
 function onApproachChallenge(event) {
-  if (disposed || event?.detail?.kind !== 'succeeded') return;
-  const islandId = typeof event?.detail?.islandId === 'string'
-    ? event.detail.islandId.trim().slice(0, 120)
-    : '';
-  const corridorId = typeof event?.detail?.corridorId === 'string'
-    ? event.detail.corridorId.trim().slice(0, 120)
-    : '';
-  if (!islandId || !corridorId) return;
+  if (disposed) return;
+  const mastery = masteryFromChallengeEvent({
+    eventDetail: event?.detail,
+    discoveredIslandIds: currentState?.discovered,
+    approachChallenge: currentState?.approachChallenge,
+  });
+  if (!mastery) return;
 
-  const discovered = new Set(Array.isArray(currentState?.discovered) ? currentState.discovered : []);
-  const active = currentState?.approachChallenge;
-  const matchesTruthfulSuccess = discovered.has(islandId)
-    && active?.phase === 'succeeded'
-    && active?.islandId === islandId
-    && active?.corridorId === corridorId;
-  if (!matchesTruthfulSuccess) return;
-
-  if (lifecycle.recordApproachMastery(islandId, corridorId, Date.now())) {
+  if (lifecycle.recordApproachMastery(mastery.islandId, mastery.corridorId, Date.now())) {
     flush('approach-mastered');
     globalThis.dispatchEvent?.(new CustomEvent('greyblue:approach-mastered', {
-      detail: Object.freeze({ islandId, corridorId, soundHook: 'approach-mastery' }),
+      detail: Object.freeze({ ...mastery, soundHook: 'approach-mastery' }),
     }));
   }
 }
