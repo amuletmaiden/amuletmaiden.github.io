@@ -8,6 +8,7 @@ let currentState = priorGet ? priorGet() : globalThis.__greyblueState ?? null;
 let journalState = createExplorationJournalState();
 let disposed = false;
 let open = false;
+let omen = globalThis.__greyblueRegionalOmen ?? null;
 
 const panel = document.createElement('section');
 panel.id = 'greyblue-exploration-journal';
@@ -18,6 +19,7 @@ panel.innerHTML = `
   <div class="greyblue-journal-heading">Exploration journal</div>
   <div data-greyblue-journal-objective></div>
   <div data-greyblue-journal-context></div>
+  <div data-greyblue-journal-omen hidden></div>
   <ol data-greyblue-journal-discoveries></ol>
 `;
 
@@ -30,6 +32,7 @@ host.append(panel, announcement);
 
 const objectiveNode = panel.querySelector('[data-greyblue-journal-objective]');
 const contextNode = panel.querySelector('[data-greyblue-journal-context]');
+const omenNode = panel.querySelector('[data-greyblue-journal-omen]');
 const discoveriesNode = panel.querySelector('[data-greyblue-journal-discoveries]');
 
 function render(state) {
@@ -38,6 +41,9 @@ function render(state) {
   journalState = next.state;
   objectiveNode.textContent = next.view.objective;
   contextNode.textContent = next.view.context;
+  const activeOmen = omen?.active && omen.regionId && omen.regionId === state?.currentRegion?.id ? omen : null;
+  omenNode.hidden = !activeOmen;
+  omenNode.textContent = activeOmen?.tone?.text ?? '';
   discoveriesNode.replaceChildren(...next.view.discoveries.map((label) => {
     const item = document.createElement('li');
     item.textContent = label;
@@ -62,15 +68,19 @@ function onKeyDown(event) {
   if (event.code === 'Escape' && open) setOpen(false);
 }
 
+function onRegionalOmen(event) {
+  omen = event?.detail ?? null;
+  render(currentState);
+}
+
 globalThis.addEventListener?.('keydown', onKeyDown);
+globalThis.addEventListener?.('greyblue:regional-omen', onRegionalOmen);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
     configurable: true,
     enumerable: true,
-    get() {
-      return priorGet ? priorGet() : currentState;
-    },
+    get() { return priorGet ? priorGet() : currentState; },
     set(value) {
       if (priorSet) priorSet(value);
       currentState = priorGet ? priorGet() : value;
@@ -84,6 +94,7 @@ render(currentState);
 globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
   globalThis.removeEventListener?.('keydown', onKeyDown);
+  globalThis.removeEventListener?.('greyblue:regional-omen', onRegionalOmen);
   panel.remove();
   announcement.remove();
 }, { once: true });
