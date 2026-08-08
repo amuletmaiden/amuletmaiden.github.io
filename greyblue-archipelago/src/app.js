@@ -9,6 +9,7 @@ import { DragonRuntime } from "./dragon/runtime.js";
 import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
 import { selectRouteGuidance } from "./core/route-guidance.js";
 import { cycleRouteChoice } from "./core/route-choice.js";
+import { evaluateMysteryRouteUnlocks } from "./core/mystery-route-unlock.js";
 import { loadGame, saveGame, safeRespawn } from "./core/save.js";
 
 const ASSETS = Object.freeze({
@@ -53,6 +54,9 @@ const seed = Number.isInteger(save?.seed) ? save.seed : 1337;
 const world = buildArchipelago({ seed, count: 64, radius: 11000, minGap: 390 });
 const discovered = new Set(save?.discovered || []);
 const discoveredRoutes = new Set(save?.discoveredRoutes || []);
+const mysteryExploration = {
+  events: Array.isArray(save?.exploration?.events) ? [...save.exploration.events] : [],
+};
 const position = new THREE.Vector3(
   save?.position?.x ?? FALLBACK_SPAWN.x,
   save?.position?.y ?? FALLBACK_SPAWN.y,
@@ -83,6 +87,12 @@ let currentRouteGuidance = null;
 let preferredRouteId = save?.guidance?.activeRouteId || null;
 let activeCrossingRouteId = null;
 let routeChoiceTelemetry = Object.freeze({ available: false, reason: "not-at-departure", preferredRouteId });
+let mysteryRouteTelemetry = Object.freeze({
+  unlockedRouteIds: [],
+  regionProgress: [],
+  investigationCount: 0,
+  lastUnlockedRouteId: null,
+});
 const islandMeshes = new Map();
 const loader = new GLTFLoader();
 
@@ -306,6 +316,54 @@ function setRouteChoiceStatus(message) {
   if (routeChoiceStatus) routeChoiceStatus.textContent = String(message || "").slice(0, 180);
 }
 
+function applyMysteryRouteUnlock(liveInvestigation = null) {
+  if (liveInvestigation?.landmarkId && liveInvestigation?.regionId) {
+    const duplicate = mysteryExploration.events.some((event) =>
+      event?.kind === "landmark-investigated" && event.landmarkId === liveInvestigation.landmarkId);
+    if (!duplicate) {
+      mysteryExploration.events.push({
+        kind: "landmark-investigated",
+        landmarkId: liveInvestigation.landmarkId,
+        regionId: liveInvestigation.regionId,
+      });
+    }
+  }
+
+  const result = evaluateMysteryRouteUnlocks({
+    world,
+    exploration: mysteryExploration,
+    discoveredIslandIds: discovered,
+    discoveredRouteIds: discoveredRoutes,
+    liveInvestigation,
+  });
+  const unlockedRouteIds = [];
+  for (const unlock of result.unlocks) {
+    if (discoveredRoutes.has(unlock.routeId)) continue;
+    discoveredRoutes.add(unlock.routeId);
+    unlockedRouteIds.push(unlock.routeId);
+  }
+
+  mysteryRouteTelemetry = Object.freeze({
+    unlockedRouteIds: Object.freeze(unlockedRouteIds),
+    regionProgress: result.regionProgress,
+    investigationCount: result.investigationCount,
+    lastUnlockedRouteId: unlockedRouteIds.at(-1) ?? mysteryRouteTelemetry.lastUnlockedRouteId ?? null,
+  });
+
+  if (!unlockedRouteIds.length) return false;
+  const proximity = nearestIsland();
+  updateRouteGuidance(proximity);
+  persist();
+  const route = world.routes.find((candidate) => candidate.id === unlockedRouteIds[0]);
+  const destination = route
+    ? world.islands.find((island) => island.id === route.toIslandId || island.id === route.fromIslandId)
+    : null;
+  setRouteChoiceStatus(destination?.name
+    ? `A hidden crossing resonates into view near ${destination.name}.`
+    : "A hidden crossing resonates into view.");
+  return true;
+}
+
 function chooseNextRoute() {
   const proximity = nearestIsland();
   if (!proximity || proximity.distance > ROUTE_CHOICE_RADIUS) {
@@ -372,6 +430,7 @@ function publishPausedState() {
     routeGuidance: currentRouteGuidance,
     guidancePreference: preferredRouteId,
     routeChoice: routeChoiceTelemetry,
+    mysteryRoutes: mysteryRouteTelemetry,
     world: {
       ...(globalThis.__greyblueState?.world || {}),
       heroTerrain: heroTerrain?.telemetry || null,
@@ -392,6 +451,9 @@ addEventListener("keydown", (event) => {
 addEventListener("greyblue:route-completed", () => {
   activeCrossingRouteId = null;
   routeChoiceTelemetry = Object.freeze({ ...routeChoiceTelemetry, reason: "crossing-completed" });
+});
+addEventListener("greyblue:landmark-investigated", (event) => {
+  applyMysteryRouteUnlock(event?.detail ?? null);
 });
 addEventListener("keyup", (event) => flightInput.keyUp(event.code));
 addEventListener("blur", () => flightInput.clear());
@@ -435,6 +497,7 @@ async function boot() {
   dragonRuntime.bindClips(dragonGltf.animations);
   collisionResolver.reset(position);
   lastCollision = { ...collisionResolver.telemetry };
+  applyMysteryRouteUnlock();
 
   stateLine.textContent = "FLIGHT · Greyblue Archipelago";
   requestAnimationFrame(frame);
@@ -573,6 +636,7 @@ function frame(now) {
     routeGuidance: currentRouteGuidance,
     guidancePreference: preferredRouteId,
     routeChoice: routeChoiceTelemetry,
+    mysteryRoutes: mysteryRouteTelemetry,
     activeIslandCount: islandMeshes.size,
     activeIslandIds: active.map((island) => island.id),
     discoveredCount: discovered.size,
