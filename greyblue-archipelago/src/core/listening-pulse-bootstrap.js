@@ -1,4 +1,7 @@
 import { buildArchipelago } from '../world/archipelago.js';
+import { loadGame } from './save.js';
+import { collectInvestigatedLandmarkIds } from './landmark-manifestation.js';
+import { selectAwakenedLandmarkEcho, shouldPreferAwakenedEcho } from './landmark-listening-echo.js';
 import { selectListeningSignal } from './listening-pulse-model.js';
 
 const host = document.querySelector('#hud') ?? document.body;
@@ -12,6 +15,7 @@ let visibleUntil = 0;
 let cooldownUntil = 0;
 let clearTimer = 0;
 let disposed = false;
+const investigatedLandmarkIds = collectInvestigatedLandmarkIds(loadGame()?.exploration);
 
 const panel = document.createElement('section');
 panel.id = 'greyblue-listening-pulse';
@@ -52,22 +56,59 @@ function clearLater() {
   }, delay + 20);
 }
 
+function showAwakenedEcho(echo) {
+  panel.hidden = false;
+  panel.dataset.found = 'true';
+  panel.dataset.kind = 'awakened-landmark';
+  panel.dataset.turn = echo.turn;
+  titleNode.textContent = 'A remembered resonance answers.';
+  statusNode.textContent = `${echo.distanceBand} · ${echo.turn}`;
+  announcement.textContent = `${titleNode.textContent} ${echo.distanceBand}, ${echo.turn}.`;
+  globalThis.dispatchEvent?.(new CustomEvent('greyblue:listening-echo', {
+    detail: {
+      kind: 'awakened-landmark',
+      islandId: echo.islandId,
+      landmarkId: echo.landmarkId,
+      regionId: echo.regionId,
+      distanceBand: echo.distanceBand,
+      turn: echo.turn,
+      soundHook: echo.soundHook,
+    },
+  }));
+}
+
 function listen() {
   const now = performance.now();
   if (!currentState?.ready || currentState.paused || now < cooldownUntil) return;
   cooldownUntil = now + 3500;
   visibleUntil = now + 8500;
 
+  const currentWorld = getWorld(currentState);
   const result = selectListeningSignal({
-    world: getWorld(currentState),
+    world: currentWorld,
     position: currentState.position,
     yaw: currentState.flight?.yaw,
     discovered: currentState.discovered,
   });
+  const echo = selectAwakenedLandmarkEcho({
+    world: currentWorld,
+    position: currentState.position,
+    yaw: currentState.flight?.yaw,
+    discoveredIslandIds: currentState.discovered,
+    investigatedLandmarkIds,
+  });
+
+  if (shouldPreferAwakenedEcho(echo, result)) {
+    showAwakenedEcho(echo);
+    clearLater();
+    return;
+  }
 
   panel.hidden = false;
+  panel.dataset.kind = 'unknown-island';
   panel.dataset.found = String(result.found);
   if (!result.found) {
+    delete panel.dataset.turn;
     titleNode.textContent = 'Only open mist answers.';
     statusNode.textContent = `No unknown isle within ${Math.round(result.range)}.`;
     announcement.textContent = titleNode.textContent;
@@ -89,7 +130,15 @@ function onKeyDown(event) {
   if (event.code === 'KeyQ') listen();
 }
 
+function onLandmarkInvestigated(event) {
+  const landmarkId = typeof event?.detail?.landmarkId === 'string'
+    ? event.detail.landmarkId.trim().slice(0, 120)
+    : '';
+  if (landmarkId) investigatedLandmarkIds.add(landmarkId);
+}
+
 globalThis.addEventListener?.('keydown', onKeyDown);
+globalThis.addEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
@@ -109,6 +158,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
   if (clearTimer) clearTimeout(clearTimer);
   globalThis.removeEventListener?.('keydown', onKeyDown);
+  globalThis.removeEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
   if (!disposed) return;
   panel.remove();
   announcement.remove();
