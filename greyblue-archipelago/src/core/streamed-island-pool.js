@@ -23,6 +23,19 @@ function sanitizeIsland(island) {
   return Object.freeze({ id, x, z, scale, height, landmark: island?.landmark === true });
 }
 
+function transitionTelemetry(activeEntries) {
+  let transitioning = 0;
+  let maxOpacity = 0;
+  for (const entry of activeEntries) {
+    const transition = entry?.resource?.userData?.streamTransition;
+    if (!transition) continue;
+    if (transition.transitioning === true) transitioning += 1;
+    const opacity = Number(transition.opacity);
+    if (Number.isFinite(opacity)) maxOpacity = Math.max(maxOpacity, Math.min(1, Math.max(0, opacity)));
+  }
+  return Object.freeze({ transitioning, maxOpacity });
+}
+
 export function createStreamedIslandPool({ cap = DEFAULT_CAP, create, reset, dispose } = {}) {
   if (typeof create !== 'function' || typeof reset !== 'function' || typeof dispose !== 'function') {
     throw new TypeError('streamed island pool requires create/reset/dispose adapters');
@@ -116,10 +129,11 @@ export function createStreamedIslandPool({ cap = DEFAULT_CAP, create, reset, dis
       disposed: totals.disposed,
       rejected: totals.rejected,
       cap: limit,
+      transition: transitionTelemetry(active.values()),
     });
   }
 
   return Object.freeze({ acquire, release, sync, teardown, telemetry });
 }
 
-export const streamedIslandPresentationInternals = Object.freeze({ sanitizeIsland, islandClass, clampCap });
+export const streamedIslandPresentationInternals = Object.freeze({ sanitizeIsland, islandClass, clampCap, transitionTelemetry });
