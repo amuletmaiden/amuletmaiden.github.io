@@ -1,6 +1,8 @@
 import { createExplorationLifecycle } from './exploration-lifecycle.js';
 import { masteryFromChallengeEvent } from './approach-mastery.js';
 import { createLandingRecoveryAnchor } from './landing-recovery-anchor.js';
+import { stepEarnedRoost, planRoostRecovery } from './roost-lifecycle.js';
+import { buildArchipelago } from '../world/archipelago.js';
 import { loadGame, saveGame } from './save.js';
 
 const restored = loadGame();
@@ -15,6 +17,13 @@ let lastFlushAt = restored?.savedAt ?? null;
 let lastFlushReason = restored?.exploration?.events?.length ? 'restore' : null;
 let flushError = null;
 let disposed = false;
+let roostDwell = null;
+let lastRoostStepAt = performance.now();
+let roostRecovery = null;
+let worldSeed = null;
+let recoveryWorld = null;
+let roostAnnouncement = null;
+let announcementUntil = 0;
 
 function guidanceFrom(state, fallback) {
   const routeId = typeof state?.guidancePreference === 'string' && state.guidancePreference
@@ -55,6 +64,88 @@ function flush(reason) {
   }
 }
 
+function getRecoveryWorld(seed) {
+  const nextSeed = Number.isInteger(seed) ? seed : 1337;
+  if (!recoveryWorld || worldSeed !== nextSeed) {
+    worldSeed = nextSeed;
+    recoveryWorld = buildArchipelago({ seed: nextSeed, count: 64, radius: 11000, minGap: 390 });
+  }
+  return recoveryWorld;
+}
+
+function publishRecoveryPlan(state) {
+  const plan = planRoostRecovery({
+    world: getRecoveryWorld(state?.seed),
+    exploration: lifecycle.snapshot(),
+    discoveredIslandIds: state?.discovered,
+    fallback: { x: 0, y: 160, z: 0 },
+  });
+  roostRecovery = plan?.source === 'earned-roost' ? plan : null;
+  globalThis.__greyblueRoostRecovery = roostRecovery;
+}
+
+function ensureRoostAnnouncement() {
+  if (roostAnnouncement?.isConnected) return roostAnnouncement;
+  const hud = document.querySelector('#hud');
+  if (!hud) return null;
+  roostAnnouncement = document.createElement('div');
+  roostAnnouncement.id = 'greyblue-roost-status';
+  roostAnnouncement.setAttribute('role', 'status');
+  roostAnnouncement.setAttribute('aria-live', 'polite');
+  roostAnnouncement.setAttribute('aria-atomic', 'true');
+  roostAnnouncement.hidden = true;
+  roostAnnouncement.style.marginTop = '7px';
+  roostAnnouncement.style.fontSize = '12px';
+  roostAnnouncement.style.color = '#d9e4e6';
+  hud.append(roostAnnouncement);
+  return roostAnnouncement;
+}
+
+function announceRoost(state, event) {
+  const node = ensureRoostAnnouncement();
+  if (!node) return;
+  const name = state?.nearestIsland?.id === event.islandId
+    ? state.nearestIsland?.name
+    : null;
+  node.textContent = name ? `Roost established at ${name}.` : 'Roost established.';
+  node.hidden = false;
+  announcementUntil = performance.now() + 4500;
+  globalThis.dispatchEvent?.(new CustomEvent('greyblue:roost-established', {
+    detail: Object.freeze({
+      islandId: event.islandId,
+      landingZoneId: event.landingZoneId,
+      islandName: name ?? null,
+      occurredAt: event.occurredAt,
+    }),
+  }));
+}
+
+function stepRoost(state) {
+  const now = performance.now();
+  const dt = Math.min(0.1, Math.max(0, (now - lastRoostStepAt) / 1000));
+  lastRoostStepAt = now;
+  const nearest = state?.nearestIsland;
+  const result = stepEarnedRoost({
+    dwell: roostDwell,
+    occurredAt: Date.now(),
+    frame: {
+      dt,
+      grounded: state?.paused !== true && state?.collision?.grounded === true && state?.flight?.airborne !== true,
+      island: nearest ? { id: nearest.id } : null,
+      landingZone: nearest?.landingZone ?? null,
+      discoveredIslandIds: state?.discovered,
+      position: state?.position,
+    },
+  });
+  roostDwell = result.dwell;
+  if (!result.event) return false;
+  if (!lifecycle.recordRoost(result.event.islandId, result.event.landingZoneId, result.event.occurredAt)) return false;
+  flush('roost-established');
+  publishRecoveryPlan(state);
+  announceRoost(state, result.event);
+  return true;
+}
+
 function consume(state) {
   if (!state || typeof state !== 'object') return;
   let changed = false;
@@ -71,6 +162,12 @@ function consume(state) {
   }
   if (changed) flush('discovery');
   landingRecoveryAnchor.consume(state);
+  stepRoost(state);
+  publishRecoveryPlan(state);
+  if (roostAnnouncement && !roostAnnouncement.hidden && performance.now() >= announcementUntil) {
+    roostAnnouncement.hidden = true;
+    roostAnnouncement.textContent = '';
+  }
 }
 
 function onRouteCompleted(event) {
@@ -132,6 +229,12 @@ function decorate(state) {
       error: flushError,
     },
     landingRecovery: landingRecoveryAnchor.telemetry(),
+    earnedRoost: {
+      dwell: roostDwell,
+      recoverySource: roostRecovery ? 'earned-roost' : 'fallback',
+      islandId: roostRecovery?.islandId ?? null,
+      landingZoneId: roostRecovery?.zoneId ?? null,
+    },
   };
 }
 
@@ -155,6 +258,7 @@ globalThis.addEventListener?.('greyblue:route-completed', onRouteCompleted);
 globalThis.addEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
 globalThis.addEventListener?.('greyblue:approach-challenge', onApproachChallenge);
 consume(currentState);
+publishRecoveryPlan(currentState ?? restored);
 
 function flushIfDirty(reason) {
   if (!disposed && lifecycle.dirty) flush(reason);
@@ -167,6 +271,8 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('greyblue:route-completed', onRouteCompleted);
   globalThis.removeEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
   globalThis.removeEventListener?.('greyblue:approach-challenge', onApproachChallenge);
+  roostAnnouncement?.remove();
+  delete globalThis.__greyblueRoostRecovery;
 }, { once: true });
 document.addEventListener?.('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushIfDirty('hidden');
