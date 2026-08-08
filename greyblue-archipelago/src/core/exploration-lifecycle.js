@@ -1,5 +1,5 @@
 const EXPLORATION_VERSION = 1;
-const VALID_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "route-completed", "approach-mastered"]);
+const VALID_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "route-completed", "approach-mastered", "roost-established"]);
 
 function cleanId(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -19,7 +19,7 @@ function normalizeEvent(candidate) {
     id,
     occurredAt: cleanTime(candidate.occurredAt),
   };
-  for (const field of ["regionId", "routeId", "landmarkId", "islandId", "corridorId"]) {
+  for (const field of ["regionId", "routeId", "landmarkId", "islandId", "corridorId", "landingZoneId"]) {
     const value = cleanId(candidate[field]);
     if (value) event[field] = value;
   }
@@ -65,6 +65,21 @@ export function createExplorationLifecycle(initialExploration = null) {
   function record(event) {
     const normalized = normalizeEvent(event);
     if (!normalized || events.has(normalized.key)) return false;
+    events.set(normalized.key, normalized);
+    dirty = true;
+    return true;
+  }
+
+  function replaceRoost(event) {
+    const normalized = normalizeEvent(event);
+    if (!normalized || normalized.kind !== "roost-established") return false;
+    const current = [...events.values()]
+      .filter((candidate) => candidate.kind === "roost-established")
+      .sort((left, right) => right.occurredAt - left.occurredAt || right.key.localeCompare(left.key))[0] ?? null;
+    if (current && current.islandId === normalized.islandId && current.landingZoneId === normalized.landingZoneId) return false;
+    for (const [key, candidate] of events) {
+      if (candidate.kind === "roost-established") events.delete(key);
+    }
     events.set(normalized.key, normalized);
     dirty = true;
     return true;
@@ -120,6 +135,19 @@ export function createExplorationLifecycle(initialExploration = null) {
       });
     },
 
+    recordRoost(islandId, landingZoneId, occurredAt = Date.now()) {
+      const island = cleanId(islandId);
+      const zone = cleanId(landingZoneId);
+      if (!island || !zone) return false;
+      return replaceRoost({
+        kind: "roost-established",
+        id: zone,
+        islandId: island,
+        landingZoneId: zone,
+        occurredAt,
+      });
+    },
+
     markFlushed() {
       dirty = false;
     },
@@ -145,6 +173,7 @@ export function createExplorationLifecycle(initialExploration = null) {
         landmarkInvestigationCount: values.filter((event) => event.kind === "landmark-investigated").length,
         routeCompletionCount: values.filter((event) => event.kind === "route-completed").length,
         approachMasteryCount: values.filter((event) => event.kind === "approach-mastered").length,
+        roostCount: values.filter((event) => event.kind === "roost-established").length,
         dirty,
       };
     },
