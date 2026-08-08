@@ -1,5 +1,5 @@
 const EXPLORATION_VERSION = 1;
-const VALID_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "route-completed"]);
+const VALID_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "route-completed", "approach-mastered"]);
 
 function cleanId(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -19,7 +19,7 @@ function normalizeEvent(candidate) {
     id,
     occurredAt: cleanTime(candidate.occurredAt),
   };
-  for (const field of ["regionId", "routeId", "landmarkId"]) {
+  for (const field of ["regionId", "routeId", "landmarkId", "islandId", "corridorId"]) {
     const value = cleanId(candidate[field]);
     if (value) event[field] = value;
   }
@@ -34,6 +34,18 @@ export function investigatedLandmarkIdsFromExploration(exploration = null) {
     if (event?.kind !== "landmark-investigated") continue;
     const landmarkId = cleanId(event.landmarkId || event.id);
     if (landmarkId) ids.push(landmarkId);
+  }
+  return [...new Set(ids)].slice(0, 256);
+}
+
+export function masteredApproachIdsFromExploration(exploration = null) {
+  const source = Array.isArray(exploration?.events) ? exploration.events : [];
+  const ids = [];
+  for (const candidate of source) {
+    const event = normalizeEvent(candidate);
+    if (event?.kind !== "approach-mastered") continue;
+    const corridorId = cleanId(event.corridorId || event.id);
+    if (corridorId) ids.push(corridorId);
   }
   return [...new Set(ids)].slice(0, 256);
 }
@@ -95,6 +107,19 @@ export function createExplorationLifecycle(initialExploration = null) {
       return record({ kind: "route-completed", id, routeId: id, occurredAt });
     },
 
+    recordApproachMastery(islandId, corridorId, occurredAt = Date.now()) {
+      const island = cleanId(islandId);
+      const corridor = cleanId(corridorId);
+      if (!island || !corridor) return false;
+      return record({
+        kind: "approach-mastered",
+        id: corridor,
+        islandId: island,
+        corridorId: corridor,
+        occurredAt,
+      });
+    },
+
     markFlushed() {
       dirty = false;
     },
@@ -119,6 +144,7 @@ export function createExplorationLifecycle(initialExploration = null) {
         landmarkCount: values.filter((event) => event.kind === "landmark-reached").length,
         landmarkInvestigationCount: values.filter((event) => event.kind === "landmark-investigated").length,
         routeCompletionCount: values.filter((event) => event.kind === "route-completed").length,
+        approachMasteryCount: values.filter((event) => event.kind === "approach-mastered").length,
         dirty,
       };
     },
