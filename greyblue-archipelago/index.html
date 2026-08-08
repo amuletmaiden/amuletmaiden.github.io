@@ -11,6 +11,7 @@
     #hud{position:fixed;z-index:2;left:14px;top:14px;max-width:460px;padding:10px 12px;background:#0b1118d9;border:1px solid #a7c0c866;border-radius:8px;line-height:1.45;pointer-events:none;backdrop-filter:blur(5px)}
     #state{font-weight:700;letter-spacing:.04em}
     #error{color:#ffd7d7;white-space:pre-wrap}
+    #greyblue-optional-status{margin-top:7px;font-size:11px;color:#d9e4e6}
     #greyblue-flight-instruments{display:grid;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid #a7c0c84d}
     #greyblue-flight-instruments>[data-greyblue-instrument-mode]{font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:#c3d5d9}
     .greyblue-instrument-grid{display:grid;grid-template-columns:repeat(3,minmax(72px,1fr));gap:7px}
@@ -80,16 +81,6 @@
     <div id="route-choice-status" data-visually-hidden role="status" aria-live="polite" aria-atomic="true"></div>
     <div id="error"></div>
   </div>
-  <script type="module" src="./src/interface/live-guidance-bootstrap.js"></script>
-  <script type="module" src="./src/core/exploration-journal-bootstrap.js"></script>
-  <script type="module" src="./src/interface/live-flight-instruments-bootstrap.js"></script>
-  <script type="module" src="./src/interface/live-landing-approach-bootstrap.js"></script>
-  <script type="module" src="./src/core/landmark-encounter-bootstrap.js"></script>
-  <script type="module" src="./src/core/crossing-objective-bootstrap.js"></script>
-  <script type="module" src="./src/core/listening-pulse-bootstrap.js"></script>
-  <script type="module" src="./src/core/exploration-persistence-bootstrap.js"></script>
-  <script type="module" src="./src/core/approach-challenge-bootstrap.js"></script>
-  <script type="module" src="./src/core/soundscape-bootstrap.js"></script>
-  <script type="module" src="./src/app.js"></script>
+  <script type="module" src="./src/core/optional-surfaces-bootstrap.js"></script>
 </body>
 </html>
