@@ -71,6 +71,21 @@ function apply(view = deriveSoundscape(currentState)) {
   setParam(audio.lfoDepth.gain, audible && view.crossing ? Math.min(0.018, view.crossingGain * 0.36) : 0, now, 0.2);
 }
 
+function oneShot(frequency, peak = 0.026, duration = 1.5) {
+  if (!enabled || !audio || audio.context.state !== 'running' || !Number.isFinite(frequency)) return;
+  const oscillator = audio.context.createOscillator();
+  const gain = audio.context.createGain();
+  oscillator.type = 'sine';
+  oscillator.frequency.value = frequency;
+  const now = audio.context.currentTime;
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(peak, now + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration - 0.05);
+  oscillator.connect(gain).connect(audio.master);
+  oscillator.start(now);
+  oscillator.stop(now + duration);
+}
+
 function omenFrequency(soundHook) {
   const table = Object.freeze({
     'omen-answering-air': 233,
@@ -82,21 +97,19 @@ function omenFrequency(soundHook) {
   return table[soundHook] ?? null;
 }
 
+function encounterFrequency(encounterClass) {
+  const table = Object.freeze({ resonance: 220, instrument: 277, relic: 165, threshold: 196 });
+  return table[encounterClass] ?? null;
+}
+
 function onOmenListened(event) {
-  if (!enabled || !audio || audio.context.state !== 'running') return;
   const frequency = omenFrequency(event?.detail?.soundHook);
-  if (!frequency) return;
-  const oscillator = audio.context.createOscillator();
-  const gain = audio.context.createGain();
-  oscillator.type = 'sine';
-  oscillator.frequency.value = frequency;
-  const now = audio.context.currentTime;
-  gain.gain.setValueAtTime(0, now);
-  gain.gain.linearRampToValueAtTime(0.026, now + 0.05);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.45);
-  oscillator.connect(gain).connect(audio.master);
-  oscillator.start(now);
-  oscillator.stop(now + 1.5);
+  if (frequency) oneShot(frequency);
+}
+
+function onLandmarkFlightEncounter(event) {
+  const frequency = encounterFrequency(event?.detail?.encounterClass);
+  if (frequency) oneShot(frequency, 0.022, 1.2);
 }
 
 async function toggleSound() {
@@ -112,6 +125,7 @@ async function toggleSound() {
 function onKeyDown(event) { if (!event.defaultPrevented && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && event.code === 'KeyM') void toggleSound(); }
 globalThis.addEventListener?.('keydown', onKeyDown);
 globalThis.addEventListener?.('greyblue:omen-listened', onOmenListened);
+globalThis.addEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
@@ -126,6 +140,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
   globalThis.removeEventListener?.('keydown', onKeyDown);
   globalThis.removeEventListener?.('greyblue:omen-listened', onOmenListened);
+  globalThis.removeEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
   status.remove();
   if (audio) { try { audio.wind.stop(); audio.tone.stop(); audio.crossing.stop(); audio.lfo.stop(); void audio.context.close(); } catch {} }
 }, { once: true });
