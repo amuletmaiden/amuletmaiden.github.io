@@ -10,6 +10,8 @@ import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
 import { selectRouteGuidance } from "./core/route-guidance.js";
 import { cycleRouteChoice } from "./core/route-choice.js";
 import { evaluateMysteryRouteUnlocks } from "./core/mystery-route-unlock.js";
+import { createStreamedIslandPool } from "./core/streamed-island-pool.js";
+import { createStreamedIslandThreeAdapter } from "./core/streamed-island-three-adapter.js";
 import { loadGame, saveGame, safeRespawn } from "./core/save.js";
 
 const ASSETS = Object.freeze({
@@ -94,47 +96,23 @@ let mysteryRouteTelemetry = Object.freeze({
   lastUnlockedRouteId: null,
 });
 const islandMeshes = new Map();
+const streamedIslandThreeAdapter = createStreamedIslandThreeAdapter({ THREE, scene, islandMeshes });
+const streamedIslandPresentation = createStreamedIslandPool({
+  cap: 12,
+  create: streamedIslandThreeAdapter.create,
+  reset: streamedIslandThreeAdapter.reset,
+  dispose: streamedIslandThreeAdapter.dispose,
+});
 const loader = new GLTFLoader();
 
 function loadGltf(url) {
   return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
 }
 
-function makeIslandMesh(island) {
-  const geometry = new THREE.ConeGeometry(110 * island.scale, island.height, 9, 3);
-  geometry.translate(0, -island.height * 0.42, 0);
-  const material = new THREE.MeshStandardMaterial({
-    color: island.landmark ? 0x607f74 : 0x536e64,
-    roughness: 0.96,
-    metalness: 0,
-  });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.set(island.x, 0, island.z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  mesh.userData.island = island;
-  return mesh;
-}
-
 function updateStreaming() {
   const activeIds = new Set(islandMeshes.keys());
   const active = updateActiveIslands(world, position, activeIds, STREAMING_RANGES);
-  const wanted = new Set(active.map((island) => island.id));
-  for (const island of active) {
-    if (!islandMeshes.has(island.id)) {
-      const mesh = makeIslandMesh(island);
-      islandMeshes.set(island.id, mesh);
-      scene.add(mesh);
-    }
-  }
-  for (const [id, mesh] of islandMeshes) {
-    if (!wanted.has(id)) {
-      scene.remove(mesh);
-      mesh.geometry.dispose();
-      mesh.material.dispose();
-      islandMeshes.delete(id);
-    }
-  }
+  streamedIslandPresentation.sync(active);
   return active;
 }
 
@@ -433,6 +411,7 @@ function publishPausedState() {
     mysteryRoutes: mysteryRouteTelemetry,
     world: {
       ...(globalThis.__greyblueState?.world || {}),
+      streamingPresentation: streamedIslandPresentation.telemetry(),
       heroTerrain: heroTerrain?.telemetry || null,
     },
   };
@@ -457,7 +436,10 @@ addEventListener("greyblue:landmark-investigated", (event) => {
 });
 addEventListener("keyup", (event) => flightInput.keyUp(event.code));
 addEventListener("blur", () => flightInput.clear());
-addEventListener("beforeunload", persist);
+addEventListener("beforeunload", () => {
+  streamedIslandPresentation.teardown();
+  persist();
+});
 addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
@@ -660,6 +642,7 @@ function frame(now) {
       routeCount: world.routes.length,
       islandCount: world.islands.length,
       streaming: STREAMING_RANGES,
+      streamingPresentation: streamedIslandPresentation.telemetry(),
       heroTerrain: heroTerrain?.telemetry || null,
     },
     clip,
