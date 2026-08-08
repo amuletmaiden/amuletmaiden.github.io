@@ -39,7 +39,7 @@ export function createStreamedIslandPool({ cap = DEFAULT_CAP, create, reset, dis
       totals.rejected += 1;
       return null;
     }
-    if (active.has(island.id)) return active.get(island.id);
+    if (active.has(island.id)) return active.get(island.id).resource;
 
     const kind = islandClass(island);
     let resource = idle[kind].pop() ?? null;
@@ -54,23 +54,22 @@ export function createStreamedIslandPool({ cap = DEFAULT_CAP, create, reset, dis
     }
 
     reset(resource, island, kind);
-    active.set(island.id, resource);
+    active.set(island.id, { resource, kind });
     return resource;
   }
 
   function release(id) {
     const key = cleanId(id);
-    const resource = active.get(key);
-    if (!resource) return false;
+    const entry = active.get(key);
+    if (!entry) return false;
     active.delete(key);
-    const kind = resource.__greybluePoolKind === 'landmark' ? 'landmark' : 'ordinary';
     const pooledCount = idle.ordinary.length + idle.landmark.length;
     if (pooledCount < limit) {
-      reset(resource, null, kind);
-      idle[kind].push(resource);
+      reset(entry.resource, null, entry.kind);
+      idle[entry.kind].push(entry.resource);
       totals.pooled += 1;
     } else {
-      dispose(resource);
+      dispose(entry.resource);
       totals.disposed += 1;
     }
     return true;
@@ -91,12 +90,12 @@ export function createStreamedIslandPool({ cap = DEFAULT_CAP, create, reset, dis
       if (!wanted.has(id)) release(id);
     }
     for (const island of ordered) acquire(island);
-    return ordered.map((island) => active.get(island.id)).filter(Boolean);
+    return ordered.map((island) => active.get(island.id)?.resource).filter(Boolean);
   }
 
   function teardown() {
-    for (const resource of active.values()) {
-      dispose(resource);
+    for (const entry of active.values()) {
+      dispose(entry.resource);
       totals.disposed += 1;
     }
     active.clear();
