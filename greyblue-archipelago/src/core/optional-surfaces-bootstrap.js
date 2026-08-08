@@ -11,6 +11,7 @@ const OPTIONAL_SURFACES = [
   ["approach-challenge", () => import("./approach-challenge-bootstrap.js")],
   ["soundscape", () => import("./soundscape-bootstrap.js")],
   ["familiar-mist", () => import("./familiar-mist-bootstrap.js")],
+  ["regional-omens", () => import("./regional-omen-bootstrap.js")],
 ].map(([id, load]) => ({ id, load }));
 
 const readiness = createOptionalSurfaceReadiness(OPTIONAL_SURFACES);
@@ -48,7 +49,5 @@ function publish(snapshot) {
 publish(readiness.snapshot());
 await readiness.loadAll(publish);
 
-// Persistence and the app runtime are required surfaces. Failures here remain loud:
-// they are deliberately not folded into degraded optional readiness.
 await import("./exploration-persistence-bootstrap.js");
 await import("../app.js");
