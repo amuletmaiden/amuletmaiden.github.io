@@ -112,6 +112,21 @@ export function deriveKnownLandmarkMistCues({
   return Object.freeze({ active: cues.length > 0, cueClass, cues: Object.freeze(cues) });
 }
 
+export function knownLandmarkMistCuePresentationPolicy(cueClass, { highContrast = false } = {}) {
+  const normalized = CUE_CLASSES.includes(cueClass) ? cueClass : 'distant';
+  const baseOpacity = normalized === 'near' ? 0.48 : normalized === 'emerging' ? 0.34 : 0.2;
+  const scale = normalized === 'near' ? 1.15 : normalized === 'emerging' ? 1 : 0.82;
+  return Object.freeze({
+    cueClass: normalized,
+    opacity: Math.min(0.62, baseOpacity * (highContrast === true ? 1.25 : 1)),
+    scale,
+    depthTest: true,
+    depthWrite: false,
+    fog: true,
+    xray: false,
+  });
+}
+
 export function knownLandmarkMistCuePublicState(result) {
   const cueClass = CUE_CLASSES.includes(result?.cueClass) ? result.cueClass : null;
   return Object.freeze({
