@@ -102,7 +102,7 @@ const journeyBase = {
   assert.equal(context.routeId, 'ab');
   assert.equal(context.destinationIslandId, 'b');
   assert.equal(context.purpose, 'landmark');
-  assert.equal(expeditionJournalLine(context), 'Several remembered ways seem to converge on something unfinished.');
+  assert.equal(expeditionJournalLine(context), 'A remembered way seems to lead toward something unfinished.');
   assert.equal(JSON.stringify(context).includes('hidden'), false);
 }
 
