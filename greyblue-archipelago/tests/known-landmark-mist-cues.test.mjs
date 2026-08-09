@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   deriveKnownLandmarkMistCues,
+  knownLandmarkMistCuePresentationPolicy,
   knownLandmarkMistCuePublicState,
 } from '../src/core/known-landmark-mist-cues.js';
 
@@ -52,6 +53,11 @@ function derive(overrides = {}) {
 }
 
 {
+  const result = derive({ position: { x: -6000, y: 190, z: 0 } });
+  assert.deepEqual(result, { active: false, cueClass: null, cues: [] });
+}
+
+{
   const clearAir = derive({ fogDensity: 0.00004 });
   const heavyFog = derive({ fogDensity: 0.001 });
   assert.ok(clearAir.cues.length >= heavyFog.cues.length);
@@ -84,6 +90,19 @@ for (const flag of ['recoveryActive', 'crossingActive', 'restorePublishing', 'lo
 {
   const malformed = deriveKnownLandmarkMistCues({ world: { islands: [{ id: 'x', regionId: 'r1', x: NaN }] } });
   assert.deepEqual(malformed, { active: false, cueClass: null, cues: [] });
+}
+
+{
+  for (const cueClass of ['distant', 'emerging', 'near']) {
+    const normal = knownLandmarkMistCuePresentationPolicy(cueClass);
+    const contrast = knownLandmarkMistCuePresentationPolicy(cueClass, { highContrast: true });
+    assert.equal(normal.depthTest, true);
+    assert.equal(normal.depthWrite, false);
+    assert.equal(normal.fog, true);
+    assert.equal(normal.xray, false);
+    assert.ok(normal.opacity > 0 && normal.opacity <= 0.62);
+    assert.ok(contrast.opacity >= normal.opacity && contrast.opacity <= 0.62);
+  }
 }
 
 {
