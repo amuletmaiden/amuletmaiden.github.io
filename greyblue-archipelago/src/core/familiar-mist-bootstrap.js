@@ -22,6 +22,9 @@ let latestFamiliarity = Object.freeze({
   radius: 1800,
 });
 let currentState = null;
+let arrivalMistMultiplier = 1;
+let arrivalMistClass = null;
+let arrivalMistTimer = 0;
 
 function addExplorationEvent(event) {
   if (!event || typeof event !== "object") return false;
@@ -71,6 +74,7 @@ function decorate(state) {
   if (!state || typeof state !== "object") return state;
   const fog = state.fog && typeof state.fog === "object" ? state.fog : {};
   const effectiveDensity = Number.isFinite(fog.effectiveDensity) ? fog.effectiveDensity : null;
+  const renderedMultiplier = latestFamiliarity.densityMultiplier * arrivalMistMultiplier;
   return {
     ...state,
     fog: {
@@ -81,7 +85,9 @@ function decorate(state) {
       familiaritySourceCount: latestFamiliarity.sourceCount,
       familiarityStrongestSource: latestFamiliarity.strongestSource,
       familiarityRadius: latestFamiliarity.radius,
-      renderedDensity: effectiveDensity === null ? null : effectiveDensity * latestFamiliarity.densityMultiplier,
+      expeditionArrivalClass: arrivalMistClass,
+      expeditionArrivalDensityMultiplier: arrivalMistMultiplier,
+      renderedDensity: effectiveDensity === null ? null : effectiveDensity * renderedMultiplier,
     },
   };
 }
@@ -119,12 +125,33 @@ function consumeEvent(kind, detail = {}) {
   if (currentState) consumeState(currentState);
 }
 
+function arrivalMistProfile(consequenceClass) {
+  const table = Object.freeze({ resonance: 0.92, clearing: 0.88, warmth: 0.94, hush: 0.97 });
+  return table[consequenceClass] ?? null;
+}
+
+function onExpeditionArrival(event) {
+  const consequenceClass = typeof event?.detail?.consequenceClass === "string" ? event.detail.consequenceClass : "";
+  const multiplier = arrivalMistProfile(consequenceClass);
+  if (!multiplier) return;
+  if (arrivalMistTimer) clearTimeout(arrivalMistTimer);
+  arrivalMistClass = consequenceClass;
+  arrivalMistMultiplier = multiplier;
+  const reducedMotion = (() => { try { return Boolean(globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches); } catch { return false; } })();
+  arrivalMistTimer = setTimeout(() => {
+    arrivalMistTimer = 0;
+    arrivalMistClass = null;
+    arrivalMistMultiplier = 1;
+  }, reducedMotion ? 1800 : 3200);
+}
+
 const onLandmarkInvestigated = (event) => consumeEvent("landmark-investigated", event?.detail);
 const onRouteCompleted = (event) => consumeEvent("route-completed", event?.detail);
 const onApproachMastered = (event) => consumeEvent("approach-mastered", event?.detail);
 globalThis.addEventListener?.("greyblue:landmark-investigated", onLandmarkInvestigated);
 globalThis.addEventListener?.("greyblue:route-completed", onRouteCompleted);
 globalThis.addEventListener?.("greyblue:approach-mastered", onApproachMastered);
+globalThis.addEventListener?.("greyblue:expedition-arrival", onExpeditionArrival);
 
 const originalRender = THREE.WebGLRenderer.prototype.render;
 THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, camera) {
@@ -133,7 +160,7 @@ THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, ca
     return originalRender.call(this, scene, camera);
   }
   const authoredDensity = fog.density;
-  fog.density = authoredDensity * latestFamiliarity.densityMultiplier;
+  fog.density = authoredDensity * latestFamiliarity.densityMultiplier * arrivalMistMultiplier;
   try {
     return originalRender.call(this, scene, camera);
   } finally {
@@ -142,10 +169,12 @@ THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, ca
 };
 
 globalThis.addEventListener?.("beforeunload", () => {
+  if (arrivalMistTimer) clearTimeout(arrivalMistTimer);
   if (THREE.WebGLRenderer.prototype.render !== originalRender) {
     THREE.WebGLRenderer.prototype.render = originalRender;
   }
   globalThis.removeEventListener?.("greyblue:landmark-investigated", onLandmarkInvestigated);
   globalThis.removeEventListener?.("greyblue:route-completed", onRouteCompleted);
   globalThis.removeEventListener?.("greyblue:approach-mastered", onApproachMastered);
+  globalThis.removeEventListener?.("greyblue:expedition-arrival", onExpeditionArrival);
 }, { once: true });
