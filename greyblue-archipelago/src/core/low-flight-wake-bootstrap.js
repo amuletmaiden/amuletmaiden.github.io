@@ -7,10 +7,7 @@ import {
 } from './low-flight-wake.js';
 
 const MAX_SAMPLES = 10;
-const WAKE_COLOR = Object.freeze({
-  water: 0xbfdde3,
-  mist: 0xd7e1df,
-});
+const WAKE_COLOR = Object.freeze({ water: 0xbfdde3, mist: 0xd7e1df });
 
 let wakeState = createLowFlightWakeState();
 let wakeScene = null;
@@ -30,17 +27,6 @@ function highContrast() {
   try { return Boolean(globalThis.matchMedia?.('(prefers-contrast: more)')?.matches); } catch { return false; }
 }
 
-function crossingActive(state) {
-  if (globalThis.__greyblueFamiliarCrossing?.active === true || state?.familiarCrossing?.active === true) return true;
-  if (state?.expedition?.phase === 'crossing' || state?.routeChoice?.reason === 'active-crossing') return true;
-  const progress = Number(state?.routeGuidance?.progress);
-  return Number.isFinite(progress) && progress > 0 && progress < 1;
-}
-
-function restorePublishing(state) {
-  return Boolean(state?.restorePublishing || state?.explorationRestorePublishing);
-}
-
 function buildFrame(state) {
   const surface = state?.surface;
   return {
@@ -48,7 +34,7 @@ function buildFrame(state) {
     paused: state?.paused === true,
     grounded: state?.collision?.grounded === true || state?.flight?.airborne === false,
     recoveryActive: state?.collision?.requiresRecovery === true,
-    restorePublishing: restorePublishing(state) || crossingActive(state),
+    restorePublishing: Boolean(state?.restorePublishing || state?.explorationRestorePublishing),
     position: state?.position,
     speed: state?.flight?.speed,
     surfaceHeight: surface?.height,
@@ -109,8 +95,7 @@ function present(scene) {
     reducedMotion: reducedMotion(),
   });
 
-  const publicState = lowFlightWakePublicState(wakeState);
-  globalThis.__greyblueLowFlightWake = publicState;
+  globalThis.__greyblueLowFlightWake = lowFlightWakePublicState(wakeState);
   const policy = lowFlightWakePresentation(wakeState, { highContrast: highContrast() });
   if (!policy.active || !ensurePool(scene)) {
     hideUnused();
@@ -123,14 +108,15 @@ function present(scene) {
     const sample = samples[index];
     const mesh = wakeMeshes[index];
     if (!mesh) break;
-    const age = newestIndex ? index / newestIndex : 1;
+    const recency = newestIndex ? index / newestIndex : 1;
     const strength = Math.max(0.2, Math.min(1, Number(sample.strength) || 0));
-    const scale = (sample.wakeClass === 'water' ? 11 : 8) * (0.72 + age * 0.5) * (0.82 + strength * 0.22);
+    const scale = (sample.wakeClass === 'water' ? 11 : 8) * (0.72 + recency * 0.5) * (0.82 + strength * 0.22);
+    const verticalOffset = sample.wakeClass === 'water' ? 0.7 : 3.5;
     mesh.visible = true;
-    mesh.position.set(sample.x, sample.y - Math.min(4, Number(sample.clearance) || 0), sample.z);
+    mesh.position.set(sample.x, sample.surfaceHeight + verticalOffset, sample.z);
     mesh.scale.set(scale * 1.45, scale, scale);
     mesh.material.color.setHex(WAKE_COLOR[sample.wakeClass] ?? WAKE_COLOR.mist);
-    mesh.material.opacity = policy.opacity * (0.28 + age * 0.72) * strength;
+    mesh.material.opacity = policy.opacity * (0.28 + recency * 0.72) * strength;
     mesh.material.depthTest = policy.depthTest;
     mesh.material.depthWrite = policy.depthWrite;
     mesh.material.fog = policy.fog;
