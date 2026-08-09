@@ -21,6 +21,12 @@ function recognizedRegionSet(exploration) {
   return recognized;
 }
 
+function sourceClass(value) {
+  if (value === 'resonance') return 'chorus';
+  if (value === 'instrument' || value === 'relic' || value === 'threshold') return value;
+  return 'threshold';
+}
+
 function threadClassFor(regionId, classes) {
   const sorted = [...classes].sort();
   let hash = 2166136261;
@@ -61,8 +67,7 @@ export function deriveRegionalMysteryThread({
     const landmarkId = cleanId(island?.landmarkRecord?.id);
     if (!islandId || !landmarkId || islandRegionId !== regionId) continue;
     if (!discovered.has(islandId) || !investigated.has(landmarkId)) continue;
-    const encounterClass = cleanId(island?.landmarkRecord?.encounter?.class);
-    classes.push(THREAD_CLASSES.includes(encounterClass) ? encounterClass : 'threshold');
+    classes.push(sourceClass(cleanId(island?.landmarkRecord?.encounter?.class)));
   }
 
   if (classes.length < 2) return inactive(recognized);
