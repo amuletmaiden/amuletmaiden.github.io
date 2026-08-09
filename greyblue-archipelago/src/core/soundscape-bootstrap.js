@@ -133,6 +133,11 @@ function onExpeditionCulmination(event) {
   if (frequency) oneShot(frequency, 0.014, 1.6);
 }
 
+function onRoostRest(event) {
+  if (!event?.detail?.beganRest || event?.detail?.atmosphere !== 'warmth') return;
+  oneShot(174, 0.012, 1.8);
+}
+
 async function toggleSound() {
   if (disposed) return;
   if (!audio) { try { audio = createAudioGraph(); } catch { audio = null; } }
@@ -149,6 +154,7 @@ globalThis.addEventListener?.('greyblue:omen-listened', onOmenListened);
 globalThis.addEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
 globalThis.addEventListener?.('greyblue:expedition-arrival', onExpeditionArrival);
 globalThis.addEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
+globalThis.addEventListener?.('greyblue:roost-rest', onRoostRest);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
@@ -166,6 +172,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
   globalThis.removeEventListener?.('greyblue:expedition-arrival', onExpeditionArrival);
   globalThis.removeEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
+  globalThis.removeEventListener?.('greyblue:roost-rest', onRoostRest);
   status.remove();
   if (audio) { try { audio.wind.stop(); audio.tone.stop(); audio.crossing.stop(); audio.lfo.stop(); void audio.context.close(); } catch {} }
 }, { once: true });
