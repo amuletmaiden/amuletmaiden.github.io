@@ -33,6 +33,9 @@ let roostRestMistMultiplier = 1;
 let roostRestMistClass = null;
 let familiarCrossingMultiplier = 1;
 let familiarCrossingClass = null;
+let landmarkEchoMistMultiplier = 1;
+let landmarkEchoMistClass = null;
+let landmarkEchoMistTimer = 0;
 
 function addExplorationEvent(event) {
   if (!event || typeof event !== "object") return false;
@@ -82,7 +85,12 @@ function decorate(state) {
   if (!state || typeof state !== "object") return state;
   const fog = state.fog && typeof state.fog === "object" ? state.fog : {};
   const effectiveDensity = Number.isFinite(fog.effectiveDensity) ? fog.effectiveDensity : null;
-  const renderedMultiplier = latestFamiliarity.densityMultiplier * arrivalMistMultiplier * culminationMistMultiplier * roostRestMistMultiplier * familiarCrossingMultiplier;
+  const renderedMultiplier = latestFamiliarity.densityMultiplier
+    * arrivalMistMultiplier
+    * culminationMistMultiplier
+    * roostRestMistMultiplier
+    * familiarCrossingMultiplier
+    * landmarkEchoMistMultiplier;
   return {
     ...state,
     fog: {
@@ -101,6 +109,8 @@ function decorate(state) {
       roostRestDensityMultiplier: roostRestMistMultiplier,
       familiarCrossingClass,
       familiarCrossingDensityMultiplier: familiarCrossingMultiplier,
+      familiarLandmarkEchoClass: landmarkEchoMistClass,
+      familiarLandmarkEchoDensityMultiplier: landmarkEchoMistMultiplier,
       renderedDensity: effectiveDensity === null ? null : effectiveDensity * renderedMultiplier,
     },
   };
@@ -149,6 +159,11 @@ function culminationMistProfile(consequenceClass) {
   return table[consequenceClass] ?? null;
 }
 
+function familiarLandmarkEchoMistProfile(echoClass) {
+  const table = Object.freeze({ resonance: 0.965, instrument: 0.95, relic: 0.975, threshold: 0.985 });
+  return table[echoClass] ?? null;
+}
+
 function onExpeditionArrival(event) {
   const consequenceClass = typeof event?.detail?.consequenceClass === "string" ? event.detail.consequenceClass : "";
   const multiplier = arrivalMistProfile(consequenceClass);
@@ -156,7 +171,9 @@ function onExpeditionArrival(event) {
   if (arrivalMistTimer) clearTimeout(arrivalMistTimer);
   arrivalMistClass = consequenceClass;
   arrivalMistMultiplier = multiplier;
-  const reducedMotion = (() => { try { return Boolean(globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches); } catch { return false; } })();
+  const reducedMotion = (() => {
+    try { return Boolean(globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches); } catch { return false; }
+  })();
   arrivalMistTimer = setTimeout(() => {
     arrivalMistTimer = 0;
     arrivalMistClass = null;
@@ -199,6 +216,30 @@ function onFamiliarCrossingSignature(event) {
   const signature = typeof event?.detail?.signature === 'string' ? event.detail.signature : null;
   familiarCrossingClass = active ? signature : null;
   familiarCrossingMultiplier = active ? familiarCrossingMistMultiplier(signature) : 1;
+  if (!active) {
+    if (landmarkEchoMistTimer) clearTimeout(landmarkEchoMistTimer);
+    landmarkEchoMistTimer = 0;
+    landmarkEchoMistClass = null;
+    landmarkEchoMistMultiplier = 1;
+  }
+}
+
+function onFamiliarLandmarkEcho(event) {
+  if (event?.detail?.active !== true) return;
+  const echoClass = typeof event.detail.echoClass === 'string' ? event.detail.echoClass : '';
+  const multiplier = familiarLandmarkEchoMistProfile(echoClass);
+  if (!multiplier) return;
+  if (landmarkEchoMistTimer) clearTimeout(landmarkEchoMistTimer);
+  landmarkEchoMistClass = echoClass;
+  landmarkEchoMistMultiplier = multiplier;
+  const reducedMotion = (() => {
+    try { return Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches); } catch { return false; }
+  })();
+  landmarkEchoMistTimer = setTimeout(() => {
+    landmarkEchoMistTimer = 0;
+    landmarkEchoMistClass = null;
+    landmarkEchoMistMultiplier = 1;
+  }, reducedMotion ? 1200 : 2200);
 }
 
 const onLandmarkInvestigated = (event) => consumeEvent("landmark-investigated", event?.detail);
@@ -211,6 +252,7 @@ globalThis.addEventListener?.("greyblue:expedition-arrival", onExpeditionArrival
 globalThis.addEventListener?.("greyblue:expedition-culmination", onExpeditionCulmination);
 globalThis.addEventListener?.("greyblue:roost-rest", onRoostRest);
 globalThis.addEventListener?.("greyblue:familiar-crossing-signature", onFamiliarCrossingSignature);
+globalThis.addEventListener?.("greyblue:familiar-crossing-landmark-echo", onFamiliarLandmarkEcho);
 
 const originalRender = THREE.WebGLRenderer.prototype.render;
 THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, camera) {
@@ -219,7 +261,13 @@ THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, ca
     return originalRender.call(this, scene, camera);
   }
   const authoredDensity = fog.density;
-  fog.density = authoredDensity * latestFamiliarity.densityMultiplier * arrivalMistMultiplier * culminationMistMultiplier * roostRestMistMultiplier * familiarCrossingMultiplier;
+  fog.density = authoredDensity
+    * latestFamiliarity.densityMultiplier
+    * arrivalMistMultiplier
+    * culminationMistMultiplier
+    * roostRestMistMultiplier
+    * familiarCrossingMultiplier
+    * landmarkEchoMistMultiplier;
   try {
     return originalRender.call(this, scene, camera);
   } finally {
@@ -230,6 +278,7 @@ THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, ca
 globalThis.addEventListener?.("beforeunload", () => {
   if (arrivalMistTimer) clearTimeout(arrivalMistTimer);
   if (culminationMistTimer) clearTimeout(culminationMistTimer);
+  if (landmarkEchoMistTimer) clearTimeout(landmarkEchoMistTimer);
   if (THREE.WebGLRenderer.prototype.render !== originalRender) {
     THREE.WebGLRenderer.prototype.render = originalRender;
   }
@@ -240,4 +289,5 @@ globalThis.addEventListener?.("beforeunload", () => {
   globalThis.removeEventListener?.("greyblue:expedition-culmination", onExpeditionCulmination);
   globalThis.removeEventListener?.("greyblue:roost-rest", onRoostRest);
   globalThis.removeEventListener?.("greyblue:familiar-crossing-signature", onFamiliarCrossingSignature);
+  globalThis.removeEventListener?.("greyblue:familiar-crossing-landmark-echo", onFamiliarLandmarkEcho);
 }, { once: true });
