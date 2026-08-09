@@ -2,6 +2,7 @@ import { createExplorationLifecycle } from './exploration-lifecycle.js';
 import { masteryFromChallengeEvent } from './approach-mastery.js';
 import { createLandingRecoveryAnchor } from './landing-recovery-anchor.js';
 import { stepEarnedRoost, planRoostRecovery } from './roost-lifecycle.js';
+import { deriveRegionalFlightMemoryEvent } from './regional-flight-memory.js';
 import { buildArchipelago } from '../world/archipelago.js';
 import { loadGame, saveGame } from './save.js';
 
@@ -165,6 +166,12 @@ function eventTime(event) {
   return Number.isFinite(event?.detail?.occurredAt) ? Math.max(0, Math.floor(event.detail.occurredAt)) : Date.now();
 }
 
+function crossingActive(state) {
+  if (globalThis.__greyblueFamiliarCrossing?.active === true || state?.familiarCrossing?.active === true) return true;
+  const progress = Number(state?.routeGuidance?.progress);
+  return Number.isFinite(progress) && progress > 0 && progress < 1;
+}
+
 function onRouteCompleted(event) {
   if (disposed) return;
   const routeId = boundedId(event?.detail?.routeId);
@@ -213,6 +220,32 @@ function onRegionalMysteryThread(event) {
   }
 }
 
+function onKnownLandmarkCircuit(event) {
+  if (disposed) return;
+  const occurredAt = eventTime(event);
+  const memory = deriveRegionalFlightMemoryEvent({
+    circuitEvent: event?.detail,
+    currentRegionId: currentState?.currentRegion?.id,
+    recoveryActive: Boolean(currentState?.collision?.requiresRecovery),
+    crossingActive: crossingActive(currentState),
+    restorePublishing: Boolean(currentState?.restorePublishing || currentState?.explorationRestorePublishing),
+    occurredAt,
+  });
+  if (!memory) return;
+  if (!lifecycle.recordRegionalFlightMemory(memory.regionId, memory.memoryClass, memory.occurredAt)) return;
+  flush('regional-flight-memory');
+  globalThis.dispatchEvent?.(new CustomEvent('greyblue:regional-flight-memory', {
+    detail: Object.freeze({
+      active: true,
+      remembered: true,
+      regionId: memory.regionId,
+      memoryClass: memory.memoryClass,
+      occurredAt: memory.occurredAt,
+      restored: false,
+    }),
+  }));
+}
+
 function decorate(state) {
   if (!state || typeof state !== 'object') return state;
   return {
@@ -249,6 +282,7 @@ globalThis.addEventListener?.('greyblue:landmark-investigated', onLandmarkInvest
 globalThis.addEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
 globalThis.addEventListener?.('greyblue:approach-challenge', onApproachChallenge);
 globalThis.addEventListener?.('greyblue:regional-mystery-thread', onRegionalMysteryThread);
+globalThis.addEventListener?.('greyblue:known-landmark-circuit', onKnownLandmarkCircuit);
 consume(currentState);
 publishRecoveryPlan(currentState ?? restored);
 
@@ -263,6 +297,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
   globalThis.removeEventListener?.('greyblue:approach-challenge', onApproachChallenge);
   globalThis.removeEventListener?.('greyblue:regional-mystery-thread', onRegionalMysteryThread);
+  globalThis.removeEventListener?.('greyblue:known-landmark-circuit', onKnownLandmarkCircuit);
   roostAnnouncement?.remove();
   delete globalThis.__greyblueRoostRecovery;
 }, { once: true });

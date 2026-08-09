@@ -6,7 +6,8 @@ const WORLD_LIMIT = 24000;
 const ALTITUDE_MIN = -100;
 const ALTITUDE_MAX = 8000;
 const MAX_DISCOVERY_RECORDS = 2048;
-const EXPLORATION_EVENT_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "landmark-flight-encounter", "route-completed", "approach-mastered", "roost-established", "regional-thread-recognized"]);
+const EXPLORATION_EVENT_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "landmark-flight-encounter", "route-completed", "approach-mastered", "roost-established", "regional-thread-recognized", "regional-flight-memory"]);
+const REGIONAL_FLIGHT_MEMORY_CLASSES = new Set(["wake", "ring", "hush", "weathering"]);
 let runtimeRecoveryCheckpoint = null;
 let holdRecoveryCheckpointOnce = false;
 
@@ -318,6 +319,11 @@ function normalizeExploration(exploration) {
     for (const field of ["regionId", "routeId", "landmarkId", "islandId", "corridorId", "landingZoneId", "encounterClass"]) {
       const value = typeof candidate[field] === "string" ? candidate[field].trim() : "";
       if (value) event[field] = value;
+    }
+    if (candidate.kind === "regional-flight-memory") {
+      const memoryClass = typeof candidate.memoryClass === "string" ? candidate.memoryClass.trim() : "";
+      if (!REGIONAL_FLIGHT_MEMORY_CLASSES.has(memoryClass)) continue;
+      event.memoryClass = memoryClass;
     }
     const previous = byKey.get(key);
     if (!previous || event.occurredAt < previous.occurredAt) byKey.set(key, event);

@@ -1,5 +1,6 @@
 const EXPLORATION_VERSION = 1;
-const VALID_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "landmark-flight-encounter", "route-completed", "approach-mastered", "roost-established", "regional-thread-recognized"]);
+const VALID_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "landmark-flight-encounter", "route-completed", "approach-mastered", "roost-established", "regional-thread-recognized", "regional-flight-memory"]);
+const REGIONAL_FLIGHT_MEMORY_CLASSES = new Set(["wake", "ring", "hush", "weathering"]);
 
 function cleanId(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -22,6 +23,11 @@ function normalizeEvent(candidate) {
   for (const field of ["regionId", "routeId", "landmarkId", "islandId", "corridorId", "landingZoneId", "encounterClass"]) {
     const value = cleanId(candidate[field]);
     if (value) event[field] = value;
+  }
+  if (candidate.kind === "regional-flight-memory") {
+    const memoryClass = cleanId(candidate.memoryClass);
+    if (!REGIONAL_FLIGHT_MEMORY_CLASSES.has(memoryClass)) return null;
+    event.memoryClass = memoryClass;
   }
   return event;
 }
@@ -186,6 +192,19 @@ export function createExplorationLifecycle(initialExploration = null) {
       });
     },
 
+    recordRegionalFlightMemory(regionId, memoryClass, occurredAt = Date.now()) {
+      const id = cleanId(regionId);
+      const qualitativeClass = cleanId(memoryClass);
+      if (!id || !REGIONAL_FLIGHT_MEMORY_CLASSES.has(qualitativeClass)) return false;
+      return record({
+        kind: "regional-flight-memory",
+        id,
+        regionId: id,
+        memoryClass: qualitativeClass,
+        occurredAt,
+      });
+    },
+
     markFlushed() {
       dirty = false;
     },
@@ -214,6 +233,7 @@ export function createExplorationLifecycle(initialExploration = null) {
         approachMasteryCount: values.filter((event) => event.kind === "approach-mastered").length,
         roostCount: values.filter((event) => event.kind === "roost-established").length,
         regionalThreadRecognitionCount: values.filter((event) => event.kind === "regional-thread-recognized").length,
+        regionalFlightMemoryCount: values.filter((event) => event.kind === "regional-flight-memory").length,
         dirty,
       };
     },
