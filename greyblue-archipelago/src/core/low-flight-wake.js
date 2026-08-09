@@ -37,10 +37,10 @@ function classifyFrame(frame = {}) {
 
   const clearance = Math.max(0, position.y - surfaceHeight);
   if (frame.surface === 'water' && clearance <= 34) {
-    return Object.freeze({ wakeClass: 'water', position, clearance, strength: clamp((34 - clearance) / 34, 0.2, 1) });
+    return Object.freeze({ wakeClass: 'water', position, surfaceHeight, strength: clamp((34 - clearance) / 34, 0.2, 1) });
   }
   if (fogDensity >= 0.00072 && clearance <= 48) {
-    return Object.freeze({ wakeClass: 'mist', position, clearance, strength: clamp(fogDensity / 0.0012, 0.25, 1) });
+    return Object.freeze({ wakeClass: 'mist', position, surfaceHeight, strength: clamp(fogDensity / 0.0012, 0.25, 1) });
   }
   return null;
 }
@@ -59,7 +59,10 @@ export function stepLowFlightWake({ state, frame, now = 0, reducedMotion = false
       const occurredAt = cleanTime(sample?.occurredAt);
       const wakeClass = WAKE_CLASSES.includes(sample?.wakeClass) ? sample.wakeClass : null;
       const strength = finite(sample?.strength);
-      return position && wakeClass && strength != null ? Object.freeze({ ...position, occurredAt, wakeClass, strength: clamp(strength, 0, 1) }) : null;
+      const surfaceHeight = finite(sample?.surfaceHeight);
+      return position && wakeClass && strength != null && surfaceHeight != null
+        ? Object.freeze({ ...position, surfaceHeight, occurredAt, wakeClass, strength: clamp(strength, 0, 1) })
+        : null;
     })
     .filter((sample) => sample && time - sample.occurredAt <= lifetime)
     .slice(-MAX_SAMPLES);
@@ -72,6 +75,7 @@ export function stepLowFlightWake({ state, frame, now = 0, reducedMotion = false
   if (!last || distance(last, eligible.position) >= MIN_SAMPLE_DISTANCE) {
     matching.push(Object.freeze({
       ...eligible.position,
+      surfaceHeight: eligible.surfaceHeight,
       occurredAt: time,
       wakeClass: eligible.wakeClass,
       strength: eligible.strength,
