@@ -80,14 +80,16 @@ function highContrast() {
 
 function ensureCuePool(scene) {
   if (!scene?.isScene) return null;
-  if (cueGroup && cueScene !== scene) {
-    cueGroup.removeFromParent();
-    cueGroup = null;
-    cueScene = null;
+  if (cueGroup) {
+    if (cueScene !== scene) {
+      cueGroup.removeFromParent();
+      scene.add(cueGroup);
+      cueScene = scene;
+    }
+    return cueGroup;
   }
-  if (cueGroup) return cueGroup;
 
-  cueGeometry ??= new THREE.RingGeometry(10, 13.5, 18);
+  cueGeometry = new THREE.RingGeometry(10, 13.5, 18);
   cueGroup = new THREE.Group();
   cueGroup.name = 'greyblue-known-landmark-mist-cues';
   cueMeshes = [];
