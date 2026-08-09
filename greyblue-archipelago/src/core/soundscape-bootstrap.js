@@ -8,6 +8,7 @@ let enabled = false;
 let disposed = false;
 let audio = null;
 let lastView = deriveSoundscape(currentState);
+let lastFamiliarCrossingKey = '';
 
 const status = document.createElement('div');
 status.setAttribute('data-visually-hidden', '');
@@ -112,6 +113,11 @@ function expeditionCulminationFrequency(consequenceClass) {
   return table[consequenceClass] ?? null;
 }
 
+function familiarCrossingFrequency(signature) {
+  const table = Object.freeze({ hush: 131, pressure: 156, resonance: 208, clearing: 262 });
+  return table[signature] ?? null;
+}
+
 function onOmenListened(event) {
   const frequency = omenFrequency(event?.detail?.soundHook);
   if (frequency) oneShot(frequency);
@@ -138,6 +144,19 @@ function onRoostRest(event) {
   oneShot(174, 0.012, 1.8);
 }
 
+function onFamiliarCrossingSignature(event) {
+  if (!event?.detail?.active) {
+    lastFamiliarCrossingKey = '';
+    return;
+  }
+  const signature = typeof event.detail.signature === 'string' ? event.detail.signature : '';
+  const key = signature;
+  if (!signature || key === lastFamiliarCrossingKey) return;
+  lastFamiliarCrossingKey = key;
+  const frequency = familiarCrossingFrequency(signature);
+  if (frequency) oneShot(frequency, 0.009, 1.1);
+}
+
 async function toggleSound() {
   if (disposed) return;
   if (!audio) { try { audio = createAudioGraph(); } catch { audio = null; } }
@@ -155,6 +174,7 @@ globalThis.addEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFl
 globalThis.addEventListener?.('greyblue:expedition-arrival', onExpeditionArrival);
 globalThis.addEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
 globalThis.addEventListener?.('greyblue:roost-rest', onRoostRest);
+globalThis.addEventListener?.('greyblue:familiar-crossing-signature', onFamiliarCrossingSignature);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
@@ -173,6 +193,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('greyblue:expedition-arrival', onExpeditionArrival);
   globalThis.removeEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
   globalThis.removeEventListener?.('greyblue:roost-rest', onRoostRest);
+  globalThis.removeEventListener?.('greyblue:familiar-crossing-signature', onFamiliarCrossingSignature);
   status.remove();
   if (audio) { try { audio.wind.stop(); audio.tone.stop(); audio.crossing.stop(); audio.lfo.stop(); void audio.context.close(); } catch {} }
 }, { once: true });
