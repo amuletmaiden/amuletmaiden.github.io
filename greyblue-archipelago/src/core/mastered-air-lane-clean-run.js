@@ -73,10 +73,6 @@ function idle(previousPosition = null, completed = false) {
   });
 }
 
-function inactivePublic(completed = false) {
-  return Object.freeze({ available: false, active: false, phase: null, completed });
-}
-
 export function createMasteredAirLaneCleanRunState() {
   return idle(null, false);
 }
@@ -97,10 +93,7 @@ export function stepMasteredAirLaneCleanRun({
   const completed = prior.completed === true || prior.status === 'completed';
   const candidates = Array.isArray(lanes) ? lanes.map(laneGeometry).filter(Boolean) : [];
 
-  if (!dragon || airborne !== true || recoveryActive || crossingActive || restorePublishing) {
-    return idle(dragon, completed);
-  }
-
+  if (!dragon || airborne !== true || recoveryActive || crossingActive || restorePublishing) return idle(dragon, completed);
   if (completed) return idle(dragon, true);
 
   const activeCorridorId = cleanId(prior.corridorId);
@@ -110,12 +103,14 @@ export function stepMasteredAirLaneCleanRun({
 
     const progress = progressAlong(dragon, geometry);
     const lastProgress = finite(prior.lastProgress) ?? 0;
-    if (distanceToLane(dragon, geometry) > LANE_ENVELOPE || progress + REVERSAL_TOLERANCE < lastProgress) {
-      return idle(dragon, false);
-    }
+    if (distanceToLane(dragon, geometry) > LANE_ENVELOPE || progress + REVERSAL_TOLERANCE < lastProgress) return idle(dragon, false);
 
     let nextGateIndex = Number.isInteger(prior.nextGateIndex) ? prior.nextGateIndex : 1;
     nextGateIndex = Math.max(1, Math.min(4, nextGateIndex));
+    for (let index = nextGateIndex + 1; index < geometry.trace.length; index += 1) {
+      if (insideGate(dragon, geometry.trace[index])) return idle(dragon, false);
+    }
+
     const expectedGate = geometry.trace[nextGateIndex];
     if (insideGate(dragon, expectedGate)) {
       if (nextGateIndex === geometry.trace.length - 1) {
