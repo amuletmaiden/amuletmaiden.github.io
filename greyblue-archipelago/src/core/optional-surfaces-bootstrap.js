@@ -13,6 +13,7 @@ const OPTIONAL_SURFACES = [
   ["soundscape", () => import("./soundscape-bootstrap.js")],
   ["familiar-mist", () => import("./familiar-mist-bootstrap.js")],
   ["regional-omens", () => import("./regional-omen-bootstrap.js")],
+  ["regional-mystery-thread", () => import("./regional-mystery-thread-bootstrap.js")],
   ["expedition", () => import("./expedition-bootstrap.js")],
   ["familiar-crossing-signature", () => import("./familiar-crossing-signature-bootstrap.js")],
   ["roost-rest", () => import("./roost-rest-bootstrap.js")],
