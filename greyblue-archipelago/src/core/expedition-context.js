@@ -252,7 +252,7 @@ export function expeditionJournalLine(context) {
     if (context.purpose === 'roost') return 'The way back toward your roost has shortened.';
     return 'A familiar crossing has settled behind you.';
   }
-  if (context.purpose === 'landmark') return 'Several remembered ways seem to converge on something unfinished.';
+  if (context.purpose === 'landmark') return 'A remembered way seems to lead toward something unfinished.';
   if (context.purpose === 'frontier') return 'A remembered way continues beyond this crossing.';
   if (context.purpose === 'roost') return 'A remembered way bends back toward a place of rest.';
   return 'A familiar crossing remains available.';
