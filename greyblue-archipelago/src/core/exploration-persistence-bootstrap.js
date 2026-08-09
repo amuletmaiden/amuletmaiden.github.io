@@ -201,6 +201,18 @@ function onApproachChallenge(event) {
   }
 }
 
+function onRegionalMysteryThread(event) {
+  if (disposed || event?.detail?.active !== true || event?.detail?.recognized !== true) return;
+  const regionId = boundedId(event?.detail?.regionId);
+  if (!regionId) return;
+  if (lifecycle.recordRegionalThreadRecognition(regionId, eventTime(event))) {
+    flush('regional-thread-recognized');
+    globalThis.dispatchEvent?.(new CustomEvent('greyblue:regional-thread-recognized', {
+      detail: Object.freeze({ regionId, occurredAt: eventTime(event) }),
+    }));
+  }
+}
+
 function decorate(state) {
   if (!state || typeof state !== 'object') return state;
   return {
@@ -236,6 +248,7 @@ globalThis.addEventListener?.('greyblue:route-completed', onRouteCompleted);
 globalThis.addEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
 globalThis.addEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
 globalThis.addEventListener?.('greyblue:approach-challenge', onApproachChallenge);
+globalThis.addEventListener?.('greyblue:regional-mystery-thread', onRegionalMysteryThread);
 consume(currentState);
 publishRecoveryPlan(currentState ?? restored);
 
@@ -249,6 +262,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
   globalThis.removeEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
   globalThis.removeEventListener?.('greyblue:approach-challenge', onApproachChallenge);
+  globalThis.removeEventListener?.('greyblue:regional-mystery-thread', onRegionalMysteryThread);
   roostAnnouncement?.remove();
   delete globalThis.__greyblueRoostRecovery;
 }, { once: true });
