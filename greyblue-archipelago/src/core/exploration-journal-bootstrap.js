@@ -11,6 +11,7 @@ let open = false;
 let omen = globalThis.__greyblueRegionalOmen ?? null;
 let expeditionLine = null;
 let culminationLine = null;
+let roostRestLine = null;
 
 const panel = document.createElement('section');
 panel.id = 'greyblue-exploration-journal';
@@ -23,6 +24,7 @@ panel.innerHTML = `
   <div data-greyblue-journal-context></div>
   <div data-greyblue-journal-expedition hidden></div>
   <div data-greyblue-journal-culmination hidden></div>
+  <div data-greyblue-journal-roost-rest hidden></div>
   <div data-greyblue-journal-omen hidden></div>
   <ol data-greyblue-journal-discoveries></ol>
 `;
@@ -38,6 +40,7 @@ const objectiveNode = panel.querySelector('[data-greyblue-journal-objective]');
 const contextNode = panel.querySelector('[data-greyblue-journal-context]');
 const expeditionNode = panel.querySelector('[data-greyblue-journal-expedition]');
 const culminationNode = panel.querySelector('[data-greyblue-journal-culmination]');
+const roostRestNode = panel.querySelector('[data-greyblue-journal-roost-rest]');
 const omenNode = panel.querySelector('[data-greyblue-journal-omen]');
 const discoveriesNode = panel.querySelector('[data-greyblue-journal-discoveries]');
 
@@ -51,6 +54,8 @@ function render(state) {
   expeditionNode.textContent = expeditionLine ?? '';
   culminationNode.hidden = !culminationLine;
   culminationNode.textContent = culminationLine ?? '';
+  roostRestNode.hidden = !roostRestLine;
+  roostRestNode.textContent = roostRestLine ?? '';
   const activeOmen = omen?.active && omen.regionId && omen.regionId === state?.currentRegion?.id ? omen : null;
   omenNode.hidden = !activeOmen;
   omenNode.textContent = activeOmen?.tone?.text ?? '';
@@ -96,10 +101,18 @@ function onExpeditionCulmination(event) {
   render(currentState);
 }
 
+function onRoostRest(event) {
+  const active = Boolean(event?.detail?.resting);
+  const line = active && typeof event?.detail?.line === 'string' ? event.detail.line.trim().slice(0, 220) : '';
+  roostRestLine = line || null;
+  render(currentState);
+}
+
 globalThis.addEventListener?.('keydown', onKeyDown);
 globalThis.addEventListener?.('greyblue:regional-omen', onRegionalOmen);
 globalThis.addEventListener?.('greyblue:expedition-context', onExpeditionContext);
 globalThis.addEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
+globalThis.addEventListener?.('greyblue:roost-rest', onRoostRest);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
@@ -122,6 +135,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('greyblue:regional-omen', onRegionalOmen);
   globalThis.removeEventListener?.('greyblue:expedition-context', onExpeditionContext);
   globalThis.removeEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
+  globalThis.removeEventListener?.('greyblue:roost-rest', onRoostRest);
   panel.remove();
   announcement.remove();
 }, { once: true });
