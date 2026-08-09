@@ -7,15 +7,18 @@ import {
   masteredApproachAirLanePresentationPolicy,
   masteredApproachAirLanePublicState,
 } from './mastered-approach-air-lanes.js';
+import {
+  createMasteredAirLaneCleanRunState,
+  stepMasteredAirLaneCleanRun,
+  masteredAirLaneCleanRunPublicState,
+  masteredAirLaneCleanRunPresentationPolicy,
+} from './mastered-air-lane-clean-run.js';
 
 const MAX_LANES = 3;
 const TRACE_COUNT = 5;
 const MAX_TRACES = MAX_LANES * TRACE_COUNT;
-const TRACE_COLOR = Object.freeze({
-  faint: 0x8fa9ad,
-  clear: 0xb8cdd0,
-  final: 0xdde8e9,
-});
+const TRACE_COLOR = Object.freeze({ faint: 0x8fa9ad, clear: 0xb8cdd0, final: 0xdde8e9 });
+const ACTIVE_COLOR = Object.freeze({ entry: 0xc8dadd, middle: 0xd9e6e7, final: 0xf0f5f5 });
 
 let world = null;
 let worldSeed = null;
@@ -24,14 +27,15 @@ let laneGroup = null;
 let traceGeometry = null;
 const traceMeshes = [];
 const masteredCorridorIds = new Set(masteredApproachIdsFromExploration(loadGame()?.exploration));
+let cleanRun = createMasteredAirLaneCleanRunState();
+let completionPublished = false;
+let completionUntil = 0;
 
 function cleanId(value) {
   return typeof value === 'string' && value.trim() ? value.trim().slice(0, 120) : '';
 }
 
-function currentState() {
-  return globalThis.__greyblueState ?? null;
-}
+function currentState() { return globalThis.__greyblueState ?? null; }
 
 function getWorld(state) {
   const seed = Number.isInteger(state?.seed) ? state.seed : 1337;
@@ -52,9 +56,11 @@ function crossingActive(state) {
 function reducedMotion() {
   try { return Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches); } catch { return false; }
 }
-
 function highContrast() {
   try { return Boolean(globalThis.matchMedia?.('(prefers-contrast: more)')?.matches); } catch { return false; }
+}
+function mutedAudio(state) {
+  return state?.soundscape?.enabled !== true && globalThis.__greyblueSoundscape?.enabled !== true;
 }
 
 function ensurePool(scene) {
@@ -67,11 +73,9 @@ function ensurePool(scene) {
     }
     return laneGroup;
   }
-
   traceGeometry = new THREE.TorusGeometry(30, 1.35, 6, 24);
   laneGroup = new THREE.Group();
   laneGroup.name = 'greyblue-mastered-approach-air-lanes';
-
   for (let index = 0; index < MAX_TRACES; index += 1) {
     const policy = masteredApproachAirLanePresentationPolicy('faint');
     const material = new THREE.MeshBasicMaterial({
@@ -90,7 +94,6 @@ function ensurePool(scene) {
     laneGroup.add(mesh);
     traceMeshes.push(mesh);
   }
-
   scene.add(laneGroup);
   laneScene = scene;
   return laneGroup;
@@ -100,8 +103,7 @@ function hideUnused(start = 0) {
   for (let index = start; index < traceMeshes.length; index += 1) traceMeshes[index].visible = false;
 }
 
-function derive() {
-  const state = currentState();
+function derive(state) {
   return deriveMasteredApproachAirLanes({
     world: getWorld(state),
     currentRegionId: cleanId(state?.currentRegion?.id),
@@ -125,18 +127,47 @@ function traceHeading(trace, index) {
   return Number.isFinite(dx) && Number.isFinite(dz) ? Math.atan2(dx, dz) : 0;
 }
 
+function publishCompletion(state) {
+  if (completionPublished || cleanRun.completed !== true) return;
+  completionPublished = true;
+  const policy = masteredAirLaneCleanRunPresentationPolicy({ reducedMotion: reducedMotion(), mutedAudio: mutedAudio(state) });
+  completionUntil = performance.now() + policy.atmosphereDurationMs;
+  globalThis.dispatchEvent?.(new CustomEvent('greyblue:mastered-air-lane-clean-run', {
+    detail: Object.freeze({ completed: true, soundHook: policy.soundHook }),
+  }));
+}
+
+function stepCleanRun(state, result) {
+  cleanRun = stepMasteredAirLaneCleanRun({
+    state: cleanRun,
+    lanes: result?.lanes,
+    position: state?.position,
+    speed: state?.flight?.speed ?? state?.speed,
+    airborne: state?.flight?.airborne !== false && state?.collision?.grounded !== true,
+    recoveryActive: state?.collision?.requiresRecovery === true,
+    crossingActive: crossingActive(state),
+    restorePublishing: Boolean(state?.restorePublishing || state?.explorationRestorePublishing),
+  });
+  globalThis.__greyblueMasteredAirLaneCleanRun = masteredAirLaneCleanRunPublicState(cleanRun, result?.lanes);
+  publishCompletion(state);
+}
+
 function present(scene) {
-  const result = derive();
+  const state = currentState();
+  const result = derive(state);
   globalThis.__greyblueMasteredApproachAirLanes = masteredApproachAirLanePublicState(result);
+  stepCleanRun(state, result);
   if (!result.active || !ensurePool(scene)) {
     hideUnused();
     return;
   }
 
   const contrast = highContrast();
+  const publicRun = globalThis.__greyblueMasteredAirLaneCleanRun;
   let meshIndex = 0;
   for (const lane of result.lanes) {
     const policy = masteredApproachAirLanePresentationPolicy(lane.laneClass, { highContrast: contrast });
+    const isActiveRun = cleanRun.status === 'active' && cleanRun.corridorId === lane.corridorId;
     for (let traceIndex = 0; traceIndex < lane.trace.length; traceIndex += 1) {
       const point = lane.trace[traceIndex];
       const mesh = traceMeshes[meshIndex];
@@ -146,16 +177,24 @@ function present(scene) {
       mesh.position.set(point.x, point.y, point.z);
       mesh.rotation.set(0, traceHeading(lane.trace, traceIndex), 0);
       mesh.scale.setScalar(taper);
-      mesh.material.color.setHex(TRACE_COLOR[policy.laneClass] ?? TRACE_COLOR.faint);
-      mesh.material.opacity = Math.max(0.08, policy.opacity * (0.74 + traceIndex * 0.055));
+      const isNextGate = isActiveRun && traceIndex === cleanRun.nextGateIndex;
+      mesh.material.color.setHex(isNextGate ? (ACTIVE_COLOR[publicRun?.phase] ?? ACTIVE_COLOR.entry) : (TRACE_COLOR[policy.laneClass] ?? TRACE_COLOR.faint));
+      mesh.material.opacity = Math.min(0.62, Math.max(0.08, policy.opacity * (isNextGate ? 1.55 : 0.74 + traceIndex * 0.055)));
       mesh.material.depthTest = policy.depthTest;
       mesh.material.depthWrite = policy.depthWrite;
       mesh.material.fog = policy.fog;
       mesh.userData.greyblueLaneClass = policy.laneClass;
+      mesh.userData.greyblueCleanRunGate = isNextGate;
       meshIndex += 1;
     }
   }
   hideUnused(meshIndex);
+
+  if (completionUntil > performance.now() && scene?.fog?.isFogExp2) {
+    const authored = scene.fog.density;
+    scene.fog.density = Math.max(0.000001, authored * 0.94);
+    queueMicrotask(() => { if (scene?.fog?.isFogExp2) scene.fog.density = authored; });
+  }
 }
 
 function onApproachMastered(event) {
@@ -164,6 +203,7 @@ function onApproachMastered(event) {
 }
 
 globalThis.__greyblueMasteredApproachAirLanes = Object.freeze({ active: false, laneClass: null });
+globalThis.__greyblueMasteredAirLaneCleanRun = Object.freeze({ available: false, active: false, phase: null, completed: false });
 globalThis.addEventListener?.('greyblue:approach-mastered', onApproachMastered);
 
 const originalRender = THREE.WebGLRenderer.prototype.render;
