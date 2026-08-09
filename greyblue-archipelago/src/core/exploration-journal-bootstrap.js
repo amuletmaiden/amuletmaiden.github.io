@@ -12,6 +12,7 @@ let omen = globalThis.__greyblueRegionalOmen ?? null;
 let expeditionLine = null;
 let culminationLine = null;
 let roostRestLine = null;
+let familiarCrossingLine = null;
 
 const panel = document.createElement('section');
 panel.id = 'greyblue-exploration-journal';
@@ -25,6 +26,7 @@ panel.innerHTML = `
   <div data-greyblue-journal-expedition hidden></div>
   <div data-greyblue-journal-culmination hidden></div>
   <div data-greyblue-journal-roost-rest hidden></div>
+  <div data-greyblue-journal-familiar-crossing hidden></div>
   <div data-greyblue-journal-omen hidden></div>
   <ol data-greyblue-journal-discoveries></ol>
 `;
@@ -41,6 +43,7 @@ const contextNode = panel.querySelector('[data-greyblue-journal-context]');
 const expeditionNode = panel.querySelector('[data-greyblue-journal-expedition]');
 const culminationNode = panel.querySelector('[data-greyblue-journal-culmination]');
 const roostRestNode = panel.querySelector('[data-greyblue-journal-roost-rest]');
+const familiarCrossingNode = panel.querySelector('[data-greyblue-journal-familiar-crossing]');
 const omenNode = panel.querySelector('[data-greyblue-journal-omen]');
 const discoveriesNode = panel.querySelector('[data-greyblue-journal-discoveries]');
 
@@ -56,6 +59,8 @@ function render(state) {
   culminationNode.textContent = culminationLine ?? '';
   roostRestNode.hidden = !roostRestLine;
   roostRestNode.textContent = roostRestLine ?? '';
+  familiarCrossingNode.hidden = !familiarCrossingLine;
+  familiarCrossingNode.textContent = familiarCrossingLine ?? '';
   const activeOmen = omen?.active && omen.regionId && omen.regionId === state?.currentRegion?.id ? omen : null;
   omenNode.hidden = !activeOmen;
   omenNode.textContent = activeOmen?.tone?.text ?? '';
@@ -108,11 +113,19 @@ function onRoostRest(event) {
   render(currentState);
 }
 
+function onFamiliarCrossingSignature(event) {
+  const active = Boolean(event?.detail?.active);
+  const line = active && typeof event?.detail?.line === 'string' ? event.detail.line.trim().slice(0, 220) : '';
+  familiarCrossingLine = line || null;
+  render(currentState);
+}
+
 globalThis.addEventListener?.('keydown', onKeyDown);
 globalThis.addEventListener?.('greyblue:regional-omen', onRegionalOmen);
 globalThis.addEventListener?.('greyblue:expedition-context', onExpeditionContext);
 globalThis.addEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
 globalThis.addEventListener?.('greyblue:roost-rest', onRoostRest);
+globalThis.addEventListener?.('greyblue:familiar-crossing-signature', onFamiliarCrossingSignature);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
@@ -136,6 +149,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('greyblue:expedition-context', onExpeditionContext);
   globalThis.removeEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
   globalThis.removeEventListener?.('greyblue:roost-rest', onRoostRest);
+  globalThis.removeEventListener?.('greyblue:familiar-crossing-signature', onFamiliarCrossingSignature);
   panel.remove();
   announcement.remove();
 }, { once: true });
