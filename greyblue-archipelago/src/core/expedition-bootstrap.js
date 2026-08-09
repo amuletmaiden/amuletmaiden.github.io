@@ -116,6 +116,12 @@ function onCrossingCancelled() {
   recomputeAfterCanonicalEvent();
 }
 
+function onKeyDown(event) {
+  if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.code !== 'KeyX' || currentContext?.phase !== 'crossing') return;
+  onCrossingCancelled();
+}
+
 function decorate(state) {
   if (!state || typeof state !== 'object') return state;
   return { ...state, expedition: currentContext };
@@ -139,6 +145,7 @@ globalThis.addEventListener?.('greyblue:landmark-investigated', recomputeAfterCa
 globalThis.addEventListener?.('greyblue:landmark-flight-encounter', recomputeAfterCanonicalEvent);
 globalThis.addEventListener?.('greyblue:roost-established', recomputeAfterCanonicalEvent);
 globalThis.addEventListener?.('greyblue:crossing-cancelled', onCrossingCancelled);
+globalThis.addEventListener?.('keydown', onKeyDown);
 
 recompute(currentState);
 
@@ -149,6 +156,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('greyblue:landmark-flight-encounter', recomputeAfterCanonicalEvent);
   globalThis.removeEventListener?.('greyblue:roost-established', recomputeAfterCanonicalEvent);
   globalThis.removeEventListener?.('greyblue:crossing-cancelled', onCrossingCancelled);
+  globalThis.removeEventListener?.('keydown', onKeyDown);
   panel.remove();
   delete globalThis.__greyblueExpedition;
 }, { once: true });
