@@ -38,16 +38,30 @@ function createAudioGraph() {
   master.gain.value = 0;
   master.connect(context.destination);
   const wind = context.createBufferSource();
-  wind.buffer = createNoiseBuffer(context); wind.loop = true;
-  const windFilter = context.createBiquadFilter(); windFilter.type = 'lowpass'; windFilter.Q.value = 0.7;
-  const windGain = context.createGain(); wind.connect(windFilter).connect(windGain).connect(master);
-  const tone = context.createOscillator(); tone.type = 'sine';
-  const toneGain = context.createGain(); tone.connect(toneGain).connect(master);
-  const crossing = context.createOscillator(); crossing.type = 'sine'; crossing.frequency.value = 48;
-  const crossingGain = context.createGain(); crossing.connect(crossingGain).connect(master);
-  const lfo = context.createOscillator(); lfo.type = 'sine';
-  const lfoDepth = context.createGain(); lfo.connect(lfoDepth).connect(crossingGain.gain);
-  wind.start(); tone.start(); crossing.start(); lfo.start();
+  wind.buffer = createNoiseBuffer(context);
+  wind.loop = true;
+  const windFilter = context.createBiquadFilter();
+  windFilter.type = 'lowpass';
+  windFilter.Q.value = 0.7;
+  const windGain = context.createGain();
+  wind.connect(windFilter).connect(windGain).connect(master);
+  const tone = context.createOscillator();
+  tone.type = 'sine';
+  const toneGain = context.createGain();
+  tone.connect(toneGain).connect(master);
+  const crossing = context.createOscillator();
+  crossing.type = 'sine';
+  crossing.frequency.value = 48;
+  const crossingGain = context.createGain();
+  crossing.connect(crossingGain).connect(master);
+  const lfo = context.createOscillator();
+  lfo.type = 'sine';
+  const lfoDepth = context.createGain();
+  lfo.connect(lfoDepth).connect(crossingGain.gain);
+  wind.start();
+  tone.start();
+  crossing.start();
+  lfo.start();
   return { context, master, wind, windFilter, windGain, tone, toneGain, crossing, crossingGain, lfo, lfoDepth };
 }
 
@@ -118,6 +132,11 @@ function familiarCrossingFrequency(signature) {
   return table[signature] ?? null;
 }
 
+function familiarLandmarkEchoFrequency(echoClass) {
+  const table = Object.freeze({ resonance: 247, instrument: 311, relic: 174, threshold: 208 });
+  return table[echoClass] ?? null;
+}
+
 function onOmenListened(event) {
   const frequency = omenFrequency(event?.detail?.soundHook);
   if (frequency) oneShot(frequency);
@@ -157,17 +176,34 @@ function onFamiliarCrossingSignature(event) {
   if (frequency) oneShot(frequency, 0.009, 1.1);
 }
 
+function onFamiliarLandmarkEcho(event) {
+  if (event?.detail?.active !== true || event?.detail?.soundHook !== 'familiar-landmark-echo') return;
+  const frequency = familiarLandmarkEchoFrequency(event.detail.echoClass);
+  if (frequency) oneShot(frequency, 0.008, 1.25);
+}
+
 async function toggleSound() {
   if (disposed) return;
-  if (!audio) { try { audio = createAudioGraph(); } catch { audio = null; } }
-  if (!audio) { enabled = false; status.textContent = 'Soundscape unavailable.'; return; }
+  if (!audio) {
+    try { audio = createAudioGraph(); } catch { audio = null; }
+  }
+  if (!audio) {
+    enabled = false;
+    status.textContent = 'Soundscape unavailable.';
+    return;
+  }
   enabled = !enabled;
-  if (enabled && audio.context.state === 'suspended') { try { await audio.context.resume(); } catch { enabled = false; } }
+  if (enabled && audio.context.state === 'suspended') {
+    try { await audio.context.resume(); } catch { enabled = false; }
+  }
   apply(lastView);
   status.textContent = enabled ? 'Soundscape on.' : 'Soundscape off.';
 }
 
-function onKeyDown(event) { if (!event.defaultPrevented && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && event.code === 'KeyM') void toggleSound(); }
+function onKeyDown(event) {
+  if (!event.defaultPrevented && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && event.code === 'KeyM') void toggleSound();
+}
+
 globalThis.addEventListener?.('keydown', onKeyDown);
 globalThis.addEventListener?.('greyblue:omen-listened', onOmenListened);
 globalThis.addEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
@@ -175,12 +211,18 @@ globalThis.addEventListener?.('greyblue:expedition-arrival', onExpeditionArrival
 globalThis.addEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
 globalThis.addEventListener?.('greyblue:roost-rest', onRoostRest);
 globalThis.addEventListener?.('greyblue:familiar-crossing-signature', onFamiliarCrossingSignature);
+globalThis.addEventListener?.('greyblue:familiar-crossing-landmark-echo', onFamiliarLandmarkEcho);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
-    configurable: true, enumerable: true,
+    configurable: true,
+    enumerable: true,
     get() { return priorGet ? priorGet() : currentState; },
-    set(value) { if (priorSet) priorSet(value); currentState = priorGet ? priorGet() : value; apply(deriveSoundscape(currentState)); },
+    set(value) {
+      if (priorSet) priorSet(value);
+      currentState = priorGet ? priorGet() : value;
+      apply(deriveSoundscape(currentState));
+    },
   });
 }
 apply(lastView);
@@ -194,6 +236,15 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
   globalThis.removeEventListener?.('greyblue:roost-rest', onRoostRest);
   globalThis.removeEventListener?.('greyblue:familiar-crossing-signature', onFamiliarCrossingSignature);
+  globalThis.removeEventListener?.('greyblue:familiar-crossing-landmark-echo', onFamiliarLandmarkEcho);
   status.remove();
-  if (audio) { try { audio.wind.stop(); audio.tone.stop(); audio.crossing.stop(); audio.lfo.stop(); void audio.context.close(); } catch {} }
+  if (audio) {
+    try {
+      audio.wind.stop();
+      audio.tone.stop();
+      audio.crossing.stop();
+      audio.lfo.stop();
+      void audio.context.close();
+    } catch {}
+  }
 }, { once: true });
