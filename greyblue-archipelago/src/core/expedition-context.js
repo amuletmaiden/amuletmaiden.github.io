@@ -24,12 +24,22 @@ function completedRoutes(exploration) {
     .filter(Boolean));
 }
 
-function knownLandmarkConsequences(exploration) {
+function knownLandmarkConsequences(exploration, islands) {
   const result = new Set();
+  const islandForLandmark = new Map();
+  for (const island of islands.values()) {
+    if (island.landmarkId) islandForLandmark.set(island.landmarkId, island.id);
+  }
   for (const event of eventList(exploration)) {
     if (event.kind !== 'landmark-investigated' && event.kind !== 'landmark-flight-encounter') continue;
     const islandId = cleanId(event.islandId);
-    if (islandId) result.add(islandId);
+    if (islandId && islands.has(islandId)) {
+      result.add(islandId);
+      continue;
+    }
+    const landmarkId = cleanId(event.landmarkId || event.id);
+    const authoredIslandId = islandForLandmark.get(landmarkId);
+    if (authoredIslandId) result.add(authoredIslandId);
   }
   return result;
 }
@@ -53,10 +63,12 @@ function normalizeWorld(world, discoveredIslandIds, discoveredRouteIds) {
   for (const island of rawIslands) {
     const id = cleanId(island?.id);
     if (!id || !discoveredIslands.has(id)) continue;
+    const landmarkId = cleanId(island.landmarkRecord?.id || island.landmark?.id);
     islands.set(id, Object.freeze({
       id,
       regionId: cleanId(island.regionId) || null,
-      hasLandmark: Boolean(island.landmarkRecord?.id || island.landmark),
+      landmarkId: landmarkId || null,
+      hasLandmark: Boolean(landmarkId || island.landmark),
     }));
   }
 
@@ -153,7 +165,7 @@ function pathKey(path) {
 
 function chooseJourney({ world, departureIslandId, exploration, explicitRouteId }) {
   const completed = completedRoutes(exploration);
-  const landmarkConsequences = knownLandmarkConsequences(exploration);
+  const landmarkConsequences = knownLandmarkConsequences(exploration, world.islands);
   const roostId = currentRoost(exploration);
   let candidates = simplePaths(world, departureIslandId).map((path) => {
     const purpose = purposeFor(path, { islands: world.islands, landmarkConsequences, completed, roostId });
