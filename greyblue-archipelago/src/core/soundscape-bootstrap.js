@@ -102,6 +102,11 @@ function encounterFrequency(encounterClass) {
   return table[encounterClass] ?? null;
 }
 
+function expeditionArrivalFrequency(consequenceClass) {
+  const table = Object.freeze({ resonance: 247, clearing: 294, warmth: 185, hush: 139 });
+  return table[consequenceClass] ?? null;
+}
+
 function onOmenListened(event) {
   const frequency = omenFrequency(event?.detail?.soundHook);
   if (frequency) oneShot(frequency);
@@ -110,6 +115,11 @@ function onOmenListened(event) {
 function onLandmarkFlightEncounter(event) {
   const frequency = encounterFrequency(event?.detail?.encounterClass);
   if (frequency) oneShot(frequency, 0.022, 1.2);
+}
+
+function onExpeditionArrival(event) {
+  const frequency = expeditionArrivalFrequency(event?.detail?.consequenceClass);
+  if (frequency) oneShot(frequency, 0.02, 1.35);
 }
 
 async function toggleSound() {
@@ -126,6 +136,7 @@ function onKeyDown(event) { if (!event.defaultPrevented && !event.repeat && !eve
 globalThis.addEventListener?.('keydown', onKeyDown);
 globalThis.addEventListener?.('greyblue:omen-listened', onOmenListened);
 globalThis.addEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
+globalThis.addEventListener?.('greyblue:expedition-arrival', onExpeditionArrival);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
@@ -141,6 +152,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('keydown', onKeyDown);
   globalThis.removeEventListener?.('greyblue:omen-listened', onOmenListened);
   globalThis.removeEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
+  globalThis.removeEventListener?.('greyblue:expedition-arrival', onExpeditionArrival);
   status.remove();
   if (audio) { try { audio.wind.stop(); audio.tone.stop(); audio.crossing.stop(); audio.lfo.stop(); void audio.context.close(); } catch {} }
 }, { once: true });
