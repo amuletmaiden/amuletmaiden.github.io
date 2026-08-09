@@ -1,5 +1,6 @@
 const MAX_ID = 120;
 const PURPOSES = new Set(['landmark', 'frontier', 'roost']);
+const CLASSES = new Set(['resonance', 'clearing', 'warmth', 'hush']);
 
 function cleanId(value) {
   return typeof value === 'string' ? value.trim().slice(0, MAX_ID) : '';
@@ -60,7 +61,7 @@ export function idleExpeditionCulmination() {
 export function publicExpeditionCulmination(culmination) {
   if (!culmination?.active) return idleExpeditionCulmination();
   const purpose = PURPOSES.has(culmination.purpose) ? culmination.purpose : null;
-  const consequenceClass = cleanId(culmination.class);
+  const consequenceClass = CLASSES.has(culmination.class) ? culmination.class : null;
   if (!purpose || !consequenceClass) return idleExpeditionCulmination();
   return Object.freeze({
     active: true,
