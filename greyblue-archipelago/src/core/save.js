@@ -19,6 +19,7 @@ export function saveGame(state, storage = localStorage, guidanceContext = null) 
   const previousExploration = state.exploration === undefined
     ? readStoredExploration(storage)
     : null;
+  const previousSettings = readStoredSettings(storage);
   const position = normalizePosition(state.position);
   const previousPosition = readStoredPosition(storage);
   if (holdRecoveryCheckpointOnce) {
@@ -38,10 +39,31 @@ export function saveGame(state, storage = localStorage, guidanceContext = null) 
     discoveredRoutes,
     guidance: guidanceResult.guidance,
     exploration: normalizeExploration(state.exploration ?? previousExploration),
-    settings: isPlainObject(state.settings) ? state.settings : {},
+    settings: {
+      ...previousSettings,
+      ...(isPlainObject(state.settings) ? state.settings : {}),
+    },
   };
   storage.setItem(SAVE_KEY, JSON.stringify(payload));
   return { ...payload, guidanceRecovery: guidanceResult.recovery };
+}
+
+export function saveSettingsPatch(settings, storage = localStorage) {
+  if (!isPlainObject(settings)) return false;
+  try {
+    const raw = storage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!isPlainObject(parsed) || ![1, CURRENT_VERSION].includes(parsed.version)) return false;
+    parsed.settings = {
+      ...(isPlainObject(parsed.settings) ? parsed.settings : {}),
+      ...settings,
+    };
+    storage.setItem(SAVE_KEY, JSON.stringify(parsed));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function loadGame(storage = localStorage, guidanceContext = null) {
@@ -259,6 +281,19 @@ function readStoredExploration(storage) {
     return isPlainObject(parsed) ? parsed.exploration ?? null : null;
   } catch {
     return null;
+  }
+}
+
+function readStoredSettings(storage) {
+  try {
+    const raw = storage.getItem(SAVE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return isPlainObject(parsed) && isPlainObject(parsed.settings)
+      ? parsed.settings
+      : {};
+  } catch {
+    return {};
   }
 }
 
