@@ -43,7 +43,7 @@ function departureLine(departureClass) {
 function derive(state = currentState, enterRest = false) {
   const speed = Number(state?.flight?.speed);
   const next = deriveRoostRest({
-    earnedRoost: state?.earnedRoost,
+    earnedRoost: state?.earnedRoost ?? globalThis.__greyblueRoostRecovery ?? null,
     grounded: state?.collision?.grounded === true && state?.flight?.airborne !== true,
     groundedIslandId: state?.nearestIsland?.id ?? null,
     groundedZoneId: groundedZone(state),
