@@ -44,6 +44,30 @@ const base = {
 
 {
   const context = deriveExpeditionContext({
+    world: {
+      islands: [
+        { id: 'a', regionId: 'r' },
+        { id: 'b', regionId: 'r', landmarkRecord: { id: 'landmark-b' } },
+        { id: 'c', regionId: 'r' },
+      ],
+      routes: [
+        { id: 'ab', fromIslandId: 'a', toIslandId: 'b' },
+        { id: 'ac', fromIslandId: 'a', toIslandId: 'c' },
+      ],
+    },
+    discoveredIslandIds: ['a', 'b', 'c'],
+    discoveredRouteIds: ['ab', 'ac'],
+    currentIslandId: 'a',
+    exploration: { events: [
+      { kind: 'landmark-investigated', id: 'landmark-b', landmarkId: 'landmark-b', occurredAt: 1 },
+    ] },
+  });
+  assert.equal(context.routeId, 'ab');
+  assert.equal(context.purpose, 'frontier');
+}
+
+{
+  const context = deriveExpeditionContext({
     ...base,
     discoveredIslandIds: ['isle-a', 'isle-b'],
     discoveredRouteIds: ['route-a-c'],

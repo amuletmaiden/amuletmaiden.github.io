@@ -25,6 +25,9 @@ let currentState = null;
 let arrivalMistMultiplier = 1;
 let arrivalMistClass = null;
 let arrivalMistTimer = 0;
+let culminationMistMultiplier = 1;
+let culminationMistClass = null;
+let culminationMistTimer = 0;
 
 function addExplorationEvent(event) {
   if (!event || typeof event !== "object") return false;
@@ -74,7 +77,7 @@ function decorate(state) {
   if (!state || typeof state !== "object") return state;
   const fog = state.fog && typeof state.fog === "object" ? state.fog : {};
   const effectiveDensity = Number.isFinite(fog.effectiveDensity) ? fog.effectiveDensity : null;
-  const renderedMultiplier = latestFamiliarity.densityMultiplier * arrivalMistMultiplier;
+  const renderedMultiplier = latestFamiliarity.densityMultiplier * arrivalMistMultiplier * culminationMistMultiplier;
   return {
     ...state,
     fog: {
@@ -87,6 +90,8 @@ function decorate(state) {
       familiarityRadius: latestFamiliarity.radius,
       expeditionArrivalClass: arrivalMistClass,
       expeditionArrivalDensityMultiplier: arrivalMistMultiplier,
+      expeditionCulminationClass: culminationMistClass,
+      expeditionCulminationDensityMultiplier: culminationMistMultiplier,
       renderedDensity: effectiveDensity === null ? null : effectiveDensity * renderedMultiplier,
     },
   };
@@ -130,6 +135,11 @@ function arrivalMistProfile(consequenceClass) {
   return table[consequenceClass] ?? null;
 }
 
+function culminationMistProfile(consequenceClass) {
+  const table = Object.freeze({ resonance: 0.89, clearing: 0.85, warmth: 0.92, hush: 0.96 });
+  return table[consequenceClass] ?? null;
+}
+
 function onExpeditionArrival(event) {
   const consequenceClass = typeof event?.detail?.consequenceClass === "string" ? event.detail.consequenceClass : "";
   const multiplier = arrivalMistProfile(consequenceClass);
@@ -145,6 +155,29 @@ function onExpeditionArrival(event) {
   }, reducedMotion ? 1800 : 3200);
 }
 
+function onExpeditionCulmination(event) {
+  if (!event?.detail?.active) {
+    if (culminationMistTimer) clearTimeout(culminationMistTimer);
+    culminationMistTimer = 0;
+    culminationMistClass = null;
+    culminationMistMultiplier = 1;
+    return;
+  }
+  const consequenceClass = typeof event.detail.consequenceClass === "string" ? event.detail.consequenceClass : "";
+  const multiplier = culminationMistProfile(consequenceClass);
+  if (!multiplier) return;
+  if (culminationMistTimer) clearTimeout(culminationMistTimer);
+  culminationMistClass = consequenceClass;
+  culminationMistMultiplier = multiplier;
+  const requestedDuration = Number(event.detail.durationMs);
+  const duration = Number.isFinite(requestedDuration) ? Math.max(800, Math.min(8000, requestedDuration)) : 4600;
+  culminationMistTimer = setTimeout(() => {
+    culminationMistTimer = 0;
+    culminationMistClass = null;
+    culminationMistMultiplier = 1;
+  }, duration);
+}
+
 const onLandmarkInvestigated = (event) => consumeEvent("landmark-investigated", event?.detail);
 const onRouteCompleted = (event) => consumeEvent("route-completed", event?.detail);
 const onApproachMastered = (event) => consumeEvent("approach-mastered", event?.detail);
@@ -152,6 +185,7 @@ globalThis.addEventListener?.("greyblue:landmark-investigated", onLandmarkInvest
 globalThis.addEventListener?.("greyblue:route-completed", onRouteCompleted);
 globalThis.addEventListener?.("greyblue:approach-mastered", onApproachMastered);
 globalThis.addEventListener?.("greyblue:expedition-arrival", onExpeditionArrival);
+globalThis.addEventListener?.("greyblue:expedition-culmination", onExpeditionCulmination);
 
 const originalRender = THREE.WebGLRenderer.prototype.render;
 THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, camera) {
@@ -160,7 +194,7 @@ THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, ca
     return originalRender.call(this, scene, camera);
   }
   const authoredDensity = fog.density;
-  fog.density = authoredDensity * latestFamiliarity.densityMultiplier * arrivalMistMultiplier;
+  fog.density = authoredDensity * latestFamiliarity.densityMultiplier * arrivalMistMultiplier * culminationMistMultiplier;
   try {
     return originalRender.call(this, scene, camera);
   } finally {
@@ -170,6 +204,7 @@ THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, ca
 
 globalThis.addEventListener?.("beforeunload", () => {
   if (arrivalMistTimer) clearTimeout(arrivalMistTimer);
+  if (culminationMistTimer) clearTimeout(culminationMistTimer);
   if (THREE.WebGLRenderer.prototype.render !== originalRender) {
     THREE.WebGLRenderer.prototype.render = originalRender;
   }
@@ -177,4 +212,5 @@ globalThis.addEventListener?.("beforeunload", () => {
   globalThis.removeEventListener?.("greyblue:route-completed", onRouteCompleted);
   globalThis.removeEventListener?.("greyblue:approach-mastered", onApproachMastered);
   globalThis.removeEventListener?.("greyblue:expedition-arrival", onExpeditionArrival);
+  globalThis.removeEventListener?.("greyblue:expedition-culmination", onExpeditionCulmination);
 }, { once: true });

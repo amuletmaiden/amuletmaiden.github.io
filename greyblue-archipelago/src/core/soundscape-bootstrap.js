@@ -107,6 +107,11 @@ function expeditionArrivalFrequency(consequenceClass) {
   return table[consequenceClass] ?? null;
 }
 
+function expeditionCulminationFrequency(consequenceClass) {
+  const table = Object.freeze({ resonance: 330, clearing: 370, warmth: 220, hush: 165 });
+  return table[consequenceClass] ?? null;
+}
+
 function onOmenListened(event) {
   const frequency = omenFrequency(event?.detail?.soundHook);
   if (frequency) oneShot(frequency);
@@ -120,6 +125,12 @@ function onLandmarkFlightEncounter(event) {
 function onExpeditionArrival(event) {
   const frequency = expeditionArrivalFrequency(event?.detail?.consequenceClass);
   if (frequency) oneShot(frequency, 0.02, 1.35);
+}
+
+function onExpeditionCulmination(event) {
+  if (!event?.detail?.active) return;
+  const frequency = expeditionCulminationFrequency(event.detail.consequenceClass);
+  if (frequency) oneShot(frequency, 0.014, 1.6);
 }
 
 async function toggleSound() {
@@ -137,6 +148,7 @@ globalThis.addEventListener?.('keydown', onKeyDown);
 globalThis.addEventListener?.('greyblue:omen-listened', onOmenListened);
 globalThis.addEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
 globalThis.addEventListener?.('greyblue:expedition-arrival', onExpeditionArrival);
+globalThis.addEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
@@ -153,6 +165,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('greyblue:omen-listened', onOmenListened);
   globalThis.removeEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
   globalThis.removeEventListener?.('greyblue:expedition-arrival', onExpeditionArrival);
+  globalThis.removeEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
   status.remove();
   if (audio) { try { audio.wind.stop(); audio.tone.stop(); audio.crossing.stop(); audio.lfo.stop(); void audio.context.close(); } catch {} }
 }, { once: true });
