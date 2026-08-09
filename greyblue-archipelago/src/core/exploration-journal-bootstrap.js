@@ -9,6 +9,7 @@ let journalState = createExplorationJournalState();
 let disposed = false;
 let open = false;
 let omen = globalThis.__greyblueRegionalOmen ?? null;
+let expeditionLine = null;
 
 const panel = document.createElement('section');
 panel.id = 'greyblue-exploration-journal';
@@ -19,6 +20,7 @@ panel.innerHTML = `
   <div class="greyblue-journal-heading">Exploration journal</div>
   <div data-greyblue-journal-objective></div>
   <div data-greyblue-journal-context></div>
+  <div data-greyblue-journal-expedition hidden></div>
   <div data-greyblue-journal-omen hidden></div>
   <ol data-greyblue-journal-discoveries></ol>
 `;
@@ -32,6 +34,7 @@ host.append(panel, announcement);
 
 const objectiveNode = panel.querySelector('[data-greyblue-journal-objective]');
 const contextNode = panel.querySelector('[data-greyblue-journal-context]');
+const expeditionNode = panel.querySelector('[data-greyblue-journal-expedition]');
 const omenNode = panel.querySelector('[data-greyblue-journal-omen]');
 const discoveriesNode = panel.querySelector('[data-greyblue-journal-discoveries]');
 
@@ -41,6 +44,8 @@ function render(state) {
   journalState = next.state;
   objectiveNode.textContent = next.view.objective;
   contextNode.textContent = next.view.context;
+  expeditionNode.hidden = !expeditionLine;
+  expeditionNode.textContent = expeditionLine ?? '';
   const activeOmen = omen?.active && omen.regionId && omen.regionId === state?.currentRegion?.id ? omen : null;
   omenNode.hidden = !activeOmen;
   omenNode.textContent = activeOmen?.tone?.text ?? '';
@@ -73,8 +78,15 @@ function onRegionalOmen(event) {
   render(currentState);
 }
 
+function onExpeditionContext(event) {
+  const line = typeof event?.detail?.line === 'string' ? event.detail.line.trim().slice(0, 220) : '';
+  expeditionLine = line || null;
+  render(currentState);
+}
+
 globalThis.addEventListener?.('keydown', onKeyDown);
 globalThis.addEventListener?.('greyblue:regional-omen', onRegionalOmen);
+globalThis.addEventListener?.('greyblue:expedition-context', onExpeditionContext);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
@@ -95,6 +107,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
   globalThis.removeEventListener?.('keydown', onKeyDown);
   globalThis.removeEventListener?.('greyblue:regional-omen', onRegionalOmen);
+  globalThis.removeEventListener?.('greyblue:expedition-context', onExpeditionContext);
   panel.remove();
   announcement.remove();
 }, { once: true });
