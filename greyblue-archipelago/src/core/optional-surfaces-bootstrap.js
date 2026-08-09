@@ -14,6 +14,7 @@ const OPTIONAL_SURFACES = [
   ["familiar-mist", () => import("./familiar-mist-bootstrap.js")],
   ["regional-omens", () => import("./regional-omen-bootstrap.js")],
   ["expedition", () => import("./expedition-bootstrap.js")],
+  ["contextual-hud", () => import("../interface/contextual-hud-bootstrap.js")],
 ].map(([id, load]) => ({ id, load }));
 
 const readiness = createOptionalSurfaceReadiness(OPTIONAL_SURFACES);
