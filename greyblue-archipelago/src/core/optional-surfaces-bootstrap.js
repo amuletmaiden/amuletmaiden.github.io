@@ -17,6 +17,7 @@ const OPTIONAL_SURFACES = [
   ["expedition", () => import("./expedition-bootstrap.js")],
   ["familiar-crossing-signature", () => import("./familiar-crossing-signature-bootstrap.js")],
   ["known-crossing-destination-atmosphere", () => import("./known-crossing-destination-atmosphere-bootstrap.js")],
+  ["known-crossing-destination-atmosphere-presentation", () => import("./known-crossing-destination-atmosphere-presentation-bootstrap.js")],
   ["roost-rest", () => import("./roost-rest-bootstrap.js")],
   ["contextual-hud", () => import("../interface/contextual-hud-bootstrap.js")],
 ].map(([id, load]) => ({ id, load }));
