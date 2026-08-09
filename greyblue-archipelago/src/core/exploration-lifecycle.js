@@ -1,5 +1,5 @@
 const EXPLORATION_VERSION = 1;
-const VALID_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "landmark-flight-encounter", "route-completed", "approach-mastered", "roost-established"]);
+const VALID_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "landmark-flight-encounter", "route-completed", "approach-mastered", "roost-established", "regional-thread-recognized"]);
 
 function cleanId(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -175,6 +175,17 @@ export function createExplorationLifecycle(initialExploration = null) {
       });
     },
 
+    recordRegionalThreadRecognition(regionId, occurredAt = Date.now()) {
+      const id = cleanId(regionId);
+      if (!id) return false;
+      return record({
+        kind: "regional-thread-recognized",
+        id,
+        regionId: id,
+        occurredAt,
+      });
+    },
+
     markFlushed() {
       dirty = false;
     },
@@ -202,6 +213,7 @@ export function createExplorationLifecycle(initialExploration = null) {
         routeCompletionCount: values.filter((event) => event.kind === "route-completed").length,
         approachMasteryCount: values.filter((event) => event.kind === "approach-mastered").length,
         roostCount: values.filter((event) => event.kind === "roost-established").length,
+        regionalThreadRecognitionCount: values.filter((event) => event.kind === "regional-thread-recognized").length,
         dirty,
       };
     },
