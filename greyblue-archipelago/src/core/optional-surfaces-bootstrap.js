@@ -22,6 +22,7 @@ const OPTIONAL_SURFACES = [
   ["known-landmark-revisit", () => import("./known-landmark-revisit-bootstrap.js")],
   ["known-landmark-traversal-circuit", () => import("./known-landmark-traversal-circuit-bootstrap.js")],
   ["regional-flight-memory", () => import("./regional-flight-memory-bootstrap.js")],
+  ["regional-aerial-echo", () => import("./regional-aerial-echo-bootstrap.js")],
   ["contextual-hud", () => import("../interface/contextual-hud-bootstrap.js")],
 ].map(([id, load]) => ({ id, load }));
 
