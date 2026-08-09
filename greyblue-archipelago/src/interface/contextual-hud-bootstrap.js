@@ -20,6 +20,21 @@ const nodes = Object.freeze({
   approach: document.querySelector('#greyblue-approach-challenge'),
 });
 
+const style = document.createElement('style');
+style.id = 'greyblue-contextual-hud-style';
+style.textContent = `
+  #hud [data-greyblue-context-dimmed="true"] { opacity:.42; filter:saturate(.72); }
+  #hud [data-greyblue-context-dimmed="true"] [data-visually-hidden] { opacity:1; filter:none; }
+  #hud[data-greyblue-hud-density="expanded"] [data-greyblue-context-dimmed="true"] { opacity:1; filter:none; }
+  @media (prefers-reduced-motion: no-preference) {
+    #hud > section { transition:opacity 120ms linear,filter 120ms linear; }
+  }
+  @media (prefers-contrast: more) {
+    #hud [data-greyblue-context-dimmed="true"] { opacity:.68; filter:none; }
+  }
+`;
+document.head?.append(style);
+
 function visible(node) {
   return Boolean(node && node.isConnected && !node.hidden);
 }
@@ -66,8 +81,8 @@ function render(state = currentState) {
     setDimmed(nodes[id], focus.dimmedSurfaceIds.includes(id));
   }
 
-  // The journal is explicitly player-controlled. Listening and approach surfaces
-  // remain fully legible because they can contain immediate interaction feedback.
+  // Journal control stays wholly with the player. Listening and approach panels can
+  // carry immediate interaction feedback, so focus never visually suppresses them.
   setDimmed(nodes.journal, false);
   setDimmed(nodes.listening, false);
   setDimmed(nodes.approach, false);
@@ -92,7 +107,7 @@ if (!priorDescriptor || priorDescriptor.configurable) {
   });
 }
 
-for (const eventName of [
+const refreshEvents = Object.freeze([
   'greyblue:expedition-context',
   'greyblue:expedition-arrival',
   'greyblue:expedition-culmination',
@@ -100,22 +115,15 @@ for (const eventName of [
   'greyblue:landmark-investigated',
   'greyblue:landmark-flight-encounter',
   'greyblue:crossing-cancelled',
-]) globalThis.addEventListener?.(eventName, refreshSoon);
-
+]);
+for (const eventName of refreshEvents) globalThis.addEventListener?.(eventName, refreshSoon);
 globalThis.addEventListener?.('keydown', refreshSoon);
 render(currentState);
 
 globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
-  for (const eventName of [
-    'greyblue:expedition-context',
-    'greyblue:expedition-arrival',
-    'greyblue:expedition-culmination',
-    'greyblue:route-completed',
-    'greyblue:landmark-investigated',
-    'greyblue:landmark-flight-encounter',
-    'greyblue:crossing-cancelled',
-    'keydown',
-  ]) globalThis.removeEventListener?.(eventName, refreshSoon);
+  for (const eventName of refreshEvents) globalThis.removeEventListener?.(eventName, refreshSoon);
+  globalThis.removeEventListener?.('keydown', refreshSoon);
+  style.remove();
   delete globalThis.__greyblueHudFocus;
 }, { once: true });
