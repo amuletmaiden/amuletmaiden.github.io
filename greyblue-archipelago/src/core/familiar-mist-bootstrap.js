@@ -36,6 +36,9 @@ let familiarCrossingClass = null;
 let landmarkEchoMistMultiplier = 1;
 let landmarkEchoMistClass = null;
 let landmarkEchoMistTimer = 0;
+let regionalThreadMistMultiplier = 1;
+let regionalThreadMistClass = null;
+let regionalThreadMistTimer = 0;
 
 function addExplorationEvent(event) {
   if (!event || typeof event !== "object") return false;
@@ -90,7 +93,8 @@ function decorate(state) {
     * culminationMistMultiplier
     * roostRestMistMultiplier
     * familiarCrossingMultiplier
-    * landmarkEchoMistMultiplier;
+    * landmarkEchoMistMultiplier
+    * regionalThreadMistMultiplier;
   return {
     ...state,
     fog: {
@@ -111,6 +115,8 @@ function decorate(state) {
       familiarCrossingDensityMultiplier: familiarCrossingMultiplier,
       familiarLandmarkEchoClass: landmarkEchoMistClass,
       familiarLandmarkEchoDensityMultiplier: landmarkEchoMistMultiplier,
+      regionalMysteryThreadClass: regionalThreadMistClass,
+      regionalMysteryThreadDensityMultiplier: regionalThreadMistMultiplier,
       renderedDensity: effectiveDensity === null ? null : effectiveDensity * renderedMultiplier,
     },
   };
@@ -162,6 +168,11 @@ function culminationMistProfile(consequenceClass) {
 function familiarLandmarkEchoMistProfile(echoClass) {
   const table = Object.freeze({ resonance: 0.965, instrument: 0.95, relic: 0.975, threshold: 0.985 });
   return table[echoClass] ?? null;
+}
+
+function regionalThreadMistProfile(threadClass) {
+  const table = Object.freeze({ chorus: 0.94, instrument: 0.955, relic: 0.97, threshold: 0.985 });
+  return table[threadClass] ?? null;
 }
 
 function onExpeditionArrival(event) {
@@ -242,6 +253,24 @@ function onFamiliarLandmarkEcho(event) {
   }, reducedMotion ? 1200 : 2200);
 }
 
+function onRegionalMysteryThread(event) {
+  if (event?.detail?.active !== true || event?.detail?.recognized !== true) return;
+  const threadClass = typeof event.detail.threadClass === 'string' ? event.detail.threadClass : '';
+  const multiplier = regionalThreadMistProfile(threadClass);
+  if (!multiplier) return;
+  if (regionalThreadMistTimer) clearTimeout(regionalThreadMistTimer);
+  regionalThreadMistClass = threadClass;
+  regionalThreadMistMultiplier = multiplier;
+  const reducedMotion = (() => {
+    try { return Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches); } catch { return false; }
+  })();
+  regionalThreadMistTimer = setTimeout(() => {
+    regionalThreadMistTimer = 0;
+    regionalThreadMistClass = null;
+    regionalThreadMistMultiplier = 1;
+  }, reducedMotion ? 1600 : 2800);
+}
+
 const onLandmarkInvestigated = (event) => consumeEvent("landmark-investigated", event?.detail);
 const onRouteCompleted = (event) => consumeEvent("route-completed", event?.detail);
 const onApproachMastered = (event) => consumeEvent("approach-mastered", event?.detail);
@@ -253,6 +282,7 @@ globalThis.addEventListener?.("greyblue:expedition-culmination", onExpeditionCul
 globalThis.addEventListener?.("greyblue:roost-rest", onRoostRest);
 globalThis.addEventListener?.("greyblue:familiar-crossing-signature", onFamiliarCrossingSignature);
 globalThis.addEventListener?.("greyblue:familiar-crossing-landmark-echo", onFamiliarLandmarkEcho);
+globalThis.addEventListener?.("greyblue:regional-mystery-thread", onRegionalMysteryThread);
 
 const originalRender = THREE.WebGLRenderer.prototype.render;
 THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, camera) {
@@ -267,7 +297,8 @@ THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, ca
     * culminationMistMultiplier
     * roostRestMistMultiplier
     * familiarCrossingMultiplier
-    * landmarkEchoMistMultiplier;
+    * landmarkEchoMistMultiplier
+    * regionalThreadMistMultiplier;
   try {
     return originalRender.call(this, scene, camera);
   } finally {
@@ -279,6 +310,7 @@ globalThis.addEventListener?.("beforeunload", () => {
   if (arrivalMistTimer) clearTimeout(arrivalMistTimer);
   if (culminationMistTimer) clearTimeout(culminationMistTimer);
   if (landmarkEchoMistTimer) clearTimeout(landmarkEchoMistTimer);
+  if (regionalThreadMistTimer) clearTimeout(regionalThreadMistTimer);
   if (THREE.WebGLRenderer.prototype.render !== originalRender) {
     THREE.WebGLRenderer.prototype.render = originalRender;
   }
@@ -290,4 +322,5 @@ globalThis.addEventListener?.("beforeunload", () => {
   globalThis.removeEventListener?.("greyblue:roost-rest", onRoostRest);
   globalThis.removeEventListener?.("greyblue:familiar-crossing-signature", onFamiliarCrossingSignature);
   globalThis.removeEventListener?.("greyblue:familiar-crossing-landmark-echo", onFamiliarLandmarkEcho);
+  globalThis.removeEventListener?.("greyblue:regional-mystery-thread", onRegionalMysteryThread);
 }, { once: true });
