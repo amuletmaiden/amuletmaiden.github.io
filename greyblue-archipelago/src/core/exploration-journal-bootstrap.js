@@ -13,6 +13,8 @@ let expeditionLine = null;
 let culminationLine = null;
 let roostRestLine = null;
 let familiarCrossingLine = null;
+let familiarLandmarkEchoLine = null;
+let familiarLandmarkEchoTimer = 0;
 
 const panel = document.createElement('section');
 panel.id = 'greyblue-exploration-journal';
@@ -27,6 +29,7 @@ panel.innerHTML = `
   <div data-greyblue-journal-culmination hidden></div>
   <div data-greyblue-journal-roost-rest hidden></div>
   <div data-greyblue-journal-familiar-crossing hidden></div>
+  <div data-greyblue-journal-familiar-landmark-echo hidden></div>
   <div data-greyblue-journal-omen hidden></div>
   <ol data-greyblue-journal-discoveries></ol>
 `;
@@ -44,6 +47,7 @@ const expeditionNode = panel.querySelector('[data-greyblue-journal-expedition]')
 const culminationNode = panel.querySelector('[data-greyblue-journal-culmination]');
 const roostRestNode = panel.querySelector('[data-greyblue-journal-roost-rest]');
 const familiarCrossingNode = panel.querySelector('[data-greyblue-journal-familiar-crossing]');
+const familiarLandmarkEchoNode = panel.querySelector('[data-greyblue-journal-familiar-landmark-echo]');
 const omenNode = panel.querySelector('[data-greyblue-journal-omen]');
 const discoveriesNode = panel.querySelector('[data-greyblue-journal-discoveries]');
 
@@ -61,6 +65,8 @@ function render(state) {
   roostRestNode.textContent = roostRestLine ?? '';
   familiarCrossingNode.hidden = !familiarCrossingLine;
   familiarCrossingNode.textContent = familiarCrossingLine ?? '';
+  familiarLandmarkEchoNode.hidden = !familiarLandmarkEchoLine;
+  familiarLandmarkEchoNode.textContent = familiarLandmarkEchoLine ?? '';
   const activeOmen = omen?.active && omen.regionId && omen.regionId === state?.currentRegion?.id ? omen : null;
   omenNode.hidden = !activeOmen;
   omenNode.textContent = activeOmen?.tone?.text ?? '';
@@ -117,7 +123,22 @@ function onFamiliarCrossingSignature(event) {
   const active = Boolean(event?.detail?.active);
   const line = active && typeof event?.detail?.line === 'string' ? event.detail.line.trim().slice(0, 220) : '';
   familiarCrossingLine = line || null;
+  if (!active) familiarLandmarkEchoLine = null;
   render(currentState);
+}
+
+function onFamiliarLandmarkEcho(event) {
+  if (familiarLandmarkEchoTimer) clearTimeout(familiarLandmarkEchoTimer);
+  const active = event?.detail?.active === true;
+  const line = active && typeof event?.detail?.line === 'string' ? event.detail.line.trim().slice(0, 220) : '';
+  familiarLandmarkEchoLine = line || null;
+  render(currentState);
+  if (!familiarLandmarkEchoLine) return;
+  familiarLandmarkEchoTimer = setTimeout(() => {
+    familiarLandmarkEchoTimer = 0;
+    familiarLandmarkEchoLine = null;
+    render(currentState);
+  }, 8500);
 }
 
 globalThis.addEventListener?.('keydown', onKeyDown);
@@ -126,6 +147,7 @@ globalThis.addEventListener?.('greyblue:expedition-context', onExpeditionContext
 globalThis.addEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
 globalThis.addEventListener?.('greyblue:roost-rest', onRoostRest);
 globalThis.addEventListener?.('greyblue:familiar-crossing-signature', onFamiliarCrossingSignature);
+globalThis.addEventListener?.('greyblue:familiar-crossing-landmark-echo', onFamiliarLandmarkEcho);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
@@ -144,12 +166,14 @@ render(currentState);
 
 globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
+  if (familiarLandmarkEchoTimer) clearTimeout(familiarLandmarkEchoTimer);
   globalThis.removeEventListener?.('keydown', onKeyDown);
   globalThis.removeEventListener?.('greyblue:regional-omen', onRegionalOmen);
   globalThis.removeEventListener?.('greyblue:expedition-context', onExpeditionContext);
   globalThis.removeEventListener?.('greyblue:expedition-culmination', onExpeditionCulmination);
   globalThis.removeEventListener?.('greyblue:roost-rest', onRoostRest);
   globalThis.removeEventListener?.('greyblue:familiar-crossing-signature', onFamiliarCrossingSignature);
+  globalThis.removeEventListener?.('greyblue:familiar-crossing-landmark-echo', onFamiliarLandmarkEcho);
   panel.remove();
   announcement.remove();
 }, { once: true });
