@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { buildArchipelago } from "../world/archipelago.js";
 import { loadGame } from "./save.js";
 import { evaluateLocalFamiliarity } from "./local-familiarity.js";
+import { familiarCrossingMistMultiplier } from "./familiar-crossing-signature.js";
 
 const restored = loadGame();
 const explorationEvents = Array.isArray(restored?.exploration?.events)
@@ -30,6 +31,8 @@ let culminationMistClass = null;
 let culminationMistTimer = 0;
 let roostRestMistMultiplier = 1;
 let roostRestMistClass = null;
+let familiarCrossingMultiplier = 1;
+let familiarCrossingClass = null;
 
 function addExplorationEvent(event) {
   if (!event || typeof event !== "object") return false;
@@ -79,7 +82,7 @@ function decorate(state) {
   if (!state || typeof state !== "object") return state;
   const fog = state.fog && typeof state.fog === "object" ? state.fog : {};
   const effectiveDensity = Number.isFinite(fog.effectiveDensity) ? fog.effectiveDensity : null;
-  const renderedMultiplier = latestFamiliarity.densityMultiplier * arrivalMistMultiplier * culminationMistMultiplier * roostRestMistMultiplier;
+  const renderedMultiplier = latestFamiliarity.densityMultiplier * arrivalMistMultiplier * culminationMistMultiplier * roostRestMistMultiplier * familiarCrossingMultiplier;
   return {
     ...state,
     fog: {
@@ -96,6 +99,8 @@ function decorate(state) {
       expeditionCulminationDensityMultiplier: culminationMistMultiplier,
       roostRestClass: roostRestMistClass,
       roostRestDensityMultiplier: roostRestMistMultiplier,
+      familiarCrossingClass,
+      familiarCrossingDensityMultiplier: familiarCrossingMultiplier,
       renderedDensity: effectiveDensity === null ? null : effectiveDensity * renderedMultiplier,
     },
   };
@@ -189,6 +194,13 @@ function onRoostRest(event) {
   roostRestMistMultiplier = roostRestMistClass ? 0.95 : 1;
 }
 
+function onFamiliarCrossingSignature(event) {
+  const active = event?.detail?.active === true;
+  const signature = typeof event?.detail?.signature === 'string' ? event.detail.signature : null;
+  familiarCrossingClass = active ? signature : null;
+  familiarCrossingMultiplier = active ? familiarCrossingMistMultiplier(signature) : 1;
+}
+
 const onLandmarkInvestigated = (event) => consumeEvent("landmark-investigated", event?.detail);
 const onRouteCompleted = (event) => consumeEvent("route-completed", event?.detail);
 const onApproachMastered = (event) => consumeEvent("approach-mastered", event?.detail);
@@ -198,6 +210,7 @@ globalThis.addEventListener?.("greyblue:approach-mastered", onApproachMastered);
 globalThis.addEventListener?.("greyblue:expedition-arrival", onExpeditionArrival);
 globalThis.addEventListener?.("greyblue:expedition-culmination", onExpeditionCulmination);
 globalThis.addEventListener?.("greyblue:roost-rest", onRoostRest);
+globalThis.addEventListener?.("greyblue:familiar-crossing-signature", onFamiliarCrossingSignature);
 
 const originalRender = THREE.WebGLRenderer.prototype.render;
 THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, camera) {
@@ -206,7 +219,7 @@ THREE.WebGLRenderer.prototype.render = function renderWithFamiliarMist(scene, ca
     return originalRender.call(this, scene, camera);
   }
   const authoredDensity = fog.density;
-  fog.density = authoredDensity * latestFamiliarity.densityMultiplier * arrivalMistMultiplier * culminationMistMultiplier * roostRestMistMultiplier;
+  fog.density = authoredDensity * latestFamiliarity.densityMultiplier * arrivalMistMultiplier * culminationMistMultiplier * roostRestMistMultiplier * familiarCrossingMultiplier;
   try {
     return originalRender.call(this, scene, camera);
   } finally {
@@ -226,4 +239,5 @@ globalThis.addEventListener?.("beforeunload", () => {
   globalThis.removeEventListener?.("greyblue:expedition-arrival", onExpeditionArrival);
   globalThis.removeEventListener?.("greyblue:expedition-culmination", onExpeditionCulmination);
   globalThis.removeEventListener?.("greyblue:roost-rest", onRoostRest);
+  globalThis.removeEventListener?.("greyblue:familiar-crossing-signature", onFamiliarCrossingSignature);
 }, { once: true });
