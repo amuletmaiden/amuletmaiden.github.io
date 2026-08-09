@@ -21,6 +21,7 @@ const OPTIONAL_SURFACES = [
   ["roost-rest", () => import("./roost-rest-bootstrap.js")],
   ["known-landmark-revisit", () => import("./known-landmark-revisit-bootstrap.js")],
   ["known-landmark-traversal-circuit", () => import("./known-landmark-traversal-circuit-bootstrap.js")],
+  ["regional-flight-memory", () => import("./regional-flight-memory-bootstrap.js")],
   ["contextual-hud", () => import("../interface/contextual-hud-bootstrap.js")],
 ].map(([id, load]) => ({ id, load }));
 
