@@ -22,6 +22,10 @@ function cleanId(value) {
   return typeof value === 'string' && value.trim() ? value.trim().slice(0, 120) : null;
 }
 
+export function completedHighAirCrossingInternalDestination() {
+  return modelState?.completed === true ? cleanId(modelState.targetRegionId) : null;
+}
+
 function getWorld(state) {
   const seed = Number.isInteger(state?.seed) ? state.seed : 1337;
   if (!world || worldSeed !== seed) {
