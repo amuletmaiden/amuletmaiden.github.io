@@ -4,7 +4,7 @@ import { deriveUndiscoveredIslandMistHint, undiscoveredIslandMistHintPublicState
 
 let world = null;
 let worldSeed = null;
-let current = Object.freeze({ active: false, hintClass: null, relative: null, distance: null });
+let current = Object.freeze({ active: false, hintClass: null, candidateId: '', relative: null, distance: null });
 let disposed = false;
 
 function cleanId(value) {
@@ -26,8 +26,7 @@ function crossingActive(state) {
   return Number.isFinite(progress) && progress > 0 && progress < 1;
 }
 
-function derive() {
-  const state = globalThis.__greyblueState ?? null;
+function deriveForState(state) {
   return deriveUndiscoveredIslandMistHint({
     world: getWorld(state),
     currentRegionId: cleanId(state?.currentRegion?.id),
@@ -40,6 +39,16 @@ function derive() {
     restorePublishing: Boolean(state?.restorePublishing || state?.explorationRestorePublishing),
     crossingActive: crossingActive(state),
   });
+}
+
+function derive() {
+  return deriveForState(globalThis.__greyblueState ?? null);
+}
+
+// Sibling optional systems may consume the hidden candidate only in module
+// scope. Public global state remains the bounded qualitative shape below.
+export function deriveUndiscoveredIslandMistHintInternal(state = globalThis.__greyblueState ?? null) {
+  return deriveForState(state);
 }
 
 function publish(result) {
