@@ -40,6 +40,7 @@ function step(state, x, side = null, patch = {}) {
   assert.equal(state.phase, 'reverse');
   state = step(state, 44, 'right');
   assert.equal(state.completed, true);
+  assert.equal(linkedBankReversalPublicState(state, frameAt(44)).direction, 'left-right');
 }
 
 {
@@ -51,6 +52,7 @@ function step(state, x, side = null, patch = {}) {
   state = step(state, 33, 'left');
   state = step(state, 45, 'left');
   assert.equal(state.completed, true, 'right-to-left ordering has identical semantics');
+  assert.equal(linkedBankReversalPublicState(state, frameAt(45)).direction, 'right-left');
 }
 
 {
