@@ -21,6 +21,10 @@ function islandInnerDistance(island) {
   return Math.max(DEFAULT_INNER_DISTANCE, threshold * 1.25);
 }
 
+function inactiveHint() {
+  return Object.freeze({ active: false, hintClass: null, candidateId: '', relative: null, distance: null });
+}
+
 export function deriveUndiscoveredIslandMistHint({
   world,
   currentRegionId,
@@ -34,9 +38,9 @@ export function deriveUndiscoveredIslandMistHint({
   crossingActive = false,
 } = {}) {
   const regionId = cleanRegionId(currentRegionId);
-  if (!world || !Array.isArray(world.islands) || !regionId || !finitePosition(position)) return Object.freeze({ active: false, hintClass: null, relative: null, distance: null });
+  if (!world || !Array.isArray(world.islands) || !regionId || !finitePosition(position)) return inactiveHint();
   if (ready !== true || paused === true || airborne !== true || recoveryActive === true || restorePublishing === true || crossingActive === true) {
-    return Object.freeze({ active: false, hintClass: null, relative: null, distance: null });
+    return inactiveHint();
   }
 
   const discovered = discoveredSet(discoveredIslandIds);
@@ -55,10 +59,11 @@ export function deriveUndiscoveredIslandMistHint({
     }
   }
 
-  if (!nearest) return Object.freeze({ active: false, hintClass: null, relative: null, distance: null });
+  if (!nearest) return inactiveHint();
   return Object.freeze({
     active: true,
     hintClass: nearest.distance <= NEAR_BAND ? 'near' : 'faint',
+    candidateId: String(nearest.id).slice(0, 120),
     relative: Object.freeze({ x: nearest.dx, z: nearest.dz }),
     distance: nearest.distance,
   });
