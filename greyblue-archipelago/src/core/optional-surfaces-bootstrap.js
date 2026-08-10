@@ -27,6 +27,7 @@ const OPTIONAL_SURFACES = [
   ["discovered-landing-shelf-cues", () => import("./discovered-landing-shelf-cues-bootstrap.js")],
   ["mastered-approach-air-lanes", () => import("./mastered-approach-air-lanes-bootstrap.js")],
   ["low-flight-wake", () => import("./low-flight-wake-bootstrap.js")],
+  ["bank-mist-arcs", () => import("./bank-mist-arcs-bootstrap.js")],
   ["contextual-hud", () => import("../interface/contextual-hud-bootstrap.js")],
 ].map(([id, load]) => ({ id, load }));
 
