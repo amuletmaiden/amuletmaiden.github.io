@@ -1,4 +1,5 @@
 import { deriveSoundscape } from './soundscape-model.js';
+import { deriveAerodynamicSound, aerodynamicSoundPublicState } from './aerodynamic-sound.js';
 
 const priorDescriptor = Object.getOwnPropertyDescriptor(globalThis, '__greyblueState');
 const priorGet = typeof priorDescriptor?.get === 'function' ? priorDescriptor.get.bind(globalThis) : null;
@@ -8,6 +9,7 @@ let enabled = false;
 let disposed = false;
 let audio = null;
 let lastView = deriveSoundscape(currentState);
+let lastAirView = deriveAerodynamicSound(buildAerodynamicFrame(currentState));
 let lastFamiliarCrossingKey = '';
 
 const status = document.createElement('div');
@@ -16,6 +18,21 @@ status.setAttribute('role', 'status');
 status.setAttribute('aria-live', 'polite');
 status.setAttribute('aria-atomic', 'true');
 (document.querySelector('#hud') ?? document.body).append(status);
+
+function buildAerodynamicFrame(state) {
+  return {
+    ready: state?.ready === true,
+    paused: state?.paused === true,
+    airborne: state?.collision?.grounded === true ? false : state?.flight?.airborne !== false,
+    recoveryActive: state?.collision?.requiresRecovery === true || state?.flight?.mode === 'recovery',
+    restorePublishing: Boolean(state?.restorePublishing || state?.explorationRestorePublishing),
+    speed: state?.flight?.speed,
+    bank: state?.flight?.bank,
+    verticalSpeed: state?.flight?.verticalSpeed ?? state?.velocity?.y,
+    stall: state?.flight?.stall === true,
+    flightMode: state?.flight?.mode,
+  };
+}
 
 function createNoiseBuffer(context) {
   const length = Math.max(1, Math.floor(context.sampleRate * 2));
@@ -45,6 +62,12 @@ function createAudioGraph() {
   windFilter.Q.value = 0.7;
   const windGain = context.createGain();
   wind.connect(windFilter).connect(windGain).connect(master);
+  const aerodynamicFilter = context.createBiquadFilter();
+  aerodynamicFilter.type = 'bandpass';
+  aerodynamicFilter.Q.value = 0.9;
+  const aerodynamicGain = context.createGain();
+  aerodynamicGain.gain.value = 0;
+  wind.connect(aerodynamicFilter).connect(aerodynamicGain).connect(master);
   const tone = context.createOscillator();
   tone.type = 'sine';
   const toneGain = context.createGain();
@@ -62,7 +85,21 @@ function createAudioGraph() {
   tone.start();
   crossing.start();
   lfo.start();
-  return { context, master, wind, windFilter, windGain, tone, toneGain, crossing, crossingGain, lfo, lfoDepth };
+  return {
+    context,
+    master,
+    wind,
+    windFilter,
+    windGain,
+    aerodynamicFilter,
+    aerodynamicGain,
+    tone,
+    toneGain,
+    crossing,
+    crossingGain,
+    lfo,
+    lfoDepth,
+  };
 }
 
 function setParam(param, value, now, seconds = 0.18) {
@@ -73,12 +110,17 @@ function setParam(param, value, now, seconds = 0.18) {
 
 function apply(view = deriveSoundscape(currentState)) {
   lastView = view;
+  lastAirView = deriveAerodynamicSound(buildAerodynamicFrame(currentState));
+  globalThis.__greyblueAerodynamicSound = aerodynamicSoundPublicState(lastAirView);
   if (!audio) return;
   const now = audio.context.currentTime;
   const audible = enabled && view.active;
+  const aerodynamicAudible = audible && lastAirView.active;
   setParam(audio.master.gain, audible ? 0.72 : 0, now, 0.12);
   setParam(audio.windGain.gain, audible ? view.windGain : 0, now);
   setParam(audio.windFilter.frequency, view.windCutoff, now, 0.22);
+  setParam(audio.aerodynamicGain.gain, aerodynamicAudible ? lastAirView.gain : 0, now, 0.16);
+  setParam(audio.aerodynamicFilter.frequency, lastAirView.cutoff, now, 0.2);
   setParam(audio.tone.frequency, view.toneFrequency, now, 0.32);
   setParam(audio.toneGain.gain, audible ? view.toneGain : 0, now, 0.24);
   setParam(audio.crossingGain.gain, audible ? view.crossingGain : 0, now, 0.2);
@@ -204,6 +246,7 @@ function onKeyDown(event) {
   if (!event.defaultPrevented && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && event.code === 'KeyM') void toggleSound();
 }
 
+globalThis.__greyblueAerodynamicSound = aerodynamicSoundPublicState(lastAirView);
 globalThis.addEventListener?.('keydown', onKeyDown);
 globalThis.addEventListener?.('greyblue:omen-listened', onOmenListened);
 globalThis.addEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
