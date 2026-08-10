@@ -5,6 +5,12 @@ import { stepEarnedRoost, planRoostRecovery } from './roost-lifecycle.js';
 import { deriveRegionalFlightMemoryEvent } from './regional-flight-memory.js';
 import { buildArchipelago } from '../world/archipelago.js';
 import { loadGame, saveGame } from './save.js';
+import {
+  createExitSavePolicyState,
+  planPersistenceFlush,
+  rearmExitSavePolicyState,
+  truthfulExitSaveState,
+} from './exit-save-policy.js';
 
 const restored = loadGame();
 const lifecycle = createExplorationLifecycle(restored?.exploration);
@@ -17,6 +23,7 @@ let currentState = priorGet ? priorGet() : globalThis.__greyblueState ?? null;
 let lastFlushAt = restored?.savedAt ?? null;
 let lastFlushReason = restored?.exploration?.events?.length ? 'restore' : null;
 let flushError = null;
+let exitSavePolicy = createExitSavePolicyState();
 let disposed = false;
 let roostDwell = null;
 let lastRoostStepAt = performance.now();
@@ -37,11 +44,11 @@ function guidanceFrom(state, fallback) {
   return { activeRouteId: routeId, progress };
 }
 
-function stateForSave(state) {
+function stateForSave(state, { preservePosition = false } = {}) {
   const previous = loadGame() ?? restored ?? {};
   return {
     seed: Number.isInteger(state?.seed) ? state.seed : previous.seed,
-    position: state?.position ?? previous.position,
+    position: preservePosition ? previous.position : state?.position ?? previous.position,
     discovered: Array.isArray(state?.discovered) ? state.discovered : previous.discovered,
     discoveredRoutes: Array.isArray(state?.discoveredRoutes) ? state.discoveredRoutes : previous.discoveredRoutes,
     guidance: guidanceFrom(state, previous.guidance),
@@ -51,10 +58,21 @@ function stateForSave(state) {
 }
 
 function flush(reason) {
-  if (!lifecycle.dirty && reason !== 'restore-checkpoint') return false;
+  const lifecycleDirty = lifecycle.dirty || reason === 'restore-checkpoint';
+  const plan = planPersistenceFlush({
+    policyState: exitSavePolicy,
+    reason,
+    lifecycleDirty,
+    runtimeState: currentState,
+  });
+  if (!plan.shouldFlush) return false;
+
+  const exitReason = reason === 'pagehide' || reason === 'beforeunload' || reason === 'hidden';
+  const preservePosition = exitReason && !truthfulExitSaveState(currentState);
   try {
-    const saved = saveGame(stateForSave(currentState));
+    const saved = saveGame(stateForSave(currentState, { preservePosition }));
     lifecycle.markFlushed();
+    exitSavePolicy = plan.nextPolicyState;
     lastFlushAt = saved.savedAt;
     lastFlushReason = reason;
     flushError = null;
@@ -286,11 +304,18 @@ globalThis.addEventListener?.('greyblue:known-landmark-circuit', onKnownLandmark
 consume(currentState);
 publishRecoveryPlan(currentState ?? restored);
 
-function flushIfDirty(reason) { if (!disposed && lifecycle.dirty) flush(reason); }
+function flushOnLifecycleExit(reason) {
+  if (!disposed) flush(reason);
+}
 
-globalThis.addEventListener?.('pagehide', () => flushIfDirty('pagehide'));
+function rearmExitSave() {
+  if (!disposed) exitSavePolicy = rearmExitSavePolicyState(exitSavePolicy);
+}
+
+globalThis.addEventListener?.('pagehide', () => flushOnLifecycleExit('pagehide'));
+globalThis.addEventListener?.('pageshow', rearmExitSave);
 globalThis.addEventListener?.('beforeunload', () => {
-  flushIfDirty('beforeunload');
+  flushOnLifecycleExit('beforeunload');
   disposed = true;
   globalThis.removeEventListener?.('greyblue:route-completed', onRouteCompleted);
   globalThis.removeEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
@@ -301,4 +326,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   roostAnnouncement?.remove();
   delete globalThis.__greyblueRoostRecovery;
 }, { once: true });
-document.addEventListener?.('visibilitychange', () => { if (document.visibilityState === 'hidden') flushIfDirty('hidden'); });
+document.addEventListener?.('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushOnLifecycleExit('hidden');
+  else if (document.visibilityState === 'visible') rearmExitSave();
+});

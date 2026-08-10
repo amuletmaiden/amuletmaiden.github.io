@@ -25,10 +25,10 @@ export function saveGame(state, storage = localStorage, guidanceContext = null) 
   const previousPosition = readStoredPosition(storage);
   if (holdRecoveryCheckpointOnce) {
     holdRecoveryCheckpointOnce = false;
-  } else if (previousPosition) {
+  } else if (previousPosition && !samePosition(previousPosition, position)) {
     runtimeRecoveryCheckpoint = previousPosition;
-  } else {
-    runtimeRecoveryCheckpoint = position;
+  } else if (!runtimeRecoveryCheckpoint) {
+    runtimeRecoveryCheckpoint = previousPosition ?? position;
   }
   const payload = {
     version: CURRENT_VERSION,
@@ -226,6 +226,13 @@ function normalizePosition(position) {
     y: Number(position.y),
     z: Number(position.z),
   };
+}
+
+function samePosition(left, right) {
+  return Boolean(left) && Boolean(right)
+    && left.x === right.x
+    && left.y === right.y
+    && left.z === right.z;
 }
 
 function normalizeStringSet(values) {

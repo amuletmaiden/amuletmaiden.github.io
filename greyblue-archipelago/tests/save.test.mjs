@@ -146,6 +146,9 @@ class MemoryStorage {
   const second = saveGame({ seed: 1337, position: { x: 900, y: 240, z: -700 } }, storage);
   assert.deepEqual(second.recoveryCheckpoint, { x: 100, y: 200, z: 300 }, "the prior persisted position becomes the rolling recovery checkpoint");
 
+  const duplicate = saveGame({ seed: 1337, position: { x: 900, y: 240, z: -700 } }, storage);
+  assert.deepEqual(duplicate.recoveryCheckpoint, { x: 100, y: 200, z: 300 }, "a duplicate same-position save cannot collapse the one-save-behind recovery checkpoint");
+
   const recovered = safeRespawn({
     airborne: false,
     velocity: { x: 12, y: -4, z: 2 },
