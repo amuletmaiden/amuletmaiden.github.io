@@ -92,7 +92,7 @@ function publishCompletion() {
 }
 
 function consume(state) {
-  const grounded = state?.flight?.airborne === false || state?.collision?.grounded === true;
+  const grounded = state?.flight?.airborne === false;
   const cue = grounded ? null : finalApproachCue(state);
   const liveTelemetry = grounded ? priorAirborneTelemetry : airborneTelemetry(state);
   const input = {
