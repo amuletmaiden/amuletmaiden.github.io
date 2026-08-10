@@ -11,6 +11,12 @@ export function createExitSavePolicyState() {
   return Object.freeze({ exitSaved: false });
 }
 
+export function rearmExitSavePolicyState(policyState = createExitSavePolicyState()) {
+  return policyState?.exitSaved === true
+    ? createExitSavePolicyState()
+    : policyState;
+}
+
 export function truthfulExitSaveState(runtimeState) {
   return Boolean(runtimeState)
     && runtimeState.ready === true
