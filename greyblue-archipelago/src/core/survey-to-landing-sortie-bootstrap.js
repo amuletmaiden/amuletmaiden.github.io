@@ -1,15 +1,17 @@
 import * as THREE from 'three';
 import { buildArchipelago } from '../world/archipelago.js';
+import { completedDiscoveredIslandSurveyInternalIdentity } from './discovered-island-survey-bootstrap.js';
 import {
-  advanceDiscoveredIslandSurvey,
-  createDiscoveredIslandSurveyState,
-  discoveredIslandSurveyPublicState,
-} from './discovered-island-survey.js';
+  advanceSurveyToLandingSortie,
+  createSurveyToLandingSortieState,
+  surveyToLandingSortiePublicState,
+} from './survey-to-landing-sortie.js';
 
-let surveyState = createDiscoveredIslandSurveyState();
+let sortieState = createSurveyToLandingSortieState();
+let surveyArmConsumed = false;
+let feedbackConsumed = false;
 let world = null;
 let worldSeed = null;
-let feedbackConsumed = false;
 let mistMultiplier = 1;
 let mistTimer = 0;
 let journalTimer = 0;
@@ -18,8 +20,8 @@ function cleanId(value) {
   return typeof value === 'string' && value.trim() ? value.trim().slice(0, 120) : '';
 }
 
-export function completedDiscoveredIslandSurveyInternalIdentity() {
-  return surveyState?.completed === true ? cleanId(surveyState.islandId) : '';
+function finitePosition(position) {
+  return position && Number.isFinite(position.x) && Number.isFinite(position.y ?? 0) && Number.isFinite(position.z);
 }
 
 function getWorld(state) {
@@ -31,6 +33,20 @@ function getWorld(state) {
   return world;
 }
 
+function discoveredSet(values) {
+  if (values instanceof Set) return new Set(values);
+  return new Set(Array.isArray(values) ? values : []);
+}
+
+function surveyedIsland(state) {
+  const id = cleanId(completedDiscoveredIslandSurveyInternalIdentity());
+  const regionId = cleanId(state?.currentRegion?.id);
+  if (!id || !regionId) return null;
+  const discovered = discoveredSet(state?.discovered);
+  if (!discovered.has(id)) return null;
+  return getWorld(state).islands.find((island) => island.id === id && island.regionId === regionId) ?? null;
+}
+
 function crossingActive(state) {
   if (globalThis.__greyblueFamiliarCrossing?.active === true || state?.familiarCrossing?.active === true) return true;
   if (state?.expedition?.phase === 'crossing' || state?.routeChoice?.reason === 'active-crossing') return true;
@@ -38,51 +54,41 @@ function crossingActive(state) {
   return Number.isFinite(progress) && progress > 0 && progress < 1;
 }
 
-function reducedMotion() {
-  try { return Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches); } catch { return false; }
+function airborne(state) {
+  if (state?.collision?.grounded === true) return false;
+  return state?.flight?.airborne !== false;
 }
 
-function liveInputs(state) {
+function liveInputs(state, island, { touchdown = false } = {}) {
   return {
+    surveyCompleted: surveyArmConsumed !== true && Boolean(island),
+    surveyIsland: island,
     discoveredIslandIds: state?.discovered,
     currentRegionId: cleanId(state?.currentRegion?.id),
     position: state?.position,
     ready: state?.ready === true,
     paused: state?.paused === true,
-    airborne: state?.collision?.grounded === true ? false : state?.flight?.airborne !== false,
+    airborne: airborne(state),
     recoveryActive: state?.collision?.requiresRecovery === true || state?.flight?.mode === 'recovery',
     restorePublishing: Boolean(state?.restorePublishing || state?.explorationRestorePublishing),
     crossingActive: crossingActive(state),
+    precisionTouchdownCompleted: touchdown,
+    touchdownIslandId: touchdown && island ? island.id : '',
+    landedPosition: touchdown ? state?.position : null,
   };
 }
 
-function candidateIslands(state) {
-  const generated = getWorld(state);
-  const regionId = cleanId(state?.currentRegion?.id);
-  const discovered = new Set(Array.isArray(state?.discovered) ? state.discovered : state?.discovered instanceof Set ? state.discovered : []);
-  const position = state?.position;
-  if (!regionId || !position || !Number.isFinite(position.x) || !Number.isFinite(position.z)) return [];
-
-  const currentId = cleanId(surveyState?.islandId);
-  if (surveyState?.active === true && currentId) {
-    const current = generated.islands.find((island) => island.id === currentId && island.regionId === regionId && discovered.has(island.id));
-    return current ? [current] : [];
-  }
-
-  return generated.islands
-    .filter((island) => island.regionId === regionId && discovered.has(island.id))
-    .map((island) => ({ island, distance: Math.hypot(position.x - island.x, position.z - island.z) }))
-    .sort((a, b) => a.distance - b.distance || a.island.id.localeCompare(b.island.id))
-    .map(({ island }) => island);
+function reducedMotion() {
+  try { return Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches); } catch { return false; }
 }
 
 function journalNode() {
   const journal = document.querySelector('#greyblue-exploration-journal');
   if (!journal) return null;
-  let node = journal.querySelector('[data-greyblue-journal-island-survey]');
+  let node = journal.querySelector('[data-greyblue-journal-survey-sortie]');
   if (!node) {
     node = document.createElement('div');
-    node.setAttribute('data-greyblue-journal-island-survey', '');
+    node.setAttribute('data-greyblue-journal-survey-sortie', '');
     const omen = journal.querySelector('[data-greyblue-journal-omen]');
     if (omen) journal.insertBefore(node, omen);
     else journal.append(node);
@@ -100,7 +106,7 @@ function showJournal(line) {
     journalTimer = 0;
     node.hidden = true;
     node.textContent = '';
-  }, reducedMotion() ? 2800 : 6800);
+  }, reducedMotion() ? 3000 : 7600);
 }
 
 function showListening(line) {
@@ -110,65 +116,61 @@ function showListening(line) {
   const statusTarget = listening.querySelector('[data-greyblue-listening-status]');
   listening.hidden = false;
   listening.dataset.found = 'true';
-  listening.dataset.kind = 'island-survey';
+  listening.dataset.kind = 'survey-sortie';
   delete listening.dataset.turn;
   delete listening.dataset.intensity;
-  if (titleTarget) titleTarget.textContent = 'The island has a shape in the air.';
+  if (titleTarget) titleTarget.textContent = 'The circuit closes on stone.';
   if (statusTarget) statusTarget.textContent = line;
 }
 
-function beginSurveyFeedback() {
+function beginFeedback() {
   if (feedbackConsumed) return;
   feedbackConsumed = true;
-  const line = 'A full circuit gathers the island into one remembered shape: cliff, lee, shelf, and open water.';
+  const line = 'You carry the island out into open air, return by its remembered shape, and settle where the rock will take you.';
   showJournal(line);
   showListening(line);
 
-  mistMultiplier = 0.95;
+  mistMultiplier = 0.945;
   if (mistTimer) clearTimeout(mistTimer);
   mistTimer = setTimeout(() => {
     mistTimer = 0;
     mistMultiplier = 1;
-  }, reducedMotion() ? 650 : 1700);
+  }, reducedMotion() ? 700 : 1900);
 
-  globalThis.dispatchEvent?.(new CustomEvent('greyblue:discovered-island-survey', {
-    detail: Object.freeze({ completed: true, phase: 'complete' }),
+  globalThis.dispatchEvent?.(new CustomEvent('greyblue:survey-to-landing-sortie', {
+    detail: Object.freeze({ completed: true, phase: 'settle' }),
   }));
   globalThis.dispatchEvent?.(new CustomEvent('greyblue:omen-listened', {
-    detail: Object.freeze({ soundHook: 'omen-confluence', source: 'discovered-island-survey' }),
+    detail: Object.freeze({ soundHook: 'omen-confluence', source: 'survey-to-landing-sortie' }),
   }));
 }
 
-function consumeState(state) {
-  if (surveyState.completed === true) {
-    globalThis.__greyblueDiscoveredIslandSurvey = discoveredIslandSurveyPublicState(surveyState);
+function publish(previous) {
+  const publicState = surveyToLandingSortiePublicState(sortieState);
+  globalThis.__greyblueSurveyToLandingSortie = publicState;
+  if (previous?.completed !== true && publicState.completed === true) beginFeedback();
+}
+
+function consumeState(state, options = {}) {
+  if (sortieState.completed === true) {
+    publish(sortieState);
     return;
   }
 
-  const inputs = liveInputs(state);
-  const candidates = candidateIslands(state);
-  const beforeCompleted = surveyState.completed === true;
-
-  if (surveyState.active === true) {
-    surveyState = advanceDiscoveredIslandSurvey(surveyState, { ...inputs, island: candidates[0] });
-  } else {
-    let next = createDiscoveredIslandSurveyState();
-    for (const island of candidates) {
-      const attempt = advanceDiscoveredIslandSurvey(createDiscoveredIslandSurveyState(), { ...inputs, island });
-      if (attempt.active === true || attempt.completed === true) {
-        next = attempt;
-        break;
-      }
-    }
-    surveyState = next;
-  }
-
-  const publicState = discoveredIslandSurveyPublicState(surveyState);
-  globalThis.__greyblueDiscoveredIslandSurvey = publicState;
-  if (!beforeCompleted && publicState.completed === true) beginSurveyFeedback();
+  const island = surveyedIsland(state);
+  const before = sortieState;
+  sortieState = advanceSurveyToLandingSortie(sortieState, liveInputs(state, island, options));
+  if (before.active !== true && sortieState.active === true) surveyArmConsumed = true;
+  publish(before);
 }
 
-globalThis.__greyblueDiscoveredIslandSurvey = discoveredIslandSurveyPublicState(surveyState);
+function finishFromPrecisionTouchdown(event) {
+  if (event?.detail?.completed !== true || sortieState.active !== true) return;
+  consumeState(globalThis.__greyblueState, { touchdown: true });
+}
+
+globalThis.__greyblueSurveyToLandingSortie = surveyToLandingSortiePublicState(sortieState);
+globalThis.addEventListener?.('greyblue:precision-touchdown', finishFromPrecisionTouchdown);
 
 const priorDescriptor = Object.getOwnPropertyDescriptor(globalThis, '__greyblueState');
 const priorGet = typeof priorDescriptor?.get === 'function' ? priorDescriptor.get.bind(globalThis) : null;
@@ -190,7 +192,7 @@ if (!priorDescriptor || priorDescriptor.configurable) {
 consumeState(currentState);
 
 const originalRender = THREE.WebGLRenderer.prototype.render;
-const surveyRender = function renderWithSurveyAtmosphere(scene, camera) {
+const sortieRender = function renderWithSurveySortieAtmosphere(scene, camera) {
   const fog = scene?.fog;
   if (!fog?.isFogExp2 || !Number.isFinite(fog.density) || mistMultiplier === 1) {
     return originalRender.call(this, scene, camera);
@@ -203,11 +205,12 @@ const surveyRender = function renderWithSurveyAtmosphere(scene, camera) {
     fog.density = authoredDensity;
   }
 };
-THREE.WebGLRenderer.prototype.render = surveyRender;
+THREE.WebGLRenderer.prototype.render = sortieRender;
 
 globalThis.addEventListener?.('beforeunload', () => {
+  globalThis.removeEventListener?.('greyblue:precision-touchdown', finishFromPrecisionTouchdown);
   if (mistTimer) clearTimeout(mistTimer);
   if (journalTimer) clearTimeout(journalTimer);
-  if (THREE.WebGLRenderer.prototype.render === surveyRender) THREE.WebGLRenderer.prototype.render = originalRender;
-  delete globalThis.__greyblueDiscoveredIslandSurvey;
+  if (THREE.WebGLRenderer.prototype.render === sortieRender) THREE.WebGLRenderer.prototype.render = originalRender;
+  delete globalThis.__greyblueSurveyToLandingSortie;
 }, { once: true });
