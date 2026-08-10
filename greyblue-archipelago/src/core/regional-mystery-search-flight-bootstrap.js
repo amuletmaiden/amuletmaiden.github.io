@@ -45,6 +45,31 @@ function crossingActive(state) {
   return Number.isFinite(progress) && progress > 0 && progress < 1;
 }
 
+// Sibling optional systems may consume the completed search focus only through
+// this module-scoped import seam. The public global and completion event remain
+// bounded and identity-free.
+export function deriveRegionalMysterySearchArrivalInternal(state = globalThis.__greyblueState ?? null) {
+  if (searchState?.completed !== true || searchState?.phase !== 'arrive') return null;
+  const landmarkId = cleanId(searchState.focusLandmarkId);
+  const islandId = cleanId(searchState.focusIslandId);
+  const regionId = cleanId(state?.currentRegion?.id);
+  if (!landmarkId || !islandId || !regionId) return null;
+  const island = getWorld(state)?.islands?.find((candidate) => cleanId(candidate?.id) === islandId) ?? null;
+  if (!island || cleanId(island.regionId) !== regionId || cleanId(island.landmarkRecord?.id) !== landmarkId) return null;
+  const encounterRadius = Number(island.landmarkRecord?.encounter?.triggerRadius);
+  const x = Number(island.x);
+  const z = Number(island.z);
+  const y = Number(island.height) + 48;
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)
+    || !Number.isFinite(encounterRadius) || encounterRadius <= 0) return null;
+  return Object.freeze({
+    landmarkId,
+    regionId,
+    focusPosition: Object.freeze({ x, y, z }),
+    encounterRadius,
+  });
+}
+
 function reducedMotion() {
   try { return Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches); } catch { return false; }
 }
