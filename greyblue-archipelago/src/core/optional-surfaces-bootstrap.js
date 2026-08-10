@@ -39,6 +39,7 @@ const OPTIONAL_SURFACES = [
   ["cloudbreak-run", () => import("./cloudbreak-run-bootstrap.js")],
   ["high-air-crossing", () => import("./high-air-crossing-bootstrap.js")],
   ["high-air-landfall", () => import("./high-air-landfall-bootstrap.js")],
+  ["deep-mist-run", () => import("./deep-mist-run-bootstrap.js")],
   ["mastered-approach-air-lanes", () => import("./mastered-approach-air-lanes-bootstrap.js")],
   ["low-flight-wake", () => import("./low-flight-wake-bootstrap.js")],
   ["low-flight-surface-run", () => import("./low-flight-surface-run-bootstrap.js")],
