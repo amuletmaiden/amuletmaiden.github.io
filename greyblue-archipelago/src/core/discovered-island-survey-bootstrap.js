@@ -18,6 +18,10 @@ function cleanId(value) {
   return typeof value === 'string' && value.trim() ? value.trim().slice(0, 120) : '';
 }
 
+export function completedDiscoveredIslandSurveyInternalIdentity() {
+  return surveyState?.completed === true ? cleanId(surveyState.islandId) : '';
+}
+
 function getWorld(state) {
   const seed = Number.isInteger(state?.seed) ? state.seed : 1337;
   if (!world || worldSeed !== seed) {
