@@ -29,6 +29,7 @@ const OPTIONAL_SURFACES = [
   ["precision-touchdown", () => import("./precision-touchdown-challenge-bootstrap.js")],
   ["precision-touchdown-feedback", () => import("./precision-touchdown-feedback-bootstrap.js")],
   ["touch-and-go-launch", () => import("./touch-and-go-launch-bootstrap.js")],
+  ["island-hop-run", () => import("./island-hop-run-bootstrap.js")],
   ["mastered-approach-air-lanes", () => import("./mastered-approach-air-lanes-bootstrap.js")],
   ["low-flight-wake", () => import("./low-flight-wake-bootstrap.js")],
   ["low-flight-surface-run", () => import("./low-flight-surface-run-bootstrap.js")],
