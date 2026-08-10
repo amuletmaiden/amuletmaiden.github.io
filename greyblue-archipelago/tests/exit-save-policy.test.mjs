@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   createExitSavePolicyState,
   planPersistenceFlush,
+  rearmExitSavePolicyState,
   truthfulExitSaveState,
 } from '../src/core/exit-save-policy.js';
 
@@ -37,6 +38,21 @@ const duplicateExit = planPersistenceFlush({
 assert.equal(duplicateExit.shouldFlush, false);
 assert.equal(duplicateExit.forcedExitSave, false);
 assert.equal(duplicateExit.nextPolicyState.exitSaved, true);
+
+const resumedPolicy = rearmExitSavePolicyState(cleanExit.nextPolicyState);
+assert.equal(resumedPolicy.exitSaved, false);
+const laterExit = planPersistenceFlush({
+  policyState: resumedPolicy,
+  reason: 'hidden',
+  lifecycleDirty: false,
+  runtimeState: { ...runtime, position: { x: 320, y: 180, z: -140 } },
+});
+assert.equal(laterExit.shouldFlush, true);
+assert.equal(laterExit.forcedExitSave, true);
+assert.equal(laterExit.nextPolicyState.exitSaved, true);
+
+const cleanPolicy = createExitSavePolicyState();
+assert.equal(rearmExitSavePolicyState(cleanPolicy), cleanPolicy);
 
 const dirtyOrdinary = planPersistenceFlush({
   policyState: createExitSavePolicyState(),
