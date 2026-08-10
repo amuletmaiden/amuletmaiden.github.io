@@ -4,6 +4,7 @@ const OPTIONAL_SURFACES = [
   ["guidance", () => import("../interface/live-guidance-bootstrap.js")],
   ["journal", () => import("./exploration-journal-bootstrap.js")],
   ["flight-instruments", () => import("../interface/live-flight-instruments-bootstrap.js")],
+  ["frame-pressure", () => import("./optional-frame-pressure-bootstrap.js")],
   ["landing-approach", () => import("../interface/live-landing-approach-bootstrap.js")],
   ["landmark-encounter", () => import("./landmark-encounter-bootstrap.js")],
   ["landmark-flight-encounter", () => import("./landmark-flight-encounter-bootstrap.js")],
