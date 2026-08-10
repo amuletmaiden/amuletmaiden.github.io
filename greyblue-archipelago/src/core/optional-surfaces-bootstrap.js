@@ -26,6 +26,7 @@ const OPTIONAL_SURFACES = [
   ["regional-aerial-echo", () => import("./regional-aerial-echo-bootstrap.js")],
   ["known-landmark-mist-cues", () => import("./known-landmark-mist-cues-bootstrap.js")],
   ["discovered-landing-shelf-cues", () => import("./discovered-landing-shelf-cues-bootstrap.js")],
+  ["precision-touchdown", () => import("./precision-touchdown-challenge-bootstrap.js")],
   ["mastered-approach-air-lanes", () => import("./mastered-approach-air-lanes-bootstrap.js")],
   ["low-flight-wake", () => import("./low-flight-wake-bootstrap.js")],
   ["low-flight-surface-run", () => import("./low-flight-surface-run-bootstrap.js")],
