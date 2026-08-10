@@ -6,6 +6,7 @@ import {
   deriveKnownLandmarkMistCues,
   knownLandmarkMistCuePublicState,
 } from './known-landmark-mist-cues.js';
+import { retainOptionalCuePrefix } from './optional-cue-cap.js';
 
 const MAX_CUES = 8;
 const CUE_COLOR = Object.freeze({
@@ -151,8 +152,9 @@ function present(scene, camera) {
   }
 
   const contrast = highContrast();
+  const visibleCues = retainOptionalCuePrefix(result.cues, globalThis.__greyblueOptionalPresentationBudget);
   let index = 0;
-  for (const cue of result.cues) {
+  for (const cue of visibleCues) {
     const mesh = cueMeshes[index];
     if (!mesh) break;
     const cueClass = CUE_COLOR[cue.cueClass] ? cue.cueClass : 'distant';
