@@ -109,10 +109,11 @@ function present(publicState, line) {
 
 function recognize() {
   if (!currentState?.ready || currentState.paused) return;
+  if (currentState?.collision?.requiresRecovery === true || currentState?.flight?.mode === 'recovery') return;
   const regionId = typeof currentState?.currentRegion?.id === 'string'
     ? currentState.currentRegion.id.trim().slice(0, 120)
     : '';
-  if (!regionId) return;
+  if (!regionId || recognizedRegionIds.has(regionId)) return;
   const result = deriveRegionalMysteryThread({
     world: getWorld(currentState),
     currentRegionId: regionId,
@@ -154,6 +155,11 @@ function onKeyDown(event) {
   if (event.code === 'KeyQ') recognize();
 }
 
+function onSortieCompleted(event) {
+  if (event?.detail?.completed !== true || event?.detail?.phase !== 'settle') return;
+  recognize();
+}
+
 function onLandmarkInvestigated(event) {
   const landmarkId = typeof event?.detail?.landmarkId === 'string'
     ? event.detail.landmarkId.trim().slice(0, 120)
@@ -170,6 +176,7 @@ function onRecognitionPersisted(event) {
 
 globalThis.__greyblueRegionalMysteryThread = Object.freeze({ active: false, recognized: false, threadClass: null });
 globalThis.addEventListener?.('keydown', onKeyDown);
+globalThis.addEventListener?.('greyblue:survey-to-landing-sortie', onSortieCompleted);
 globalThis.addEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
 globalThis.addEventListener?.('greyblue:regional-thread-recognized', onRecognitionPersisted);
 
@@ -189,6 +196,7 @@ ensurePresentationNodes();
 globalThis.addEventListener?.('beforeunload', () => {
   if (clearTimer) clearTimeout(clearTimer);
   globalThis.removeEventListener?.('keydown', onKeyDown);
+  globalThis.removeEventListener?.('greyblue:survey-to-landing-sortie', onSortieCompleted);
   globalThis.removeEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
   globalThis.removeEventListener?.('greyblue:regional-thread-recognized', onRecognitionPersisted);
   journalNode?.remove();
