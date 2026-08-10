@@ -3,6 +3,10 @@ import { masteryFromChallengeEvent } from './approach-mastery.js';
 import { createLandingRecoveryAnchor } from './landing-recovery-anchor.js';
 import { stepEarnedRoost, planRoostRecovery } from './roost-lifecycle.js';
 import { deriveRegionalFlightMemoryEvent } from './regional-flight-memory.js';
+import {
+  createHighAirLandfallCheckpointState,
+  planHighAirLandfallCheckpoint,
+} from './high-air-landfall-checkpoint.js';
 import { buildArchipelago } from '../world/archipelago.js';
 import { loadGame, saveGame } from './save.js';
 import {
@@ -24,6 +28,7 @@ let lastFlushAt = restored?.savedAt ?? null;
 let lastFlushReason = restored?.exploration?.events?.length ? 'restore' : null;
 let flushError = null;
 let exitSavePolicy = createExitSavePolicyState();
+let highAirLandfallCheckpointPolicy = createHighAirLandfallCheckpointState();
 let disposed = false;
 let roostDwell = null;
 let lastRoostStepAt = performance.now();
@@ -58,7 +63,7 @@ function stateForSave(state, { preservePosition = false } = {}) {
 }
 
 function flush(reason) {
-  const lifecycleDirty = lifecycle.dirty || reason === 'restore-checkpoint';
+  const lifecycleDirty = lifecycle.dirty || reason === 'restore-checkpoint' || reason === 'high-air-landfall';
   const plan = planPersistenceFlush({
     policyState: exitSavePolicy,
     reason,
@@ -264,6 +269,17 @@ function onKnownLandmarkCircuit(event) {
   }));
 }
 
+function onHighAirLandfall(event) {
+  if (disposed) return;
+  const plan = planHighAirLandfallCheckpoint({
+    policyState: highAirLandfallCheckpointPolicy,
+    eventDetail: event?.detail,
+    runtimeState: currentState,
+  });
+  highAirLandfallCheckpointPolicy = plan.nextPolicyState;
+  if (plan.shouldCheckpoint) flush('high-air-landfall');
+}
+
 function decorate(state) {
   if (!state || typeof state !== 'object') return state;
   return {
@@ -301,6 +317,7 @@ globalThis.addEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFl
 globalThis.addEventListener?.('greyblue:approach-challenge', onApproachChallenge);
 globalThis.addEventListener?.('greyblue:regional-mystery-thread', onRegionalMysteryThread);
 globalThis.addEventListener?.('greyblue:known-landmark-circuit', onKnownLandmarkCircuit);
+globalThis.addEventListener?.('greyblue:high-air-landfall', onHighAirLandfall);
 consume(currentState);
 publishRecoveryPlan(currentState ?? restored);
 
@@ -323,6 +340,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('greyblue:approach-challenge', onApproachChallenge);
   globalThis.removeEventListener?.('greyblue:regional-mystery-thread', onRegionalMysteryThread);
   globalThis.removeEventListener?.('greyblue:known-landmark-circuit', onKnownLandmarkCircuit);
+  globalThis.removeEventListener?.('greyblue:high-air-landfall', onHighAirLandfall);
   roostAnnouncement?.remove();
   delete globalThis.__greyblueRoostRecovery;
 }, { once: true });
