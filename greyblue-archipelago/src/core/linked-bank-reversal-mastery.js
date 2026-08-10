@@ -44,8 +44,11 @@ export function createLinkedBankReversalState() {
   return frozenState();
 }
 
-function reset(completed = false) {
-  return frozenState({ completed });
+function reset(completed = false, firstSide = null) {
+  return frozenState({
+    completed,
+    firstSide: completed && SIDES.includes(firstSide) ? firstSide : null,
+  });
 }
 
 function eligibleFrame(frame) {
@@ -72,7 +75,7 @@ export function stepLinkedBankReversal({
   frame = {},
   bankArc = {},
 } = {}) {
-  if (state?.completed === true) return reset(true);
+  if (state?.completed === true) return reset(true, state?.firstSide);
   const sample = eligibleFrame(frame);
   if (!sample) return reset(false);
   const arc = cleanArc(bankArc);
@@ -172,7 +175,7 @@ export function stepLinkedBankReversal({
   if (!arc.active || arc.side !== opposite) return reset(false);
   const reverseDistance = Math.max(0, finite(state?.reverseDistance) ?? 0) + travelled;
   const reverseFrames = Math.max(0, Number.isInteger(state?.reverseFrames) ? state.reverseFrames : 0) + 1;
-  if (reverseFrames >= 2 && reverseDistance >= 14) return reset(true);
+  if (reverseFrames >= 2 && reverseDistance >= 14) return reset(true, firstSide);
 
   return frozenState({
     phase: 'reverse',
