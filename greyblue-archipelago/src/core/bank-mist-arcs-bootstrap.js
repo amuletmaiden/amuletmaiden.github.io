@@ -28,6 +28,12 @@ function highContrast() {
   try { return Boolean(globalThis.matchMedia?.('(prefers-contrast: more)')?.matches); } catch { return false; }
 }
 
+function presentationSampleCap() {
+  const scale = Number(globalThis.__greyblueOptionalPresentationBudget?.historyScale);
+  if (!Number.isFinite(scale) || scale <= 0 || scale > 1) return MAX_SAMPLES;
+  return Math.max(1, Math.min(MAX_SAMPLES, Math.round(MAX_SAMPLES * scale)));
+}
+
 function buildFrame(state) {
   return {
     ready: state?.ready === true,
@@ -122,7 +128,8 @@ function present(scene) {
     return;
   }
 
-  const samples = arcState.samples.slice(-MAX_SAMPLES);
+  const renderCap = presentationSampleCap();
+  const samples = arcState.samples.slice(-renderCap);
   const newestIndex = Math.max(0, samples.length - 1);
   let meshIndex = 0;
   for (let index = 0; index < samples.length; index += 1) {
