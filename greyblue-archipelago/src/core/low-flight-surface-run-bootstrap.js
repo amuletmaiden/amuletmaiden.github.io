@@ -137,7 +137,7 @@ globalThis.__greyblueLowFlightSurfaceRun = Object.freeze({
 });
 
 const originalRender = THREE.WebGLRenderer.prototype.render;
-THREE.WebGLRenderer.prototype.render = function renderWithLowFlightSurfaceRun(scene, camera) {
+const surfaceRunRender = function renderWithLowFlightSurfaceRun(scene, camera) {
   step();
   const fog = scene?.fog;
   if (!fog?.isFogExp2 || !Number.isFinite(fog.density) || mistMultiplier === 1) return originalRender.call(this, scene, camera);
@@ -149,10 +149,11 @@ THREE.WebGLRenderer.prototype.render = function renderWithLowFlightSurfaceRun(sc
     fog.density = authoredDensity;
   }
 };
+THREE.WebGLRenderer.prototype.render = surfaceRunRender;
 
 globalThis.addEventListener?.('beforeunload', () => {
   if (mistTimer) clearTimeout(mistTimer);
   if (journalTimer) clearTimeout(journalTimer);
-  if (THREE.WebGLRenderer.prototype.render === renderWithLowFlightSurfaceRun) THREE.WebGLRenderer.prototype.render = originalRender;
+  if (THREE.WebGLRenderer.prototype.render === surfaceRunRender) THREE.WebGLRenderer.prototype.render = originalRender;
   delete globalThis.__greyblueLowFlightSurfaceRun;
 }, { once: true });
