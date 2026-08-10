@@ -25,6 +25,7 @@ const OPTIONAL_SURFACES = [
   ["regional-flight-memory", () => import("./regional-flight-memory-bootstrap.js")],
   ["regional-aerial-echo", () => import("./regional-aerial-echo-bootstrap.js")],
   ["known-landmark-mist-cues", () => import("./known-landmark-mist-cues-bootstrap.js")],
+  ["undiscovered-island-mist-hints", () => import("./undiscovered-island-mist-hint-bootstrap.js")],
   ["discovered-landing-shelf-cues", () => import("./discovered-landing-shelf-cues-bootstrap.js")],
   ["precision-touchdown", () => import("./precision-touchdown-challenge-bootstrap.js")],
   ["precision-touchdown-feedback", () => import("./precision-touchdown-feedback-bootstrap.js")],
