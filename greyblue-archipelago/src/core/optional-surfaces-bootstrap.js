@@ -16,6 +16,7 @@ const OPTIONAL_SURFACES = [
   ["regional-omens", () => import("./regional-omen-bootstrap.js")],
   ["regional-mystery-thread", () => import("./regional-mystery-thread-bootstrap.js")],
   ["regional-mystery-search-flight", () => import("./regional-mystery-search-flight-bootstrap.js")],
+  ["mystery-listening-pass", () => import("./mystery-listening-pass-bootstrap.js")],
   ["expedition", () => import("./expedition-bootstrap.js")],
   ["familiar-crossing-signature", () => import("./familiar-crossing-signature-bootstrap.js")],
   ["known-crossing-destination-atmosphere", () => import("./known-crossing-destination-atmosphere-bootstrap.js")],
