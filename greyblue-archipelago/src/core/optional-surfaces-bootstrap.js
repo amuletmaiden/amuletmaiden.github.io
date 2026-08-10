@@ -27,6 +27,7 @@ const OPTIONAL_SURFACES = [
   ["known-landmark-mist-cues", () => import("./known-landmark-mist-cues-bootstrap.js")],
   ["undiscovered-island-mist-hints", () => import("./undiscovered-island-mist-hint-bootstrap.js")],
   ["mist-thread-arrival", () => import("./mist-thread-arrival-bootstrap.js")],
+  ["discovered-island-survey", () => import("./discovered-island-survey-bootstrap.js")],
   ["discovered-landing-shelf-cues", () => import("./discovered-landing-shelf-cues-bootstrap.js")],
   ["precision-touchdown", () => import("./precision-touchdown-challenge-bootstrap.js")],
   ["precision-touchdown-feedback", () => import("./precision-touchdown-feedback-bootstrap.js")],
