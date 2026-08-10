@@ -1,5 +1,11 @@
 import { deriveSoundscape } from './soundscape-model.js';
 import { deriveAerodynamicSound, aerodynamicSoundPublicState } from './aerodynamic-sound.js';
+import {
+  createTerrainSkimPressureState,
+  stepTerrainSkimPressure,
+  terrainSkimPressurePresentation,
+  terrainSkimPressurePublicState,
+} from './terrain-skim-pressure.js';
 
 const priorDescriptor = Object.getOwnPropertyDescriptor(globalThis, '__greyblueState');
 const priorGet = typeof priorDescriptor?.get === 'function' ? priorDescriptor.get.bind(globalThis) : null;
@@ -10,6 +16,8 @@ let disposed = false;
 let audio = null;
 let lastView = deriveSoundscape(currentState);
 let lastAirView = deriveAerodynamicSound(buildAerodynamicFrame(currentState));
+let skimState = createTerrainSkimPressureState();
+let lastSkimView = terrainSkimPressurePresentation(skimState);
 let lastFamiliarCrossingKey = '';
 
 const status = document.createElement('div');
@@ -18,6 +26,14 @@ status.setAttribute('role', 'status');
 status.setAttribute('aria-live', 'polite');
 status.setAttribute('aria-atomic', 'true');
 (document.querySelector('#hud') ?? document.body).append(status);
+
+function reducedMotion() {
+  try { return Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches); } catch { return false; }
+}
+
+function highContrast() {
+  try { return Boolean(globalThis.matchMedia?.('(prefers-contrast: more)')?.matches); } catch { return false; }
+}
 
 function buildAerodynamicFrame(state) {
   return {
@@ -31,6 +47,20 @@ function buildAerodynamicFrame(state) {
     verticalSpeed: state?.flight?.verticalSpeed ?? state?.velocity?.y,
     stall: state?.flight?.stall === true,
     flightMode: state?.flight?.mode,
+  };
+}
+
+function buildTerrainSkimFrame(state) {
+  return {
+    ready: state?.ready === true,
+    paused: state?.paused === true,
+    airborne: state?.collision?.grounded === true ? false : state?.flight?.airborne !== false,
+    recoveryActive: state?.collision?.requiresRecovery === true || state?.flight?.mode === 'recovery',
+    restorePublishing: Boolean(state?.restorePublishing || state?.explorationRestorePublishing),
+    position: state?.position,
+    speed: state?.flight?.speed,
+    surfaceHeight: state?.surface?.height,
+    surface: state?.surface?.surface,
   };
 }
 
@@ -68,6 +98,13 @@ function createAudioGraph() {
   const aerodynamicGain = context.createGain();
   aerodynamicGain.gain.value = 0;
   wind.connect(aerodynamicFilter).connect(aerodynamicGain).connect(master);
+  const skimFilter = context.createBiquadFilter();
+  skimFilter.type = 'bandpass';
+  skimFilter.Q.value = 1.45;
+  skimFilter.frequency.value = 820;
+  const skimGain = context.createGain();
+  skimGain.gain.value = 0;
+  wind.connect(skimFilter).connect(skimGain).connect(master);
   const tone = context.createOscillator();
   tone.type = 'sine';
   const toneGain = context.createGain();
@@ -93,6 +130,8 @@ function createAudioGraph() {
     windGain,
     aerodynamicFilter,
     aerodynamicGain,
+    skimFilter,
+    skimGain,
     tone,
     toneGain,
     crossing,
@@ -111,16 +150,25 @@ function setParam(param, value, now, seconds = 0.18) {
 function apply(view = deriveSoundscape(currentState)) {
   lastView = view;
   lastAirView = deriveAerodynamicSound(buildAerodynamicFrame(currentState));
+  skimState = stepTerrainSkimPressure({ state: skimState, frame: buildTerrainSkimFrame(currentState) });
+  lastSkimView = terrainSkimPressurePresentation(skimState, {
+    highContrast: highContrast(),
+    reducedMotion: reducedMotion(),
+  });
   globalThis.__greyblueAerodynamicSound = aerodynamicSoundPublicState(lastAirView);
+  globalThis.__greyblueTerrainSkimPressure = terrainSkimPressurePublicState(skimState);
   if (!audio) return;
   const now = audio.context.currentTime;
   const audible = enabled && view.active;
   const aerodynamicAudible = audible && lastAirView.active;
+  const skimAudible = audible && lastSkimView.active;
   setParam(audio.master.gain, audible ? 0.72 : 0, now, 0.12);
   setParam(audio.windGain.gain, audible ? view.windGain : 0, now);
   setParam(audio.windFilter.frequency, view.windCutoff, now, 0.22);
   setParam(audio.aerodynamicGain.gain, aerodynamicAudible ? lastAirView.gain : 0, now, 0.16);
   setParam(audio.aerodynamicFilter.frequency, lastAirView.cutoff, now, 0.2);
+  setParam(audio.skimGain.gain, skimAudible ? lastSkimView.gain : 0, now, lastSkimView.responseSeconds);
+  setParam(audio.skimFilter.frequency, lastSkimView.active ? lastSkimView.filterHz : 820, now, lastSkimView.responseSeconds);
   setParam(audio.tone.frequency, view.toneFrequency, now, 0.32);
   setParam(audio.toneGain.gain, audible ? view.toneGain : 0, now, 0.24);
   setParam(audio.crossingGain.gain, audible ? view.crossingGain : 0, now, 0.2);
@@ -247,6 +295,7 @@ function onKeyDown(event) {
 }
 
 globalThis.__greyblueAerodynamicSound = aerodynamicSoundPublicState(lastAirView);
+globalThis.__greyblueTerrainSkimPressure = terrainSkimPressurePublicState(skimState);
 globalThis.addEventListener?.('keydown', onKeyDown);
 globalThis.addEventListener?.('greyblue:omen-listened', onOmenListened);
 globalThis.addEventListener?.('greyblue:landmark-flight-encounter', onLandmarkFlightEncounter);
