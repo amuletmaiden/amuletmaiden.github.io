@@ -7,6 +7,7 @@ import {
   masteredApproachAirLanePresentationPolicy,
   masteredApproachAirLanePublicState,
 } from './mastered-approach-air-lanes.js';
+import { retainOptionalCuePrefix } from './optional-cue-cap.js';
 import {
   createMasteredAirLaneCleanRunState,
   stepMasteredAirLaneCleanRun,
@@ -164,8 +165,9 @@ function present(scene) {
 
   const contrast = highContrast();
   const publicRun = globalThis.__greyblueMasteredAirLaneCleanRun;
+  const visibleLanes = retainOptionalCuePrefix(result.lanes, globalThis.__greyblueOptionalPresentationBudget);
   let meshIndex = 0;
-  for (const lane of result.lanes) {
+  for (const lane of visibleLanes) {
     const policy = masteredApproachAirLanePresentationPolicy(lane.laneClass, { highContrast: contrast });
     const isActiveRun = cleanRun.status === 'active' && cleanRun.corridorId === lane.corridorId;
     for (let traceIndex = 0; traceIndex < lane.trace.length; traceIndex += 1) {
