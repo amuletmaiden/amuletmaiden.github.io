@@ -579,6 +579,7 @@ function frame(now) {
     yaw: controller.yaw,
     bank: controller.bank,
     speed: flightState.speed,
+    grounded: collision.grounded,
     dt,
     sampleHeight: terrainHeightAt,
   });
