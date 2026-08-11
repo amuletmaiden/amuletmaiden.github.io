@@ -1,9 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-
-const source = await readFile(new URL("../src/flight/chase-camera.js", import.meta.url), "utf8");
-const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-const { ChaseCameraRig } = await import(moduleUrl);
+import { ChaseCameraRig } from "../src/flight/chase-camera.js";
 
 function finite(snapshot) {
   return [
@@ -57,12 +53,91 @@ function finite(snapshot) {
 }
 
 {
+  const airborneRig = new ChaseCameraRig();
+  const groundedRig = new ChaseCameraRig();
+  const frame = {
+    target: { x: 0, y: 100, z: 0 },
+    yaw: 0,
+    bank: 0.7,
+    speed: 80,
+    dt: 1 / 60,
+    sampleHeight: () => 0,
+  };
+  for (let index = 0; index < 90; index += 1) {
+    airborneRig.update({ ...frame, grounded: false });
+    groundedRig.update({ ...frame, grounded: true });
+  }
+  const airborne = airborneRig.snapshot();
+  const grounded = groundedRig.snapshot();
+  assert.ok(grounded.position.z > airborne.position.z, "sustained grounded truth contracts residual speed stretch");
+  assert.ok(grounded.position.y < airborne.position.y, "sustained grounded truth settles camera height");
+  assert.ok(grounded.lookTarget.z < airborne.lookTarget.z, "sustained grounded truth contracts look-ahead");
+  assert.ok(Math.abs(grounded.position.x) < Math.abs(airborne.position.x), "sustained grounded truth damps bank offset");
+}
+
+{
+  const rig = new ChaseCameraRig();
+  const frame = {
+    target: { x: 0, y: 100, z: 0 },
+    yaw: 0,
+    bank: 0.7,
+    speed: 80,
+    dt: 1 / 60,
+    sampleHeight: () => 0,
+  };
+  const first = rig.update({ ...frame, grounded: false });
+  const firstGrounded = rig.update({ ...frame, grounded: true });
+  assert.ok(Math.abs(firstGrounded.position.z - first.position.z) < 1, "first grounded frame remains continuous");
+  for (let index = 0; index < 60; index += 1) rig.update({ ...frame, grounded: true });
+  const settled = rig.snapshot();
+  for (let index = 0; index < 60; index += 1) rig.update({ ...frame, grounded: false });
+  const released = rig.snapshot();
+  assert.ok(released.position.z < settled.position.z, "airborne truth releases toward ordinary chase distance");
+}
+
+{
+  const rig = new ChaseCameraRig({ terrainClearance: 7 });
+  for (let index = 0; index < 60; index += 1) {
+    rig.update({
+      target: { x: 0, y: 30, z: 0 },
+      yaw: 0,
+      bank: 0.7,
+      speed: 80,
+      grounded: true,
+      dt: 1 / 60,
+      sampleHeight: () => 80,
+    });
+  }
+  const blockedGrounded = rig.snapshot();
+  assert.equal(blockedGrounded.obstructed, true);
+  assert.ok(blockedGrounded.position.y >= 87, "grounded settle never defeats terrain clearance");
+}
+
+{
+  const rig = new ChaseCameraRig();
+  const frame = {
+    target: { x: 0, y: 100, z: 0 },
+    yaw: 0,
+    bank: 0.7,
+    speed: 80,
+    dt: 1 / 60,
+    sampleHeight: () => 0,
+  };
+  for (let index = 0; index < 60; index += 1) rig.update({ ...frame, grounded: true });
+  rig.snapTo({ x: 0, y: 100, z: 0 }, 0, () => 0);
+  const afterRecovery = rig.update({ ...frame, grounded: false });
+  const fresh = new ChaseCameraRig().update({ ...frame, grounded: false });
+  assert.ok(Math.abs(afterRecovery.position.z - fresh.position.z) < 0.5, "recovery snap clears grounded-settle history");
+}
+
+{
   const rig = new ChaseCameraRig();
   const repaired = rig.update({
     target: { x: Infinity, y: NaN, z: 0 },
     yaw: Infinity,
     bank: NaN,
     speed: Infinity,
+    grounded: "yes",
     dt: Infinity,
     sampleHeight: () => NaN,
   });
@@ -82,6 +157,7 @@ function finite(snapshot) {
       yaw: frame / 120,
       bank: Math.sin(frame / 25) * 0.7,
       speed: 20 + Math.sin(frame / 40) * 18,
+      grounded: false,
       dt: 1 / 60,
       sampleHeight: (x, z) => 20 + Math.sin(x / 140) * 15 + Math.cos(z / 170) * 12,
     });
