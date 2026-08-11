@@ -49,6 +49,7 @@ const OPTIONAL_SURFACES = [
   ["linked-bank-reversal-mastery", () => import("./linked-bank-reversal-mastery-bootstrap.js")],
   ["terrain-ridge-run", () => import("./terrain-ridge-run-bootstrap.js")],
   ["contextual-hud", () => import("../interface/contextual-hud-bootstrap.js")],
+  ["flight-intention", () => import("../interface/flight-intention-bootstrap.js")],
 ].map(([id, load]) => ({ id, load }));
 
 const readiness = createOptionalSurfaceReadiness(OPTIONAL_SURFACES);
