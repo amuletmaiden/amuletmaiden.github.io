@@ -15,19 +15,20 @@ const world = Object.freeze({
   ]),
 });
 
+const base = Object.freeze({
+  world,
+  position: Object.freeze({ x: 0, z: 0 }),
+  activeIslandIds: Object.freeze(['known-active', 'known-other-region']),
+  discoveredIslandIds: Object.freeze(['known-near', 'known-active', 'known-other-region', 'known-far']),
+  currentRegionId: 'mist',
+  voyageActive: true,
+  activateRange: 2400,
+  prewarmRange: 3000,
+  retainRange: 3400,
+});
+
 function derive(overrides = {}) {
-  return createKnownVoyageStreamingContinuity({
-    world,
-    position: { x: 0, z: 0 },
-    activeIslandIds: ['known-active', 'known-other-region'],
-    discoveredIslandIds: ['known-near', 'known-active', 'known-other-region', 'known-far'],
-    currentRegionId: 'mist',
-    voyageActive: true,
-    activateRange: 2400,
-    prewarmRange: 3000,
-    retainRange: 3400,
-    ...overrides,
-  });
+  return createKnownVoyageStreamingContinuity({ ...base, ...overrides });
 }
 
 test('prewarms only already-known islands just beyond ordinary activation range', () => {
@@ -49,7 +50,7 @@ test('does not reach indefinitely or convert distant knowledge into residency', 
 
 test('pause, recovery and restore fail neutral', () => {
   for (const overrides of [{ paused: true }, { recovery: true }, { restorePublishing: true }]) {
-    assert.deepEqual(createKnownVoyageStreamingContinuity({ ...derive(), ...overrides }), {
+    assert.deepEqual(derive(overrides), {
       active: false,
       retainIslandIds: [],
       prewarmIslandIds: [],
@@ -86,12 +87,9 @@ test('caller world and input arrays are not mutated', () => {
   const beforeActive = [...activeIslandIds];
   const beforeDiscovered = [...discoveredIslandIds];
   createKnownVoyageStreamingContinuity({
-    world,
-    position: { x: 0, z: 0 },
+    ...base,
     activeIslandIds,
     discoveredIslandIds,
-    currentRegionId: 'mist',
-    voyageActive: true,
   });
   assert.equal(JSON.stringify(world), beforeWorld);
   assert.deepEqual(activeIslandIds, beforeActive);
