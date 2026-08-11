@@ -4,6 +4,7 @@ import {
   deriveTakeoffLift,
   TAKEOFF_LIFT_DURATION,
 } from "./takeoff-lift.js";
+import { deriveVerticalEnergySpeedBias } from "./vertical-energy-coupling.js";
 
 export class FlightController {
   constructor() {
@@ -42,13 +43,23 @@ export class FlightController {
     const stallPressure = this.airborne
       ? clamp((11 - planarSpeed) / 11, 0, 1) * (1 - Math.max(0, throttle))
       : 0;
+    const takeoffLiftActive = this.takeoffLiftElapsed < TAKEOFF_LIFT_DURATION;
     let targetSpeed = 0;
     if (this.airborne) {
       targetSpeed = throttle >= 0 ? 20 + 42 * throttle : 20 + 12 * throttle;
       if (this.landingRequested) {
         targetSpeed = Math.min(targetSpeed, 14);
-      } else if (stallPressure > 0) {
-        targetSpeed = Math.max(targetSpeed, 14 + 10 * stallPressure);
+      } else {
+        if (!takeoffLiftActive) {
+          targetSpeed += deriveVerticalEnergySpeedBias({
+            airborne: true,
+            verticalVelocity: this.velocity.y,
+            planarSpeed,
+          });
+        }
+        if (stallPressure > 0) {
+          targetSpeed = Math.max(targetSpeed, 14 + 10 * stallPressure);
+        }
       }
     }
 
