@@ -36,6 +36,7 @@ const OPTIONAL_SURFACES = [
   ["discovered-landing-shelf-cues", () => import("./discovered-landing-shelf-cues-bootstrap.js")],
   ["precision-touchdown", () => import("./precision-touchdown-challenge-bootstrap.js")],
   ["precision-touchdown-feedback", () => import("./precision-touchdown-feedback-bootstrap.js")],
+  ["touchdown-contact-feedback", () => import("./touchdown-contact-feedback-bootstrap.js")],
   ["touch-and-go-launch", () => import("./touch-and-go-launch-bootstrap.js")],
   ["island-hop-run", () => import("./island-hop-run-bootstrap.js")],
   ["cloudbreak-run", () => import("./cloudbreak-run-bootstrap.js")],
