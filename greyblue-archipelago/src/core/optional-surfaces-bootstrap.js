@@ -12,6 +12,7 @@ const OPTIONAL_SURFACES = [
   ["listening-pulse", () => import("./listening-pulse-bootstrap.js")],
   ["approach-challenge", () => import("./approach-challenge-bootstrap.js")],
   ["soundscape", () => import("./soundscape-bootstrap.js")],
+  ["vertical-weather-vapor", () => import("./vertical-weather-vapor-bootstrap.js")],
   ["familiar-mist", () => import("./familiar-mist-bootstrap.js")],
   ["regional-omens", () => import("./regional-omen-bootstrap.js")],
   ["regional-mystery-thread", () => import("./regional-mystery-thread-bootstrap.js")],
