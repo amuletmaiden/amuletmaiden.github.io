@@ -25,7 +25,7 @@ export class FlightController {
 
     if (input.toggleFlight) {
       if (this.airborne) {
-        this.landingRequested = true;
+        this.landingRequested = !this.landingRequested;
         this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
       } else {
         this.airborne = true;
@@ -48,16 +48,10 @@ export class FlightController {
       if (this.landingRequested) {
         targetSpeed = Math.min(targetSpeed, 14);
       } else if (stallPressure > 0) {
-        // A dragon below flying speed should naturally lower its nose and regain
-        // airflow. Reverse throttle previously commanded an 8-unit target below
-        // the 11-unit stall threshold, creating a self-sustaining stall.
         targetSpeed = Math.max(targetSpeed, 14 + 10 * stallPressure);
       }
     }
 
-    // Converge the entire planar velocity vector toward the desired heading.
-    // The old scalar acceleration along the current heading could add energy
-    // during hard turns and grow velocity without bound.
     const planarResponse = 1 - Math.exp(-(this.airborne ? 2.35 : 5.5) * frame);
     this.velocity.x += (forward.x * targetSpeed - this.velocity.x) * planarResponse;
     this.velocity.z += (forward.z * targetSpeed - this.velocity.z) * planarResponse;
@@ -79,9 +73,6 @@ export class FlightController {
       });
       let targetVertical = climb * 17 - 1.6 - this.stallFactor * 4.5 + bankedTurnLoad;
       if (takeoffLift > 0) {
-        // Takeoff is a short release into ordinary flight, not a one-frame
-        // velocity injection. Preserve climb authority while keeping even a
-        // held dive from immediately cancelling the initial ground clearance.
         targetVertical = Math.max(targetVertical + takeoffLift, takeoffLift * 0.55);
       }
       if (this.landingRequested) targetVertical = Math.min(targetVertical, -6.5);
