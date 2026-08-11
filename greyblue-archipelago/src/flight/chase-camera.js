@@ -9,6 +9,7 @@ export class ChaseCameraRig {
     maximumClearanceSamples = 129,
     minimumObstructedDistance = 9,
     obstructionDistanceSamples = 8,
+    obstructionReleaseFrames = 3,
     recoveryClearance = 36,
     recoveryMinimumAltitude = 72,
     smoothing = 7.5,
@@ -22,6 +23,7 @@ export class ChaseCameraRig {
     this.maximumClearanceSamples = clampInteger(maximumClearanceSamples, 2, 513, 129);
     this.minimumObstructedDistance = finitePositive(minimumObstructedDistance, 9);
     this.obstructionDistanceSamples = clampInteger(obstructionDistanceSamples, 2, 32, 8);
+    this.obstructionReleaseFrames = clampInteger(obstructionReleaseFrames, 1, 12, 3);
     this.recoveryClearance = finiteNonNegative(recoveryClearance, 36);
     this.recoveryMinimumAltitude = finiteNonNegative(recoveryMinimumAltitude, 72);
     this.smoothing = smoothing;
@@ -29,6 +31,8 @@ export class ChaseCameraRig {
     this.lookTarget = { x: 0, y: 0, z: 0 };
     this.initialized = false;
     this.obstructed = false;
+    this.retainedObstructionDistance = null;
+    this.obstructionClearFrames = 0;
     this.lastSampleHeight = () => Number.NEGATIVE_INFINITY;
   }
 
@@ -71,7 +75,16 @@ export class ChaseCameraRig {
       minimumDistance: this.minimumObstructedDistance,
       distanceSamples: this.obstructionDistanceSamples,
     });
-    const resolvedDistance = obstruction.distance;
+    const retention = resolveTerrainObstructionRetention({
+      obstruction,
+      desiredDistance,
+      retainedDistance: this.retainedObstructionDistance,
+      clearFrames: this.obstructionClearFrames,
+      releaseFrames: this.obstructionReleaseFrames,
+    });
+    const resolvedDistance = retention.distance;
+    this.retainedObstructionDistance = retention.retainedDistance;
+    this.obstructionClearFrames = retention.clearFrames;
     this.obstructed = obstruction.obstructed;
 
     const desired = {
@@ -109,6 +122,8 @@ export class ChaseCameraRig {
       this.position = { x: anchor.x, y: anchor.y + this.height, z: anchor.z - this.distance };
       this.lookTarget = { x: anchor.x, y: anchor.y + 3.5, z: anchor.z };
       this.obstructed = false;
+      this.retainedObstructionDistance = null;
+      this.obstructionClearFrames = 0;
     }
 
     return this.snapshot();
@@ -121,6 +136,9 @@ export class ChaseCameraRig {
     });
     if (target && typeof target === "object") target.y = safeAltitude;
     this.initialized = false;
+    this.obstructed = false;
+    this.retainedObstructionDistance = null;
+    this.obstructionClearFrames = 0;
     return this.update({ target, yaw, dt: 0, sampleHeight });
   }
 
@@ -136,6 +154,48 @@ export class ChaseCameraRig {
       ),
     };
   }
+}
+
+export function resolveTerrainObstructionRetention({
+  obstruction,
+  desiredDistance,
+  retainedDistance = null,
+  clearFrames = 0,
+  releaseFrames = 3,
+} = {}) {
+  const ordinaryDistance = finitePositive(desiredDistance, 24);
+  const releaseCount = clampInteger(releaseFrames, 1, 12, 3);
+  const priorClearFrames = clampInteger(clearFrames, 0, releaseCount, 0);
+  const priorRetained = Number.isFinite(Number(retainedDistance)) && Number(retainedDistance) > 0
+    ? Math.min(ordinaryDistance, Number(retainedDistance))
+    : null;
+  const obstructionDistance = Number(obstruction?.distance);
+
+  if (obstruction?.obstructed === true && Number.isFinite(obstructionDistance) && obstructionDistance > 0) {
+    const distance = Math.min(ordinaryDistance, obstructionDistance);
+    return Object.freeze({
+      distance,
+      retainedDistance: distance,
+      clearFrames: 0,
+      retained: true,
+    });
+  }
+
+  if (priorRetained !== null && priorClearFrames < releaseCount - 1) {
+    return Object.freeze({
+      distance: priorRetained,
+      retainedDistance: priorRetained,
+      clearFrames: priorClearFrames + 1,
+      retained: true,
+    });
+  }
+
+  return Object.freeze({
+    distance: ordinaryDistance,
+    retainedDistance: null,
+    clearFrames: 0,
+    retained: false,
+  });
 }
 
 export function resolveTerrainObstructionDistance({
