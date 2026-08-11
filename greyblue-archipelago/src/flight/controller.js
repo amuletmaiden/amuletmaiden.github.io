@@ -1,3 +1,5 @@
+import { deriveBankedTurnVerticalLoad } from "./banked-turn-load.js";
+
 export class FlightController {
   constructor() {
     this.velocity = { x: 0, y: 0, z: 0 };
@@ -59,7 +61,12 @@ export class FlightController {
       : 0;
 
     if (this.airborne) {
-      let targetVertical = climb * 17 - 1.6 - this.stallFactor * 4.5;
+      const bankedTurnLoad = deriveBankedTurnVerticalLoad({
+        airborne: this.airborne,
+        bank: this.bank,
+        planarSpeed: updatedPlanarSpeed,
+      });
+      let targetVertical = climb * 17 - 1.6 - this.stallFactor * 4.5 + bankedTurnLoad;
       if (this.landingRequested) targetVertical = Math.min(targetVertical, -6.5);
       const verticalResponse = 1 - Math.exp(-2.8 * frame);
       this.velocity.y += (targetVertical - this.velocity.y) * verticalResponse;
