@@ -55,6 +55,7 @@ function strongSurfaceActive() {
 function states() {
   return {
     fullColumnWeather: globalThis.__greyblueFullColumnWeatherRun,
+    ridgeToCloudAscent: globalThis.__greyblueRidgeToCloudAscent,
     highAirLandfall: globalThis.__greyblueHighAirLandfall,
     highAirCrossing: globalThis.__greyblueHighAirCrossing,
     mysteryListeningPass: globalThis.__greyblueMysteryListeningPass,
@@ -97,10 +98,11 @@ function render() {
 
 const refreshEvents = Object.freeze([
   'greyblue:deep-mist-run', 'greyblue:cloudbreak-run', 'greyblue:full-column-weather-run',
-  'greyblue:high-air-crossing', 'greyblue:high-air-landfall', 'greyblue:mystery-listening-pass',
-  'greyblue:regional-mystery-search-flight', 'greyblue:survey-to-landing-sortie',
-  'greyblue:discovered-island-survey', 'greyblue:island-hop-run', 'greyblue:touch-and-go-launch',
-  'greyblue:crossing-cancelled', 'greyblue:landmark-flight-encounter', 'keydown',
+  'greyblue:ridge-to-cloud-ascent', 'greyblue:high-air-crossing', 'greyblue:high-air-landfall',
+  'greyblue:mystery-listening-pass', 'greyblue:regional-mystery-search-flight',
+  'greyblue:survey-to-landing-sortie', 'greyblue:discovered-island-survey',
+  'greyblue:island-hop-run', 'greyblue:touch-and-go-launch', 'greyblue:crossing-cancelled',
+  'greyblue:landmark-flight-encounter', 'keydown',
 ]);
 function refreshSoon() { queueMicrotask(render); }
 for (const eventName of refreshEvents) globalThis.addEventListener?.(eventName, refreshSoon);
