@@ -1,6 +1,7 @@
 import { getKnownVoyageStreamingCandidates } from './known-voyage-streaming-channel.js';
 
 const DEFAULT_CAP = 10;
+let latestResidency = Object.freeze(new Set());
 
 function cleanId(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -23,6 +24,15 @@ function sanitizeIsland(island) {
   const height = Number(island?.height);
   if (!id || !Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(scale) || scale <= 0 || !Number.isFinite(height) || height <= 0) return null;
   return Object.freeze({ id, x, z, scale, height, landmark: island?.landmark === true });
+}
+
+function publishResidency(active) {
+  latestResidency = Object.freeze(new Set(active.keys()));
+}
+
+export function isStreamedIslandResident(id) {
+  const key = cleanId(id);
+  return Boolean(key) && latestResidency.has(key);
 }
 
 function transitionTelemetry(activeEntries) {
@@ -70,6 +80,7 @@ export function createStreamedIslandPool({ cap = DEFAULT_CAP, create, reset, dis
 
     reset(resource, island, kind);
     active.set(island.id, { resource, kind });
+    publishResidency(active);
     return resource;
   }
 
@@ -78,6 +89,7 @@ export function createStreamedIslandPool({ cap = DEFAULT_CAP, create, reset, dis
     const entry = active.get(key);
     if (!entry) return false;
     active.delete(key);
+    publishResidency(active);
     const pooledCount = idle.ordinary.length + idle.landmark.length;
     if (pooledCount < limit) {
       reset(entry.resource, null, entry.kind);
@@ -107,6 +119,7 @@ export function createStreamedIslandPool({ cap = DEFAULT_CAP, create, reset, dis
       if (!wanted.has(id)) release(id);
     }
     for (const island of ordered) acquire(island);
+    publishResidency(active);
     return ordered.map((island) => active.get(island.id)?.resource).filter(Boolean);
   }
 
@@ -116,6 +129,7 @@ export function createStreamedIslandPool({ cap = DEFAULT_CAP, create, reset, dis
       totals.disposed += 1;
     }
     active.clear();
+    publishResidency(active);
     for (const kind of ['ordinary', 'landmark']) {
       while (idle[kind].length) {
         dispose(idle[kind].pop());

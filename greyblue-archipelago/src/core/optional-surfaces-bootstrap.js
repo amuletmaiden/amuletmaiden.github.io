@@ -54,6 +54,7 @@ const OPTIONAL_SURFACES = [
   ["known-voyage-chart", () => import("../interface/known-voyage-chart-bootstrap.js")],
   ["known-voyage-itinerary", () => import("../interface/known-voyage-itinerary-bootstrap.js")],
   ["known-voyage-streaming-continuity", () => import("./known-voyage-streaming-continuity-bootstrap.js")],
+  ["known-arrival-readiness", () => import("./known-arrival-readiness-bootstrap.js")],
   ["contextual-hud", () => import("../interface/contextual-hud-bootstrap.js")],
   ["flight-intention", () => import("../interface/flight-intention-bootstrap.js")],
   ["flight-debrief", () => import("./flight-debrief-bootstrap.js")],
