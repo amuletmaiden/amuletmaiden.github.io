@@ -1,3 +1,4 @@
+import { deriveBankTurnCarry } from "./bank-turn-carry.js";
 import { deriveBankedTurnVerticalLoad } from "./banked-turn-load.js";
 import { deriveGlideCoastTarget } from "./glide-coast.js";
 import {
@@ -37,14 +38,23 @@ export class FlightController {
     }
 
     const planarSpeed = Math.hypot(this.velocity.x, this.velocity.z);
-    const turnAuthority = 0.48 + Math.min(planarSpeed / 65, 1) * 0.58;
-    this.yaw += steer * turnAuthority * frame;
-
-    const forward = { x: Math.sin(this.yaw), z: Math.cos(this.yaw) };
     const stallPressure = this.airborne
       ? clamp((11 - planarSpeed) / 11, 0, 1) * (1 - Math.max(0, throttle))
       : 0;
     const takeoffLiftActive = this.takeoffLiftElapsed < TAKEOFF_LIFT_DURATION;
+    const bankTurnCarry = deriveBankTurnCarry({
+      airborne: this.airborne,
+      landingRequested: this.landingRequested,
+      takeoffActive: takeoffLiftActive,
+      stallPressure,
+      steer,
+      bank: this.bank,
+      planarSpeed,
+    });
+    const turnAuthority = 0.48 + Math.min(planarSpeed / 65, 1) * 0.58;
+    this.yaw += (steer + bankTurnCarry) * turnAuthority * frame;
+
+    const forward = { x: Math.sin(this.yaw), z: Math.cos(this.yaw) };
     let targetSpeed = 0;
     if (this.airborne) {
       targetSpeed = throttle >= 0 ? 20 + 42 * throttle : 20 + 12 * throttle;
