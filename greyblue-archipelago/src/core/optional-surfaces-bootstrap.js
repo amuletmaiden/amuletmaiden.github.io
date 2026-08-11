@@ -50,6 +50,7 @@ const OPTIONAL_SURFACES = [
   ["terrain-ridge-run", () => import("./terrain-ridge-run-bootstrap.js")],
   ["contextual-hud", () => import("../interface/contextual-hud-bootstrap.js")],
   ["flight-intention", () => import("../interface/flight-intention-bootstrap.js")],
+  ["flight-debrief", () => import("./flight-debrief-bootstrap.js")],
 ].map(([id, load]) => ({ id, load }));
 
 const readiness = createOptionalSurfaceReadiness(OPTIONAL_SURFACES);
