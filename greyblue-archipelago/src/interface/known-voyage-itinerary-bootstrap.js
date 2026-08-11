@@ -21,6 +21,7 @@ if (!panel || !svg || !voyageStatus) throw new Error('Known voyage chart must lo
 
 let itineraryState = createKnownVoyageItineraryState();
 let planning = false;
+let activatingLeg = false;
 let worldSeed = null;
 let world = null;
 let disposed = false;
@@ -158,7 +159,12 @@ function activateCurrentLeg() {
     render();
     return false;
   }
-  group.click();
+  activatingLeg = true;
+  try {
+    group.click();
+  } finally {
+    activatingLeg = false;
+  }
   render();
   return true;
 }
@@ -176,11 +182,18 @@ function togglePlannedNode(group) {
   render();
 }
 
-function interceptPlanningActivation(event) {
-  if (!planning || disposed) return;
+function interceptChartActivation(event) {
+  if (disposed) return;
   const group = event.target instanceof Element ? event.target.closest('g[role="button"]') : null;
   if (!group || !svg.contains(group)) return;
   if (event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ') return;
+  const active = publicKnownVoyageItinerary(itineraryState).active;
+  if (active && !planning && !activatingLeg) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
+  if (!planning) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   togglePlannedNode(group);
@@ -190,8 +203,7 @@ function onPlan() {
   const publicState = publicKnownVoyageItinerary(itineraryState);
   if (publicState.active || itineraryState.completed) {
     itineraryState = cancelKnownVoyageItinerary();
-    const cancelVoyage = document.querySelector('#greyblue-voyage-chart-cancel');
-    cancelVoyage?.click();
+    document.querySelector('#greyblue-voyage-chart-cancel')?.click();
     planning = true;
   } else planning = !planning;
   render();
@@ -255,8 +267,8 @@ if (!stateDescriptor || stateDescriptor.configurable) {
   });
 }
 
-svg.addEventListener('click', interceptPlanningActivation, true);
-svg.addEventListener('keydown', interceptPlanningActivation, true);
+svg.addEventListener('click', interceptChartActivation, true);
+svg.addEventListener('keydown', interceptChartActivation, true);
 planButton.addEventListener('click', onPlan);
 reverseButton.addEventListener('click', onReverse);
 launchButton.addEventListener('click', onLaunch);
@@ -268,8 +280,8 @@ render();
 
 globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
-  svg.removeEventListener('click', interceptPlanningActivation, true);
-  svg.removeEventListener('keydown', interceptPlanningActivation, true);
+  svg.removeEventListener('click', interceptChartActivation, true);
+  svg.removeEventListener('keydown', interceptChartActivation, true);
   globalThis.removeEventListener?.('greyblue:known-voyage-intention', onVoyageCompletion);
   box.remove();
   style.remove();
