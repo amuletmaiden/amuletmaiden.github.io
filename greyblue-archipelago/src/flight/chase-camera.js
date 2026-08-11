@@ -1,3 +1,10 @@
+import {
+  clearGroundedCameraSettle,
+  createGroundedCameraSettleState,
+  groundedCameraComposition,
+  stepGroundedCameraSettle,
+} from "./grounded-camera-settle.js";
+
 export class ChaseCameraRig {
   constructor({
     distance = 24,
@@ -34,6 +41,7 @@ export class ChaseCameraRig {
     this.retainedObstructionDistance = null;
     this.obstructionClearFrames = 0;
     this.lastSampleHeight = () => Number.NEGATIVE_INFINITY;
+    this.groundedSettleState = createGroundedCameraSettleState();
   }
 
   update({
@@ -41,6 +49,7 @@ export class ChaseCameraRig {
     yaw = 0,
     bank = 0,
     speed = 0,
+    grounded = false,
     dt = 1 / 60,
     sampleHeight = this.lastSampleHeight,
   }) {
@@ -53,12 +62,25 @@ export class ChaseCameraRig {
     const safeBank = Number.isFinite(bank) ? bank : 0;
     const safeSpeed = Number.isFinite(speed) ? Math.max(0, speed) : 0;
     const frame = clamp(Number(dt) || 0, 0, 0.1);
+    this.groundedSettleState = stepGroundedCameraSettle(this.groundedSettleState, {
+      grounded: grounded === true,
+      dt: frame,
+    });
+    const groundedComposition = groundedCameraComposition(this.groundedSettleState);
+    const settledSpeed = safeSpeed * groundedComposition.speedScale;
+    const settledBank = safeBank * groundedComposition.bankScale;
     const forward = { x: Math.sin(safeYaw), z: Math.cos(safeYaw) };
     const right = { x: Math.cos(safeYaw), z: -Math.sin(safeYaw) };
-    const speedStretch = clamp(safeSpeed / 80, 0, 1) * 8;
-    const bankOffset = clamp(safeBank, -0.8, 0.8) * 4.5;
-    const desiredDistance = this.distance + speedStretch;
-    const desiredY = anchor.y + this.height + Math.min(safeSpeed * 0.035, 3.5);
+    const speedStretch = clamp(settledSpeed / 80, 0, 1) * 8;
+    const bankOffset = clamp(settledBank, -0.8, 0.8) * 4.5;
+    const desiredDistance = Math.max(
+      this.minimumObstructedDistance,
+      this.distance + speedStretch + groundedComposition.distanceOffset,
+    );
+    const desiredY = anchor.y
+      + this.height
+      + groundedComposition.heightOffset
+      + Math.min(settledSpeed * 0.035, 3.5);
 
     const obstruction = resolveTerrainObstructionDistance({
       anchor,
@@ -98,10 +120,15 @@ export class ChaseCameraRig {
       : Number.NEGATIVE_INFINITY;
     if (desired.y < minimumCameraHeight) desired.y = minimumCameraHeight;
 
-    const lookDistance = this.lookAhead + clamp(safeSpeed * 0.11, 0, 8);
+    const lookDistance = Math.max(
+      0,
+      this.lookAhead
+        + groundedComposition.lookAheadOffset
+        + clamp(settledSpeed * 0.11, 0, 8),
+    );
     const desiredLook = {
       x: anchor.x + forward.x * lookDistance,
-      y: anchor.y + 3.5 - clamp(safeBank * 1.2, -1, 1),
+      y: anchor.y + 3.5 - clamp(settledBank * 1.2, -1, 1),
       z: anchor.z + forward.z * lookDistance,
     };
 
@@ -124,6 +151,7 @@ export class ChaseCameraRig {
       this.obstructed = false;
       this.retainedObstructionDistance = null;
       this.obstructionClearFrames = 0;
+      this.groundedSettleState = clearGroundedCameraSettle();
     }
 
     return this.snapshot();
@@ -139,7 +167,8 @@ export class ChaseCameraRig {
     this.obstructed = false;
     this.retainedObstructionDistance = null;
     this.obstructionClearFrames = 0;
-    return this.update({ target, yaw, dt: 0, sampleHeight });
+    this.groundedSettleState = clearGroundedCameraSettle();
+    return this.update({ target, yaw, grounded: false, dt: 0, sampleHeight });
   }
 
   snapshot() {
