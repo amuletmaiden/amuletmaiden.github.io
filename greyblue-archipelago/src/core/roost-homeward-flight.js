@@ -70,23 +70,35 @@ export function stepRoostHomewardFlight({ state = createRoostHomewardFlightState
   const currentDistance = distance(position, resolvedTarget.center);
   const departureDistance = resolvedTarget.radius + DEPART_MARGIN;
   const priorTarget = validTarget(state?.target);
-  const continuing = state?.active === true && sameTarget(priorTarget, resolvedTarget) && PHASES.has(state?.phase);
+  const same = sameTarget(priorTarget, resolvedTarget);
 
-  if (!continuing) {
+  if (state?.active !== true) {
+    if (state?.phase === 'depart' && same) {
+      const lastPosition = finitePoint(state.lastPosition);
+      if (!lastPosition) return emptyState();
+      const step = distance(lastPosition, position);
+      if (step > MAX_STEP) return emptyState();
+      if (currentDistance > departureDistance && step >= MIN_SPACING) {
+        return Object.freeze({
+          available: true,
+          active: true,
+          phase: 'homeward',
+          completed: false,
+          target: resolvedTarget,
+          lastPosition: position,
+          closingTravel: 0,
+        });
+      }
+      return Object.freeze({ ...state, available: true, target: resolvedTarget, lastPosition: position, completed: false });
+    }
+
     if (currentDistance <= departureDistance) {
       return Object.freeze({ ...emptyState(), available: true, phase: 'depart', target: resolvedTarget, lastPosition: position });
     }
-    return Object.freeze({
-      available: true,
-      active: true,
-      phase: 'homeward',
-      completed: false,
-      target: resolvedTarget,
-      lastPosition: position,
-      closingTravel: 0,
-    });
+    return emptyState();
   }
 
+  if (!same || !PHASES.has(state?.phase)) return emptyState();
   const lastPosition = finitePoint(state.lastPosition);
   if (!lastPosition) return emptyState();
   const step = distance(lastPosition, position);
