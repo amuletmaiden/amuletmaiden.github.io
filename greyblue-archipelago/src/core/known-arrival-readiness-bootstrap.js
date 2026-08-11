@@ -62,6 +62,7 @@ function updateKnownArrivalReadiness() {
     voyage,
     target,
     world: worldFor(state?.seed),
+    crossing: globalThis.__greyblueHighAirCrossing?.active === true,
     isResident: isStreamedIslandResident,
   });
   globalThis.__greyblueKnownArrivalReadiness = publicState;
