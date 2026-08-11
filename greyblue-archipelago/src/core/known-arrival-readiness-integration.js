@@ -15,16 +15,12 @@ function restorePublishing(state) {
   return Boolean(state?.restorePublishing || state?.explorationRestorePublishing);
 }
 
-function crossingActive(state) {
-  return state?.routeChoice?.reason === 'active-crossing'
-    || globalThis.__greyblueHighAirCrossing?.active === true;
-}
-
 export function deriveKnownArrivalReadinessFrame({
   state,
   voyage,
   target,
   world,
+  crossing = false,
   isResident = () => false,
 } = {}) {
   const targetId = cleanId(target?.id);
@@ -53,7 +49,7 @@ export function deriveKnownArrivalReadinessFrame({
       recovery: recoveryActive(state),
       restoring: restorePublishing(state),
       restorePublication: restorePublishing(state),
-      crossing: crossingActive(state),
+      crossing: crossing === true || state?.routeChoice?.reason === 'active-crossing',
     },
     voyageActive: voyage?.active === true,
     known: Boolean(targetId) && discovered.has(targetId) && Boolean(island),
