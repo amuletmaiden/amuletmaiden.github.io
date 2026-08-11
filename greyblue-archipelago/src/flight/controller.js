@@ -1,6 +1,7 @@
 import { deriveBankTurnCarry } from "./bank-turn-carry.js";
 import { deriveBankedTurnVerticalLoad } from "./banked-turn-load.js";
 import { deriveGlideCoastTarget } from "./glide-coast.js";
+import { deriveLandingVerticalTarget } from "./landing-flare.js";
 import {
   advanceTakeoffLiftElapsed,
   deriveTakeoffLift,
@@ -106,7 +107,13 @@ export class FlightController {
       if (takeoffLift > 0) {
         targetVertical = Math.max(targetVertical + takeoffLift, takeoffLift * 0.55);
       }
-      if (this.landingRequested) targetVertical = Math.min(targetVertical, -6.5);
+      targetVertical = deriveLandingVerticalTarget({
+        airborne: this.airborne,
+        landingRequested: this.landingRequested,
+        takeoffActive: takeoffLift > 0,
+        climb,
+        ordinaryTargetVertical: targetVertical,
+      });
       const verticalResponse = 1 - Math.exp(-2.8 * frame);
       this.velocity.y += (targetVertical - this.velocity.y) * verticalResponse;
       this.velocity.y = clamp(this.velocity.y, -18, 24);
