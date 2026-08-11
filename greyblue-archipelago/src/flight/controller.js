@@ -1,4 +1,5 @@
 import { deriveBankedTurnVerticalLoad } from "./banked-turn-load.js";
+import { deriveGlideCoastTarget } from "./glide-coast.js";
 import {
   advanceTakeoffLiftElapsed,
   deriveTakeoffLift,
@@ -57,6 +58,15 @@ export class FlightController {
             planarSpeed,
           });
         }
+        targetSpeed = deriveGlideCoastTarget({
+          airborne: true,
+          landingRequested: false,
+          takeoffActive: takeoffLiftActive,
+          stallPressure,
+          throttle,
+          planarSpeed,
+          ordinaryTargetSpeed: targetSpeed,
+        });
         if (stallPressure > 0) {
           targetSpeed = Math.max(targetSpeed, 14 + 10 * stallPressure);
         }
