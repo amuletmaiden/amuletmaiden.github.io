@@ -121,3 +121,15 @@ export function verticalWeatherSoundMix(state) {
     aerodynamicGainMultiplier: clamp(Number(state.aerodynamicGainMultiplier) || 1, 0.85, 1.2),
   });
 }
+
+export function composeVerticalWeatherSoundTargets(base = {}, state = createVerticalWeatherSoundState()) {
+  const mix = verticalWeatherSoundMix(state);
+  const windGain = Number.isFinite(base?.windGain) ? base.windGain : 0;
+  const windCutoff = Number.isFinite(base?.windCutoff) ? base.windCutoff : 600;
+  const aerodynamicGain = Number.isFinite(base?.aerodynamicGain) ? base.aerodynamicGain : 0;
+  return Object.freeze({
+    windGain: clamp(windGain * mix.windGainMultiplier, 0, 1),
+    windCutoff: clamp(windCutoff * mix.windCutoffMultiplier, 80, 18000),
+    aerodynamicGain: clamp(aerodynamicGain * mix.aerodynamicGainMultiplier, 0, 0.3),
+  });
+}
