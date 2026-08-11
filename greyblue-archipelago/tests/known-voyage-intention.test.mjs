@@ -56,8 +56,32 @@ const wrongRegion = stepKnownVoyageIntention(underway, {
 });
 assert.equal(wrongRegion.completed, false);
 
-const arrived = stepKnownVoyageIntention(underway, {
-  ready: true, grounded: true, ordinaryFlight: true, nearestIslandId: 'b', currentRegionId: 'crown', arrivedAtNearestIsland: true,
+const loadingArrival = stepKnownVoyageIntention(underway, {
+  ready: true,
+  grounded: true,
+  ordinaryFlight: true,
+  nearestIslandId: 'b',
+  currentRegionId: 'crown',
+  arrivedAtNearestIsland: true,
+  arrivalReadinessActive: true,
+});
+assert.equal(loadingArrival.completed, false);
+assert.equal(loadingArrival.phase, 'underway');
+assert.deepEqual(publicKnownVoyageIntention(loadingArrival), {
+  active: true,
+  phase: 'underway',
+  completed: false,
+  text: 'Follow your own reading of the archipelago.',
+});
+
+const arrived = stepKnownVoyageIntention(loadingArrival, {
+  ready: true,
+  grounded: true,
+  ordinaryFlight: true,
+  nearestIslandId: 'b',
+  currentRegionId: 'crown',
+  arrivedAtNearestIsland: true,
+  arrivalReadinessActive: false,
 });
 assert.equal(arrived.completed, true);
 assert.equal(arrived.phase, 'arrived');
@@ -77,7 +101,7 @@ assert.equal(replaced.targetId, 'a');
 assert.equal(replaced.departed, false);
 assert.equal(replaced.phase, 'depart');
 
-const caller = { ready: true, airborne: true, ordinaryFlight: true, nearestIslandId: 'a', currentRegionId: 'reach' };
+const caller = { ready: true, airborne: true, ordinaryFlight: true, nearestIslandId: 'a', currentRegionId: 'reach', arrivalReadinessActive: true };
 const before = JSON.stringify(caller);
 stepKnownVoyageIntention(selected, caller);
 assert.equal(JSON.stringify(caller), before);
