@@ -9,6 +9,11 @@ const INTENTIONS = Object.freeze([
     climb: 'Take the ridge into the higher air.',
     clear: 'Break cleanly into the open sky.',
   }],
+  ['homeward-roost', 'roostHomewardFlight', {
+    depart: 'Leave the remembered shelf behind.',
+    homeward: 'Carry the flight back toward shelter.',
+    settle: 'Bring the return down cleanly.',
+  }],
   ['high-air-landfall', 'highAirLandfall', {
     descent: 'Descend into the arrival.',
     approach: 'Carry the approach forward.',

@@ -56,6 +56,7 @@ function states() {
   return {
     fullColumnWeather: globalThis.__greyblueFullColumnWeatherRun,
     ridgeToCloudAscent: globalThis.__greyblueRidgeToCloudAscent,
+    roostHomewardFlight: globalThis.__greyblueRoostHomewardFlight,
     highAirLandfall: globalThis.__greyblueHighAirLandfall,
     highAirCrossing: globalThis.__greyblueHighAirCrossing,
     mysteryListeningPass: globalThis.__greyblueMysteryListeningPass,
@@ -98,7 +99,8 @@ function render() {
 
 const refreshEvents = Object.freeze([
   'greyblue:deep-mist-run', 'greyblue:cloudbreak-run', 'greyblue:full-column-weather-run',
-  'greyblue:ridge-to-cloud-ascent', 'greyblue:high-air-crossing', 'greyblue:high-air-landfall',
+  'greyblue:ridge-to-cloud-ascent', 'greyblue:roost-homeward-flight',
+  'greyblue:high-air-crossing', 'greyblue:high-air-landfall',
   'greyblue:mystery-listening-pass', 'greyblue:regional-mystery-search-flight',
   'greyblue:survey-to-landing-sortie', 'greyblue:discovered-island-survey',
   'greyblue:island-hop-run', 'greyblue:touch-and-go-launch', 'greyblue:crossing-cancelled',

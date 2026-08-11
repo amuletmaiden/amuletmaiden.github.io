@@ -23,6 +23,7 @@ const OPTIONAL_SURFACES = [
   ["known-crossing-destination-atmosphere", () => import("./known-crossing-destination-atmosphere-bootstrap.js")],
   ["known-crossing-destination-atmosphere-presentation", () => import("./known-crossing-destination-atmosphere-presentation-bootstrap.js")],
   ["roost-rest", () => import("./roost-rest-bootstrap.js")],
+  ["roost-homeward-flight", () => import("./roost-homeward-flight-bootstrap.js")],
   ["known-landmark-revisit", () => import("./known-landmark-revisit-bootstrap.js")],
   ["known-landmark-traversal-circuit", () => import("./known-landmark-traversal-circuit-bootstrap.js")],
   ["regional-flight-memory", () => import("./regional-flight-memory-bootstrap.js")],
