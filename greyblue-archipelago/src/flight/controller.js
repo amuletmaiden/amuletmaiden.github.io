@@ -1,4 +1,9 @@
 import { deriveBankedTurnVerticalLoad } from "./banked-turn-load.js";
+import {
+  advanceTakeoffLiftElapsed,
+  deriveTakeoffLift,
+  TAKEOFF_LIFT_DURATION,
+} from "./takeoff-lift.js";
 
 export class FlightController {
   constructor() {
@@ -9,6 +14,7 @@ export class FlightController {
     this.airborne = false;
     this.landingRequested = false;
     this.stallFactor = 0;
+    this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
   }
 
   step(input, dt) {
@@ -20,10 +26,11 @@ export class FlightController {
     if (input.toggleFlight) {
       if (this.airborne) {
         this.landingRequested = true;
+        this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
       } else {
         this.airborne = true;
         this.landingRequested = false;
-        this.velocity.y = Math.max(this.velocity.y, 8);
+        this.takeoffLiftElapsed = 0;
       }
     }
 
@@ -66,13 +73,29 @@ export class FlightController {
         bank: this.bank,
         planarSpeed: updatedPlanarSpeed,
       });
+      const takeoffLift = deriveTakeoffLift({
+        active: !this.landingRequested,
+        elapsed: this.takeoffLiftElapsed,
+      });
       let targetVertical = climb * 17 - 1.6 - this.stallFactor * 4.5 + bankedTurnLoad;
+      if (takeoffLift > 0) {
+        // Takeoff is a short release into ordinary flight, not a one-frame
+        // velocity injection. Preserve climb authority while keeping even a
+        // held dive from immediately cancelling the initial ground clearance.
+        targetVertical = Math.max(targetVertical + takeoffLift, takeoffLift * 0.55);
+      }
       if (this.landingRequested) targetVertical = Math.min(targetVertical, -6.5);
       const verticalResponse = 1 - Math.exp(-2.8 * frame);
       this.velocity.y += (targetVertical - this.velocity.y) * verticalResponse;
       this.velocity.y = clamp(this.velocity.y, -18, 24);
+      this.takeoffLiftElapsed = advanceTakeoffLiftElapsed({
+        active: takeoffLift > 0,
+        elapsed: this.takeoffLiftElapsed,
+        dt: frame,
+      });
     } else {
       this.velocity.y = 0;
+      this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
     }
 
     const bankTarget = steer * (0.45 + Math.min(updatedPlanarSpeed / 70, 1) * 0.32);
@@ -98,6 +121,7 @@ export class FlightController {
         this.velocity.x *= 0.35;
         this.velocity.z *= 0.35;
         this.stallFactor = 0;
+        this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
       }
     }
     return position;
@@ -134,6 +158,7 @@ export class FlightController {
       this.yaw,
       this.pitch,
       this.bank,
+      this.takeoffLiftElapsed,
     ];
     if (values.every(Number.isFinite)) return;
     this.velocity = { x: 0, y: 0, z: 0 };
@@ -143,6 +168,7 @@ export class FlightController {
     this.airborne = true;
     this.landingRequested = false;
     this.stallFactor = 1;
+    this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
   }
 }
 
