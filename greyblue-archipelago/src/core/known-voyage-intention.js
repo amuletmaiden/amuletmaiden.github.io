@@ -73,7 +73,8 @@ export function stepKnownVoyageIntention(state = createKnownVoyageIntentionState
     return underway;
   }
 
-  const truthfulArrival = currentRegionId === state.targetRegionId
+  const truthfulArrival = frame?.arrivalReadinessActive !== true
+    && currentRegionId === state.targetRegionId
     && nearestIslandId === state.targetId
     && frame?.arrivedAtNearestIsland === true
     && frame?.ordinaryFlight === true;
