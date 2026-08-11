@@ -87,6 +87,7 @@ function stepVoyage(state) {
     grounded,
     ordinaryFlight,
     arrivedAtNearestIsland: grounded,
+    arrivalReadinessActive: globalThis.__greyblueKnownArrivalReadiness?.active === true,
   });
 
   const publicState = publicKnownVoyageIntention(voyageState);
