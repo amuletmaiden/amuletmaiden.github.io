@@ -7,6 +7,8 @@ export class ChaseCameraRig {
     clearanceSamples = 7,
     clearanceProbeSpacing = 0.5,
     maximumClearanceSamples = 129,
+    minimumObstructedDistance = 9,
+    obstructionDistanceSamples = 8,
     recoveryClearance = 36,
     recoveryMinimumAltitude = 72,
     smoothing = 7.5,
@@ -18,6 +20,8 @@ export class ChaseCameraRig {
     this.clearanceSamples = clampInteger(clearanceSamples, 2, 33, 7);
     this.clearanceProbeSpacing = finitePositive(clearanceProbeSpacing, 0.5);
     this.maximumClearanceSamples = clampInteger(maximumClearanceSamples, 2, 513, 129);
+    this.minimumObstructedDistance = finitePositive(minimumObstructedDistance, 9);
+    this.obstructionDistanceSamples = clampInteger(obstructionDistanceSamples, 2, 32, 8);
     this.recoveryClearance = finiteNonNegative(recoveryClearance, 36);
     this.recoveryMinimumAltitude = finiteNonNegative(recoveryMinimumAltitude, 72);
     this.smoothing = smoothing;
@@ -50,28 +54,36 @@ export class ChaseCameraRig {
     const speedStretch = clamp(safeSpeed / 80, 0, 1) * 8;
     const bankOffset = clamp(safeBank, -0.8, 0.8) * 4.5;
     const desiredDistance = this.distance + speedStretch;
+    const desiredY = anchor.y + this.height + Math.min(safeSpeed * 0.035, 3.5);
+
+    const obstruction = resolveTerrainObstructionDistance({
+      anchor,
+      forward,
+      right,
+      bankOffset,
+      desiredDistance,
+      desiredY,
+      sampleHeight: activeSampleHeight,
+      terrainClearance: this.terrainClearance,
+      clearanceSamples: this.clearanceSamples,
+      clearanceProbeSpacing: this.clearanceProbeSpacing,
+      maximumClearanceSamples: this.maximumClearanceSamples,
+      minimumDistance: this.minimumObstructedDistance,
+      distanceSamples: this.obstructionDistanceSamples,
+    });
+    const resolvedDistance = obstruction.distance;
+    this.obstructed = obstruction.obstructed;
 
     const desired = {
-      x: anchor.x - forward.x * desiredDistance - right.x * bankOffset,
-      y: anchor.y + this.height + Math.min(safeSpeed * 0.035, 3.5),
-      z: anchor.z - forward.z * desiredDistance - right.z * bankOffset,
+      x: anchor.x - forward.x * resolvedDistance - right.x * bankOffset,
+      y: desiredY,
+      z: anchor.z - forward.z * resolvedDistance - right.z * bankOffset,
     };
 
-    const terrainHeight = maximumFiniteHeightAlongSegment(
-      anchor,
-      desired,
-      activeSampleHeight,
-      this.clearanceSamples,
-      {
-        maximumSpacing: this.clearanceProbeSpacing,
-        maximumSamples: this.maximumClearanceSamples,
-      },
-    );
-    const minimumCameraHeight = Number.isFinite(terrainHeight)
-      ? terrainHeight + this.terrainClearance
+    const minimumCameraHeight = Number.isFinite(obstruction.terrainHeight)
+      ? obstruction.terrainHeight + this.terrainClearance
       : Number.NEGATIVE_INFINITY;
-    this.obstructed = desired.y < minimumCameraHeight;
-    if (this.obstructed) desired.y = minimumCameraHeight;
+    if (desired.y < minimumCameraHeight) desired.y = minimumCameraHeight;
 
     const lookDistance = this.lookAhead + clamp(safeSpeed * 0.11, 0, 8);
     const desiredLook = {
@@ -124,6 +136,67 @@ export class ChaseCameraRig {
       ),
     };
   }
+}
+
+export function resolveTerrainObstructionDistance({
+  anchor,
+  forward,
+  right = { x: 1, z: 0 },
+  bankOffset = 0,
+  desiredDistance,
+  desiredY,
+  sampleHeight,
+  terrainClearance = 5,
+  clearanceSamples = 7,
+  clearanceProbeSpacing = 0.5,
+  maximumClearanceSamples = 129,
+  minimumDistance = 9,
+  distanceSamples = 8,
+} = {}) {
+  const fallbackDistance = finitePositive(desiredDistance, 24);
+  const neutral = Object.freeze({
+    distance: fallbackDistance,
+    terrainHeight: Number.NEGATIVE_INFINITY,
+    obstructed: false,
+  });
+  if (!finiteVector(anchor) || !finiteHorizontal(forward) || typeof sampleHeight !== "function" || !Number.isFinite(desiredY)) return neutral;
+
+  const minimum = Math.min(fallbackDistance, finitePositive(minimumDistance, 9));
+  const samples = clampInteger(distanceSamples, 2, 32, 8);
+  const safeRight = finiteHorizontal(right) ? right : { x: 1, z: 0 };
+  const safeBankOffset = Number.isFinite(bankOffset) ? bankOffset : 0;
+  const clearance = finiteNonNegative(terrainClearance, 5);
+
+  function probe(distance) {
+    const candidate = {
+      x: anchor.x - forward.x * distance - safeRight.x * safeBankOffset,
+      y: desiredY,
+      z: anchor.z - forward.z * distance - safeRight.z * safeBankOffset,
+    };
+    return maximumFiniteHeightAlongSegment(
+      anchor,
+      candidate,
+      sampleHeight,
+      clearanceSamples,
+      { maximumSpacing: clearanceProbeSpacing, maximumSamples: maximumClearanceSamples },
+    );
+  }
+
+  const fullTerrain = probe(fallbackDistance);
+  if (!Number.isFinite(fullTerrain) || desiredY >= fullTerrain + clearance) {
+    return Object.freeze({ distance: fallbackDistance, terrainHeight: fullTerrain, obstructed: false });
+  }
+
+  for (let index = 1; index < samples; index += 1) {
+    const amount = index / (samples - 1);
+    const distance = fallbackDistance + (minimum - fallbackDistance) * amount;
+    const terrainHeight = probe(distance);
+    if (!Number.isFinite(terrainHeight) || desiredY >= terrainHeight + clearance) {
+      return Object.freeze({ distance, terrainHeight, obstructed: true });
+    }
+  }
+
+  return Object.freeze({ distance: minimum, terrainHeight: probe(minimum), obstructed: true });
 }
 
 export function resolveRecoveryAltitude(
