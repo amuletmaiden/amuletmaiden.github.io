@@ -1,4 +1,9 @@
 import { deriveFlightIntention } from './flight-intention.js';
+import {
+  deriveFlightIntentionStrongSurface,
+  resolveFlightIntentionDensity,
+  nextFlightIntentionAnnouncement,
+} from './flight-intention-view.js';
 
 let disposed = false;
 let lastVisualKey = '';
@@ -36,14 +41,15 @@ function visible(selector) {
 }
 
 function strongSurfaceActive() {
-  if (document.querySelector('#error')?.textContent?.trim()) return true;
-  const focus = globalThis.__greyblueHudFocus;
-  if (focus?.safety === true) return true;
-  return visible('#greyblue-landing-approach')
-    || visible('#greyblue-landmark-encounter')
-    || visible('#greyblue-crossing-objective')
-    || visible('#greyblue-destination-guidance')
-    || visible('#greyblue-approach-challenge');
+  return deriveFlightIntentionStrongSurface({
+    errorText: document.querySelector('#error')?.textContent || '',
+    safety: globalThis.__greyblueHudFocus?.safety === true,
+    landing: visible('#greyblue-landing-approach'),
+    landmark: visible('#greyblue-landmark-encounter'),
+    crossing: visible('#greyblue-crossing-objective'),
+    guidance: visible('#greyblue-destination-guidance'),
+    approach: visible('#greyblue-approach-challenge'),
+  });
 }
 
 function states() {
@@ -65,7 +71,12 @@ function states() {
 function render() {
   if (disposed || !hud) return;
   const intention = deriveFlightIntention({ strongSurface: strongSurfaceActive(), states: states() });
-  const density = document.documentElement.dataset.greyblueHudDensity || hud.dataset.greyblueHudDensity || 'focused';
+  const density = resolveFlightIntentionDensity(
+    document.documentElement.dataset.greyblueHudDensity,
+    hud.dataset.greyblueHudDensity,
+  );
+  hud.dataset.greyblueHudDensity = density;
+
   const visualKey = `${intention.visible}|${intention.kind}|${intention.phase}|${intention.text}|${density}`;
   if (visualKey !== lastVisualKey) {
     lastVisualKey = visualKey;
@@ -75,13 +86,10 @@ function render() {
     if (textNode) textNode.textContent = intention.visible ? intention.text : '';
   }
 
-  const announcedKey = intention.visible ? `${intention.kind}|${intention.phase}` : '';
-  if (announcedKey && announcedKey !== lastAnnouncedKey) {
-    lastAnnouncedKey = announcedKey;
-    if (statusNode) statusNode.textContent = intention.text;
-  } else if (!announcedKey) {
-    lastAnnouncedKey = '';
-    if (statusNode) statusNode.textContent = '';
+  const announcement = nextFlightIntentionAnnouncement(intention, lastAnnouncedKey);
+  if (announcement.changed) {
+    lastAnnouncedKey = announcement.key;
+    if (statusNode) statusNode.textContent = announcement.text;
   }
 
   globalThis.__greyblueFlightIntention = intention;
