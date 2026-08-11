@@ -53,6 +53,7 @@ const OPTIONAL_SURFACES = [
   ["ridge-to-cloud-ascent", () => import("./ridge-to-cloud-ascent-bootstrap.js")],
   ["known-voyage-chart", () => import("../interface/known-voyage-chart-bootstrap.js")],
   ["known-voyage-itinerary", () => import("../interface/known-voyage-itinerary-bootstrap.js")],
+  ["known-voyage-streaming-continuity", () => import("./known-voyage-streaming-continuity-bootstrap.js")],
   ["contextual-hud", () => import("../interface/contextual-hud-bootstrap.js")],
   ["flight-intention", () => import("../interface/flight-intention-bootstrap.js")],
   ["flight-debrief", () => import("./flight-debrief-bootstrap.js")],

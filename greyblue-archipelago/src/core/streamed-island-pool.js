@@ -1,3 +1,5 @@
+import { getKnownVoyageStreamingCandidates } from './known-voyage-streaming-channel.js';
+
 const DEFAULT_CAP = 10;
 
 function cleanId(value) {
@@ -89,7 +91,9 @@ export function createStreamedIslandPool({ cap = DEFAULT_CAP, create, reset, dis
   }
 
   function sync(islands = []) {
-    const candidates = Array.isArray(islands) ? islands : [];
+    const baseline = Array.isArray(islands) ? islands : [];
+    const continuity = getKnownVoyageStreamingCandidates();
+    const candidates = continuity.length ? [...baseline, ...continuity] : baseline;
     const wanted = new Set();
     const ordered = [];
     for (const rawIsland of candidates) {
