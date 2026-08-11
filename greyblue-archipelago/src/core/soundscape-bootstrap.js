@@ -1,6 +1,12 @@
 import { deriveSoundscape } from './soundscape-model.js';
 import { deriveAerodynamicSound, aerodynamicSoundPublicState } from './aerodynamic-sound.js';
 import {
+  composeVerticalWeatherSoundTargets,
+  createVerticalWeatherSoundState,
+  stepVerticalWeatherSound,
+  verticalWeatherSoundPublicState,
+} from './vertical-weather-sound.js';
+import {
   createTerrainSkimPressureState,
   stepTerrainSkimPressure,
   terrainSkimPressurePresentation,
@@ -16,6 +22,7 @@ let disposed = false;
 let audio = null;
 let lastView = deriveSoundscape(currentState);
 let lastAirView = deriveAerodynamicSound(buildAerodynamicFrame(currentState));
+let verticalWeatherState = createVerticalWeatherSoundState();
 let skimState = createTerrainSkimPressureState();
 let lastSkimView = terrainSkimPressurePresentation(skimState);
 let lastFamiliarCrossingKey = '';
@@ -47,6 +54,20 @@ function buildAerodynamicFrame(state) {
     verticalSpeed: state?.flight?.verticalSpeed ?? state?.velocity?.y,
     stall: state?.flight?.stall === true,
     flightMode: state?.flight?.mode,
+  };
+}
+
+function buildVerticalWeatherFrame(state) {
+  return {
+    ready: state?.ready === true,
+    paused: state?.paused === true,
+    airborne: state?.collision?.grounded === true ? false : state?.flight?.airborne !== false,
+    recoveryActive: state?.collision?.requiresRecovery === true || state?.flight?.mode === 'recovery',
+    restorePublishing: Boolean(state?.restorePublishing || state?.explorationRestorePublishing),
+    altitude: state?.position?.y,
+    speed: state?.flight?.speed,
+    cloudline: state?.currentRegion?.fogProfile?.altitudeThinning,
+    fogDensity: state?.fog?.effectiveDensity ?? state?.currentRegion?.fogProfile?.density,
   };
 }
 
@@ -150,22 +171,32 @@ function setParam(param, value, now, seconds = 0.18) {
 function apply(view = deriveSoundscape(currentState)) {
   lastView = view;
   lastAirView = deriveAerodynamicSound(buildAerodynamicFrame(currentState));
+  verticalWeatherState = stepVerticalWeatherSound({
+    state: verticalWeatherState,
+    frame: buildVerticalWeatherFrame(currentState),
+  });
   skimState = stepTerrainSkimPressure({ state: skimState, frame: buildTerrainSkimFrame(currentState) });
   lastSkimView = terrainSkimPressurePresentation(skimState, {
     highContrast: highContrast(),
     reducedMotion: reducedMotion(),
   });
   globalThis.__greyblueAerodynamicSound = aerodynamicSoundPublicState(lastAirView);
+  globalThis.__greyblueVerticalWeatherSound = verticalWeatherSoundPublicState(verticalWeatherState);
   globalThis.__greyblueTerrainSkimPressure = terrainSkimPressurePublicState(skimState);
   if (!audio) return;
   const now = audio.context.currentTime;
   const audible = enabled && view.active;
   const aerodynamicAudible = audible && lastAirView.active;
   const skimAudible = audible && lastSkimView.active;
+  const weatherTargets = composeVerticalWeatherSoundTargets({
+    windGain: audible ? view.windGain : 0,
+    windCutoff: view.windCutoff,
+    aerodynamicGain: aerodynamicAudible ? lastAirView.gain : 0,
+  }, verticalWeatherState);
   setParam(audio.master.gain, audible ? 0.72 : 0, now, 0.12);
-  setParam(audio.windGain.gain, audible ? view.windGain : 0, now);
-  setParam(audio.windFilter.frequency, view.windCutoff, now, 0.22);
-  setParam(audio.aerodynamicGain.gain, aerodynamicAudible ? lastAirView.gain : 0, now, 0.16);
+  setParam(audio.windGain.gain, weatherTargets.windGain, now);
+  setParam(audio.windFilter.frequency, weatherTargets.windCutoff, now, 0.22);
+  setParam(audio.aerodynamicGain.gain, weatherTargets.aerodynamicGain, now, 0.16);
   setParam(audio.aerodynamicFilter.frequency, lastAirView.cutoff, now, 0.2);
   setParam(audio.skimGain.gain, skimAudible ? lastSkimView.gain : 0, now, lastSkimView.responseSeconds);
   setParam(audio.skimFilter.frequency, lastSkimView.active ? lastSkimView.filterHz : 820, now, lastSkimView.responseSeconds);
@@ -295,6 +326,7 @@ function onKeyDown(event) {
 }
 
 globalThis.__greyblueAerodynamicSound = aerodynamicSoundPublicState(lastAirView);
+globalThis.__greyblueVerticalWeatherSound = verticalWeatherSoundPublicState(verticalWeatherState);
 globalThis.__greyblueTerrainSkimPressure = terrainSkimPressurePublicState(skimState);
 globalThis.addEventListener?.('keydown', onKeyDown);
 globalThis.addEventListener?.('greyblue:omen-listened', onOmenListened);
