@@ -14,6 +14,10 @@ const INTENTIONS = Object.freeze([
     homeward: 'Carry the flight back toward shelter.',
     settle: 'Bring the return down cleanly.',
   }],
+  ['known-voyage', 'knownVoyageIntention', {
+    depart: 'Take wing for the voyage you chose.',
+    underway: 'Read the archipelago for yourself.',
+  }],
   ['high-air-landfall', 'highAirLandfall', {
     descent: 'Descend into the arrival.',
     approach: 'Carry the approach forward.',

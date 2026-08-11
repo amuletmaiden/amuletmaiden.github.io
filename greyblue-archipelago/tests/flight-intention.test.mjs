@@ -36,8 +36,21 @@ assert.deepEqual(ridgeAscent, {
   text: 'Take the ridge into the higher air.',
 });
 
+const voyage = deriveFlightIntention({
+  states: { knownVoyageIntention: active('underway', { targetId: 'private-island', targetName: 'Private Name' }) },
+});
+assert.deepEqual(voyage, {
+  visible: true,
+  kind: 'known-voyage',
+  phase: 'underway',
+  text: 'Read the archipelago for yourself.',
+});
+assert.equal(JSON.stringify(voyage).includes('private-island'), false);
+assert.equal(JSON.stringify(voyage).includes('Private Name'), false);
+
 const priority = deriveFlightIntention({
   states: {
+    knownVoyageIntention: active('underway'),
     deepMistRun: active('thread'),
     cloudbreakRun: active('cruise'),
     ridgeToCloudAscent: active('climb'),
@@ -46,6 +59,16 @@ const priority = deriveFlightIntention({
 });
 assert.equal(priority.kind, 'full-column');
 assert.equal(priority.text, 'Carry the climb upward.');
+
+const voyagePriority = deriveFlightIntention({
+  states: {
+    knownVoyageIntention: active('depart'),
+    cloudbreakRun: active('cruise'),
+    deepMistRun: active('thread'),
+  },
+});
+assert.equal(voyagePriority.kind, 'known-voyage');
+assert.equal(voyagePriority.text, 'Take wing for the voyage you chose.');
 
 const ridgePriority = deriveFlightIntention({
   states: {
@@ -96,6 +119,7 @@ assert.equal(completed.visible, false);
 
 const malformed = deriveFlightIntention({
   states: {
+    knownVoyageIntention: Object.freeze({ available: true, active: true, completed: false, phase: 'secret-phase' }),
     ridgeToCloudAscent: Object.freeze({ available: true, active: true, completed: false, phase: 'secret-phase' }),
     cloudbreakRun: Object.freeze({ available: true, active: true, completed: false, phase: 'secret-phase' }),
     deepMistRun: active('climb'),
@@ -105,6 +129,7 @@ assert.equal(malformed.kind, 'deep-mist');
 assert.equal(malformed.phase, 'climb');
 
 const caller = {
+  knownVoyageIntention: active('underway', { target: { id: 'do-not-touch-voyage' } }),
   highAirLandfall: active('approach', { target: { id: 'do-not-touch' } }),
   ridgeToCloudAscent: active('climb', { privateState: { regionId: 'do-not-touch-either' } }),
 };

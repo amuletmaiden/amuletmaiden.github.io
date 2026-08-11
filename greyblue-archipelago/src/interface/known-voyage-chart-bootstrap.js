@@ -1,5 +1,12 @@
 import { loadGame } from '../core/save.js';
 import { buildArchipelago } from '../world/archipelago.js';
+import {
+  cancelKnownVoyageIntention,
+  createKnownVoyageIntentionState,
+  publicKnownVoyageIntention,
+  selectKnownVoyageIntention,
+  stepKnownVoyageIntention,
+} from '../core/known-voyage-intention.js';
 import { buildKnownVoyageChart } from './known-voyage-chart.js';
 
 const priorDescriptor = Object.getOwnPropertyDescriptor(globalThis, '__greyblueState');
@@ -11,6 +18,12 @@ let open = false;
 let worldSeed = null;
 let world = null;
 let lastRenderKey = '';
+let voyageState = createKnownVoyageIntentionState();
+let completionAnnounced = false;
+
+function cleanId(value) {
+  return typeof value === 'string' && value.trim() ? value.trim().slice(0, 120) : null;
+}
 
 function worldFor(seed) {
   const nextSeed = Number.isInteger(seed) ? seed : 1337;
@@ -32,6 +45,63 @@ function chartFor(state) {
   });
 }
 
+function privateKnownNodes(chart, state) {
+  const saved = loadGame() ?? {};
+  const authoredWorld = worldFor(Number.isInteger(state?.seed) ? state.seed : saved.seed);
+  const islandsById = new Map((Array.isArray(authoredWorld?.islands) ? authoredWorld.islands : [])
+    .map((island) => [cleanId(island?.id), island])
+    .filter(([id]) => id));
+  return chart.nodes.map((node) => {
+    const island = islandsById.get(cleanId(node.id));
+    return Object.freeze({ ...node, regionId: cleanId(island?.regionId) });
+  }).filter((node) => node.regionId);
+}
+
+function recoveryActive(state) {
+  return state?.collision?.requiresRecovery === true || state?.flight?.mode === 'recovery';
+}
+
+function restorePublishing(state) {
+  return Boolean(state?.restorePublishing || state?.explorationRestorePublishing);
+}
+
+function stepVoyage(state) {
+  const nearest = state?.nearestIsland;
+  const grounded = state?.collision?.grounded === true || state?.flight?.airborne === false;
+  const ordinaryFlight = state?.ready === true
+    && state?.paused !== true
+    && !recoveryActive(state)
+    && !restorePublishing(state)
+    && Number.isFinite(state?.position?.x)
+    && Number.isFinite(state?.position?.y)
+    && Number.isFinite(state?.position?.z);
+
+  voyageState = stepKnownVoyageIntention(voyageState, {
+    ready: state?.ready === true,
+    paused: state?.paused === true,
+    recovery: recoveryActive(state),
+    restorePublishing: restorePublishing(state),
+    currentRegionId: cleanId(state?.currentRegion?.id),
+    nearestIslandId: cleanId(nearest?.id),
+    airborne: !grounded,
+    grounded,
+    ordinaryFlight,
+    arrivedAtNearestIsland: grounded,
+  });
+
+  const publicState = publicKnownVoyageIntention(voyageState);
+  globalThis.__greyblueKnownVoyageIntention = publicState;
+  if (publicState.completed && !completionAnnounced) {
+    completionAnnounced = true;
+    globalThis.dispatchEvent?.(new CustomEvent('greyblue:known-voyage-intention', {
+      detail: Object.freeze({ ...publicState, event: 'completed' }),
+    }));
+  } else if (!publicState.completed) {
+    completionAnnounced = false;
+  }
+  return publicState;
+}
+
 const style = document.createElement('style');
 style.id = 'greyblue-voyage-chart-style';
 style.textContent = `
@@ -45,19 +115,24 @@ style.textContent = `
   #greyblue-voyage-chart-svg { display:block; width:100%; aspect-ratio:16/9; border-radius:.45rem; background:linear-gradient(180deg,rgba(112,143,154,.08),rgba(112,143,154,.015)); }
   #greyblue-voyage-chart-svg line { stroke:rgba(194,215,220,.35); stroke-width:1.25; vector-effect:non-scaling-stroke; }
   #greyblue-voyage-chart-svg line[data-completed="true"] { stroke:rgba(220,236,240,.7); stroke-width:1.8; }
-  #greyblue-voyage-chart-svg circle { fill:#9fb6bd; stroke:#dce9ec; stroke-width:1.2; vector-effect:non-scaling-stroke; }
+  #greyblue-voyage-chart-svg circle { fill:#9fb6bd; stroke:#dce9ec; stroke-width:1.2; vector-effect:non-scaling-stroke; cursor:pointer; }
+  #greyblue-voyage-chart-svg g[tabindex="0"]:focus circle { stroke-width:4; }
   #greyblue-voyage-chart-svg circle[data-current-region="true"] { fill:#edf6f7; stroke-width:2.5; }
   #greyblue-voyage-chart-svg circle[data-roost="true"] { stroke:#fff; stroke-width:3; }
   #greyblue-voyage-chart-svg circle[data-landmark="true"] { stroke-dasharray:2 1.5; }
-  #greyblue-voyage-chart-svg text { fill:#e9f1f3; font:10px system-ui,sans-serif; paint-order:stroke; stroke:rgba(10,20,25,.86); stroke-width:2.4px; stroke-linejoin:round; }
+  #greyblue-voyage-chart-svg circle[data-selected="true"] { fill:#fff; stroke-width:4; }
+  #greyblue-voyage-chart-svg text { fill:#e9f1f3; font:10px system-ui,sans-serif; paint-order:stroke; stroke:rgba(10,20,25,.86); stroke-width:2.4px; stroke-linejoin:round; pointer-events:none; }
+  #greyblue-voyage-chart-status { margin:.55rem 0 0; min-height:1.2em; font-size:.9rem; }
+  #greyblue-voyage-chart-cancel { margin-left:.45rem; font:inherit; border:1px solid currentColor; border-radius:.35rem; background:transparent; color:inherit; padding:.15rem .4rem; cursor:pointer; }
   #greyblue-voyage-chart-key { margin:.5rem 0 0; font-size:.82rem; opacity:.76; }
   @media (prefers-reduced-motion: no-preference) { #greyblue-voyage-chart { transition:opacity 120ms linear; } }
   @media (prefers-contrast: more) {
     #greyblue-voyage-chart { background:#081116; border-width:2px; }
     #greyblue-voyage-chart-svg line { stroke:#dbe8eb; }
     #greyblue-voyage-chart-svg circle { fill:#fff; stroke:#000; stroke-width:2.2; }
+    #greyblue-voyage-chart-svg circle[data-selected="true"] { stroke:#fff; stroke-width:5; }
     #greyblue-voyage-chart-svg text { fill:#fff; stroke:#000; stroke-width:3px; }
-    #greyblue-voyage-chart-toggle { border-width:2px; }
+    #greyblue-voyage-chart-toggle, #greyblue-voyage-chart-cancel { border-width:2px; }
   }
 `;
 document.head?.append(style);
@@ -75,7 +150,8 @@ panel.innerHTML = `
   <div id="greyblue-voyage-chart-empty" hidden>No islands have been charted yet.</div>
   <svg id="greyblue-voyage-chart-svg" viewBox="0 0 1000 562" role="img" aria-label="Known islands and passages"></svg>
   <div data-greyblue-voyage-chart-text data-visually-hidden></div>
-  <p id="greyblue-voyage-chart-key">V opens or closes the chart. It records only places and passages already known.</p>
+  <div id="greyblue-voyage-chart-status" role="status" aria-live="polite"></div>
+  <p id="greyblue-voyage-chart-key">V opens or closes the chart. Choose any known island to set a voyage; the chart gives no bearing or distance.</p>
 `;
 document.body.append(panel);
 
@@ -92,6 +168,7 @@ const closeButton = panel.querySelector('#greyblue-voyage-chart-close');
 const svg = panel.querySelector('#greyblue-voyage-chart-svg');
 const empty = panel.querySelector('#greyblue-voyage-chart-empty');
 const textEquivalent = panel.querySelector('[data-greyblue-voyage-chart-text]');
+const voyageStatus = panel.querySelector('#greyblue-voyage-chart-status');
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 function addSvg(name, attributes, parent = svg) {
@@ -110,11 +187,53 @@ function publish(chart) {
   });
 }
 
+function chooseNode(node, chart, state) {
+  const knownNodes = privateKnownNodes(chart, state);
+  const privateNode = knownNodes.find((candidate) => candidate.id === node.id);
+  if (!privateNode) return;
+  voyageState = selectKnownVoyageIntention({ state: voyageState, candidate: privateNode, knownNodes });
+  completionAnnounced = false;
+  lastRenderKey = '';
+  render(state);
+}
+
+function cancelVoyage() {
+  voyageState = cancelKnownVoyageIntention();
+  completionAnnounced = false;
+  lastRenderKey = '';
+  render(currentState);
+}
+
+function renderVoyageStatus(publicState) {
+  if (!voyageStatus) return;
+  voyageStatus.replaceChildren();
+  if (publicState.phase === 'idle') {
+    voyageStatus.textContent = 'Choose a known island for a self-directed voyage.';
+    return;
+  }
+  const destinationName = voyageState.targetName || 'known island';
+  const text = document.createElement('span');
+  text.textContent = publicState.completed
+    ? `Arrived at ${destinationName}.`
+    : `${destinationName} — ${publicState.text}`;
+  voyageStatus.append(text);
+  if (!publicState.completed) {
+    const cancel = document.createElement('button');
+    cancel.id = 'greyblue-voyage-chart-cancel';
+    cancel.type = 'button';
+    cancel.textContent = 'Cancel voyage';
+    cancel.addEventListener('click', cancelVoyage, { once: true });
+    voyageStatus.append(cancel);
+  }
+}
+
 function render(state = currentState) {
   if (disposed) return;
   const chart = chartFor(state);
+  const publicVoyage = stepVoyage(state);
   const density = document.documentElement.dataset.greyblueHudDensity === 'expanded' ? 'expanded' : 'focused';
-  const key = `${open}|${density}|${chart.nodes.map((node) => `${node.id}:${node.currentRegion}:${node.roost}:${node.investigatedLandmark}`).join(',')}|${chart.edges.map((edge) => `${edge.id}:${edge.completed}`).join(',')}`;
+  const selectedId = voyageState.targetId || '';
+  const key = `${open}|${density}|${selectedId}|${publicVoyage.phase}|${chart.nodes.map((node) => `${node.id}:${node.currentRegion}:${node.roost}:${node.investigatedLandmark}`).join(',')}|${chart.edges.map((edge) => `${edge.id}:${edge.completed}`).join(',')}`;
   if (key === lastRenderKey) {
     publish(chart);
     return;
@@ -141,7 +260,12 @@ function render(state = currentState) {
   }
 
   for (const node of chart.nodes) {
-    const group = addSvg('g', {});
+    const group = addSvg('g', {
+      tabindex: 0,
+      role: 'button',
+      'aria-label': `${node.name}. Set as voyage destination${selectedId === node.id ? '. Selected' : ''}`,
+      'aria-pressed': selectedId === node.id ? 'true' : 'false',
+    });
     const circle = addSvg('circle', {
       cx: node.x * 1000,
       cy: node.y * 562,
@@ -149,14 +273,21 @@ function render(state = currentState) {
       'data-current-region': node.currentRegion,
       'data-roost': node.roost,
       'data-landmark': node.investigatedLandmark,
+      'data-selected': selectedId === node.id,
     }, group);
     const title = addSvg('title', {}, circle);
-    title.textContent = `${node.name}${node.roost ? ', roost' : ''}${node.investigatedLandmark ? ', investigated landmark' : ''}`;
-    const labelEligible = density === 'expanded' || node.currentRegion || node.roost || node.investigatedLandmark;
+    title.textContent = `${node.name}${node.roost ? ', roost' : ''}${node.investigatedLandmark ? ', investigated landmark' : ''}${selectedId === node.id ? ', voyage destination' : ''}`;
+    const labelEligible = density === 'expanded' || node.currentRegion || node.roost || node.investigatedLandmark || selectedId === node.id;
     if (labelEligible) {
       const label = addSvg('text', { x: node.x * 1000 + 11, y: node.y * 562 - 9 }, group);
       label.textContent = node.name;
     }
+    group.addEventListener('click', () => chooseNode(node, chart, state));
+    group.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      chooseNode(node, chart, state);
+    });
   }
 
   textEquivalent.replaceChildren(...chart.text.map((line) => {
@@ -164,6 +295,7 @@ function render(state = currentState) {
     item.textContent = line;
     return item;
   }));
+  renderVoyageStatus(publicVoyage);
   publish(chart);
 }
 
@@ -171,8 +303,10 @@ function setOpen(nextOpen) {
   open = Boolean(nextOpen);
   lastRenderKey = '';
   render(currentState);
-  if (open) closeButton?.focus({ preventScroll: true });
-  else toggle.focus({ preventScroll: true });
+  if (open) {
+    const selected = svg?.querySelector('g[aria-pressed="true"]');
+    (selected || svg?.querySelector('g[tabindex="0"]') || closeButton)?.focus?.({ preventScroll: true });
+  } else toggle.focus({ preventScroll: true });
 }
 
 function onKeydown(event) {
@@ -218,6 +352,7 @@ for (const eventName of refreshEvents) globalThis.addEventListener?.(eventName, 
 globalThis.addEventListener?.('keydown', onKeydown);
 toggle.addEventListener('click', () => setOpen(!open));
 closeButton?.addEventListener('click', () => setOpen(false));
+globalThis.__greyblueKnownVoyageIntention = publicKnownVoyageIntention(voyageState);
 render(currentState);
 
 globalThis.addEventListener?.('beforeunload', () => {
@@ -228,4 +363,5 @@ globalThis.addEventListener?.('beforeunload', () => {
   toggle.remove();
   style.remove();
   delete globalThis.__greyblueVoyageChart;
+  delete globalThis.__greyblueKnownVoyageIntention;
 }, { once: true });

@@ -52,11 +52,23 @@ function strongSurfaceActive() {
   });
 }
 
+function knownVoyageForRibbon() {
+  const voyage = globalThis.__greyblueKnownVoyageIntention;
+  if (!voyage || typeof voyage !== 'object') return null;
+  return Object.freeze({
+    available: voyage.active === true || voyage.completed === true,
+    active: voyage.active === true,
+    completed: voyage.completed === true,
+    phase: typeof voyage.phase === 'string' ? voyage.phase : 'idle',
+  });
+}
+
 function states() {
   return {
     fullColumnWeather: globalThis.__greyblueFullColumnWeatherRun,
     ridgeToCloudAscent: globalThis.__greyblueRidgeToCloudAscent,
     roostHomewardFlight: globalThis.__greyblueRoostHomewardFlight,
+    knownVoyageIntention: knownVoyageForRibbon(),
     highAirLandfall: globalThis.__greyblueHighAirLandfall,
     highAirCrossing: globalThis.__greyblueHighAirCrossing,
     mysteryListeningPass: globalThis.__greyblueMysteryListeningPass,
@@ -99,7 +111,7 @@ function render() {
 
 const refreshEvents = Object.freeze([
   'greyblue:deep-mist-run', 'greyblue:cloudbreak-run', 'greyblue:full-column-weather-run',
-  'greyblue:ridge-to-cloud-ascent', 'greyblue:roost-homeward-flight',
+  'greyblue:ridge-to-cloud-ascent', 'greyblue:roost-homeward-flight', 'greyblue:known-voyage-intention',
   'greyblue:high-air-crossing', 'greyblue:high-air-landfall',
   'greyblue:mystery-listening-pass', 'greyblue:regional-mystery-search-flight',
   'greyblue:survey-to-landing-sortie', 'greyblue:discovered-island-survey',
