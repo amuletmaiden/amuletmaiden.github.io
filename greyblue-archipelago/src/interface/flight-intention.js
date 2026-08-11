@@ -4,6 +4,11 @@ const INTENTIONS = Object.freeze([
     clear: 'Keep the whole column unbroken.',
     complete: 'The weather run is complete.',
   }],
+  ['ridge-to-cloud', 'ridgeToCloudAscent', {
+    depart: 'Carry the ridge line outward.',
+    climb: 'Take the ridge into the higher air.',
+    clear: 'Break cleanly into the open sky.',
+  }],
   ['high-air-landfall', 'highAirLandfall', {
     descent: 'Descend into the arrival.',
     approach: 'Carry the approach forward.',

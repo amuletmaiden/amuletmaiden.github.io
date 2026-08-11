@@ -48,6 +48,7 @@ const OPTIONAL_SURFACES = [
   ["dive-pull-climb-mastery", () => import("./dive-pull-climb-mastery-bootstrap.js")],
   ["linked-bank-reversal-mastery", () => import("./linked-bank-reversal-mastery-bootstrap.js")],
   ["terrain-ridge-run", () => import("./terrain-ridge-run-bootstrap.js")],
+  ["ridge-to-cloud-ascent", () => import("./ridge-to-cloud-ascent-bootstrap.js")],
   ["contextual-hud", () => import("../interface/contextual-hud-bootstrap.js")],
   ["flight-intention", () => import("../interface/flight-intention-bootstrap.js")],
   ["flight-debrief", () => import("./flight-debrief-bootstrap.js")],
