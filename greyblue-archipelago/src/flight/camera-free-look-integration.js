@@ -40,6 +40,7 @@ export class FreeLookChaseCamera {
       bank,
       speed,
       grounded,
+      reducedMotion,
       dt,
       sampleHeight,
     });
