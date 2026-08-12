@@ -10,6 +10,7 @@ import { deriveRidgeLift } from "./flight/ridge-lift.js";
 import { DragonRuntime } from "./dragon/runtime.js";
 import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
 import { createIslandSurfaceSpatialIndex } from "./world/island-surface-spatial-index.js";
+import { composeLandingShelfHeight } from "./world/landing-shelf-surface.js";
 import { selectRouteGuidance } from "./core/route-guidance.js";
 import { cycleRouteChoice } from "./core/route-choice.js";
 import { evaluateMysteryRouteUnlocks } from "./core/mystery-route-unlock.js";
@@ -169,7 +170,13 @@ function sampleSurfaceAt(x, z) {
     const radius = 110 * island.scale;
     if (distance < radius) {
       const normalized = 1 - distance / radius;
-      const height = island.height * normalized * normalized * 0.58;
+      const baseHeight = island.height * normalized * normalized * 0.58;
+      const height = composeLandingShelfHeight({
+        baseHeight,
+        x,
+        z,
+        landingZones: island.landingZones,
+      });
       if (result.surface === "water" || height > result.height) {
         result = { height, surface: "terrain", id: island.id };
       }
