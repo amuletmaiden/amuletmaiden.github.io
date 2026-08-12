@@ -19,6 +19,7 @@ const hud = document.querySelector('#hud');
 const nodes = Object.freeze({
   flight: document.querySelector('#greyblue-flight-instruments'),
   landing: document.querySelector('#greyblue-landing-approach'),
+  corridor: document.querySelector('#greyblue-landing-corridor-readback'),
   interaction: document.querySelector('#greyblue-landmark-encounter'),
   crossing: document.querySelector('#greyblue-crossing-objective'),
   guidance: document.querySelector('#greyblue-destination-guidance'),
@@ -67,7 +68,7 @@ function visible(node) {
 function collectSurfaces() {
   return {
     error: Boolean(document.querySelector('#error')?.textContent?.trim()),
-    landing: visible(nodes.landing),
+    landing: visible(nodes.landing) || visible(nodes.corridor),
     interaction: visible(nodes.interaction),
     crossing: visible(nodes.crossing),
     guidance: visible(nodes.guidance),
@@ -99,7 +100,7 @@ function render(state = currentState) {
     surfaces: collectSurfaces(),
     density: preference.density,
   });
-  const key = `${focus.focus}|${focus.density}|${focus.safety}|${focus.journalOpen}|${focus.dimmedSurfaceIds.join(',')}|${preference.inputSource}`;
+  const key = `${focus.focus}|${focus.density}|${focus.safety}|${focus.journalOpen}|${focus.dimmedSurfaceIds.join(',')}|${preference.inputSource}|${visible(nodes.corridor)}`;
   if (key === lastKey) return;
   lastKey = key;
 
@@ -111,6 +112,7 @@ function render(state = currentState) {
   for (const id of ['flight', 'landing', 'interaction', 'crossing', 'guidance', 'expedition']) {
     setDimmed(nodes[id], focus.dimmedSurfaceIds.includes(id));
   }
+  setDimmed(nodes.corridor, focus.dimmedSurfaceIds.includes('landing'));
 
   // Journal control stays wholly with the player. Listening and approach panels can
   // carry immediate interaction feedback, so focus never visually suppresses them.
@@ -177,6 +179,7 @@ const refreshEvents = Object.freeze([
   'greyblue:landmark-investigated',
   'greyblue:landmark-flight-encounter',
   'greyblue:crossing-cancelled',
+  'greyblue:landing-approach-readback',
 ]);
 for (const eventName of refreshEvents) globalThis.addEventListener?.(eventName, refreshSoon);
 globalThis.addEventListener?.('keydown', onKeydown);
