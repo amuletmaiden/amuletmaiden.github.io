@@ -20,6 +20,12 @@ export class FlightController {
     this.landingRequested = false;
     this.stallFactor = 0;
     this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
+    this.environmentVerticalBias = 0;
+  }
+
+  setEnvironmentVerticalBias(value = 0) {
+    const finiteBias = Number(value);
+    this.environmentVerticalBias = Number.isFinite(finiteBias) ? clamp(finiteBias, 0, 2.8) : 0;
   }
 
   step(input, dt) {
@@ -104,7 +110,10 @@ export class FlightController {
         active: !this.landingRequested,
         elapsed: this.takeoffLiftElapsed,
       });
-      let targetVertical = climb * 17 - 1.6 - this.stallFactor * 4.5 + bankedTurnLoad;
+      const ridgeLift = !this.landingRequested && takeoffLift <= 0 && this.stallFactor <= 0.35
+        ? this.environmentVerticalBias
+        : 0;
+      let targetVertical = climb * 17 - 1.6 - this.stallFactor * 4.5 + bankedTurnLoad + ridgeLift;
       if (takeoffLift > 0) {
         targetVertical = Math.max(targetVertical + takeoffLift, takeoffLift * 0.55);
       }
@@ -126,6 +135,7 @@ export class FlightController {
     } else {
       this.velocity.y = 0;
       this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
+      this.environmentVerticalBias = 0;
     }
 
     const bankTarget = steer * (0.45 + Math.min(updatedPlanarSpeed / 70, 1) * 0.32);
@@ -166,6 +176,7 @@ export class FlightController {
         this.velocity.z *= 0.35;
         this.stallFactor = 0;
         this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
+        this.environmentVerticalBias = 0;
       }
     }
     return position;
@@ -203,6 +214,7 @@ export class FlightController {
       this.pitch,
       this.bank,
       this.takeoffLiftElapsed,
+      this.environmentVerticalBias,
     ];
     if (values.every(Number.isFinite)) return;
     this.velocity = { x: 0, y: 0, z: 0 };
@@ -213,6 +225,7 @@ export class FlightController {
     this.landingRequested = false;
     this.stallFactor = 1;
     this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
+    this.environmentVerticalBias = 0;
   }
 }
 
