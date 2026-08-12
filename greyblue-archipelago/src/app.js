@@ -12,6 +12,7 @@ import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
 import { selectRouteGuidance } from "./core/route-guidance.js";
 import { cycleRouteChoice } from "./core/route-choice.js";
 import { evaluateMysteryRouteUnlocks } from "./core/mystery-route-unlock.js";
+import { LiveRidgeRide, ridgeRideCompletionMessage } from "./core/ridge-ride-live.js";
 import { createStreamedIslandPool } from "./core/streamed-island-pool.js";
 import { createStreamedIslandThreeAdapter } from "./core/streamed-island-three-adapter.js";
 import { loadGame, saveGame, safeRespawn } from "./core/save.js";
@@ -79,6 +80,8 @@ const chaseCamera = new FreeLookChaseCamera(
 );
 const collisionResolver = new FlightCollisionResolver();
 collisionResolver.reset(position);
+const ridgeRide = new LiveRidgeRide();
+let ridgeRideTelemetry = ridgeRide.publicState();
 let lastCollision = { ...collisionResolver.telemetry };
 let dragon = null;
 let dragonRuntime = null;
@@ -233,6 +236,7 @@ function recover() {
   controller.setEnvironmentVerticalBias(0);
   collisionResolver.reset(recovered.position);
   lastCollision = { ...collisionResolver.telemetry };
+  ridgeRideTelemetry = ridgeRide.interrupt();
   chaseCamera.snapTo(position, controller.yaw);
   cameraPointerId = null;
   flightInput.clearPointerLook();
@@ -260,6 +264,7 @@ function setPaused(nextPaused, now) {
   flightInput.clear();
   clearCameraLook();
   controller.setEnvironmentVerticalBias(0);
+  if (paused) ridgeRideTelemetry = ridgeRide.interrupt();
   lastFrameAt = now;
   if (paused) persist();
 }
@@ -448,6 +453,7 @@ function publishPausedState() {
     surface,
     camera: lastCameraState,
     cameraLook: lastCameraState?.freeLook || Object.freeze({ active: false, direction: null }),
+    ridgeRide: ridgeRideTelemetry,
     routeGuidance: currentRouteGuidance,
     guidancePreference: preferredRouteId,
     routeChoice: routeChoiceTelemetry,
@@ -481,6 +487,7 @@ addEventListener("keyup", (event) => flightInput.keyUp(event.code));
 addEventListener("blur", () => {
   flightInput.clear();
   clearCameraLook();
+  ridgeRideTelemetry = ridgeRide.interrupt();
 });
 renderer.domElement.addEventListener("pointerdown", (event) => {
   if (paused || event.button !== 0 || cameraPointerId !== null) return;
@@ -584,7 +591,8 @@ function frame(now) {
   if (recovering) recover();
 
   const previous = { x: position.x, y: position.y, z: position.z };
-  controller.setEnvironmentVerticalBias(deriveLiveRidgeLift().verticalBias);
+  const ridgeLift = deriveLiveRidgeLift();
+  controller.setEnvironmentVerticalBias(ridgeLift.verticalBias);
   const flight = controller.step(input, dt);
   const proposed = {
     x: previous.x + flight.velocity.x * dt,
@@ -644,6 +652,22 @@ function frame(now) {
     routeChoiceTelemetry = Object.freeze({ ...routeChoiceTelemetry, reason: "active-crossing", preferredRouteId });
   }
 
+  const ridgeRideResult = ridgeRide.update({
+    ready: Boolean(dragon && heroIsle),
+    paused: false,
+    airborne: controller.airborne,
+    grounded: Boolean(lastCollision.grounded),
+    landing: controller.landingRequested,
+    recovering: recovering || Boolean(lastCollision.requiresRecovery),
+    restoring: false,
+    crossing: Boolean(activeCrossingRouteId),
+    ridgeLiftActive: ridgeLift.active === true,
+    position: { x: position.x, z: position.z },
+  });
+  ridgeRideTelemetry = ridgeRideResult.state;
+  const ridgeRideMessage = ridgeRideCompletionMessage(ridgeRideResult);
+  if (ridgeRideMessage) setRouteChoiceStatus(ridgeRideMessage);
+
   if (dragon) {
     dragon.position.copy(position);
     dragon.rotation.set(controller.pitch, controller.yaw + Math.PI, -controller.bank, "YXZ");
@@ -697,6 +721,7 @@ function frame(now) {
     animation: dragonRuntime?.telemetry || null,
     camera: cameraState,
     cameraLook: cameraState.freeLook,
+    ridgeRide: ridgeRideTelemetry,
     fog: currentFogProfile,
     routeGuidance: currentRouteGuidance,
     guidancePreference: preferredRouteId,
