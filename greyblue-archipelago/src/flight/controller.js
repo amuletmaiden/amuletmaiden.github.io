@@ -1,5 +1,6 @@
 import { deriveBankTurnCarry } from "./bank-turn-carry.js";
 import { deriveBankedTurnVerticalLoad } from "./banked-turn-load.js";
+import { deriveFlightPathPitchBias } from "./flight-path-pitch.js";
 import { deriveGlideCoastTarget } from "./glide-coast.js";
 import { deriveLandingVerticalTarget } from "./landing-flare.js";
 import {
@@ -130,8 +131,22 @@ export class FlightController {
     const bankTarget = steer * (0.45 + Math.min(updatedPlanarSpeed / 70, 1) * 0.32);
     const poseResponse = 1 - Math.exp(-5 * frame);
     this.bank += (bankTarget - this.bank) * poseResponse;
+    const flightPathPitchBias = takeoffLiftActive
+      ? 0
+      : deriveFlightPathPitchBias({
+          airborne: this.airborne,
+          landingRequested: this.landingRequested,
+          stallFactor: this.stallFactor,
+          climb,
+          planarSpeed: updatedPlanarSpeed,
+          verticalVelocity: this.velocity.y,
+        });
     const pitchTarget = this.airborne
-      ? clamp(climb * 0.34 - this.stallFactor * 0.12 - (this.landingRequested ? 0.12 : 0), -0.42, 0.42)
+      ? clamp(
+          climb * 0.34 + flightPathPitchBias - this.stallFactor * 0.12 - (this.landingRequested ? 0.12 : 0),
+          -0.42,
+          0.42,
+        )
       : 0;
     this.pitch += (pitchTarget - this.pitch) * poseResponse;
 
