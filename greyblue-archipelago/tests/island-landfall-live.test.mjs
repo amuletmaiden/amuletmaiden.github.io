@@ -78,5 +78,20 @@ const missingOwner = applyIslandLandfall({
 assert.deepEqual(missingOwner.state, { completed: true, newLandfall: true });
 assert.equal(missingOwner.event, null);
 assert.equal(missingOwner.message, null);
+
+const unpersistable = { events: [] };
+const missingPersist = applyIslandLandfall({
+  collision: touchdown,
+  position: { x: 101, z: -40 },
+  islands,
+  discoveredIslandIds: ["island-a"],
+  exploration: unpersistable,
+  announce: () => { throw new Error("unpersistable landfall must not announce"); },
+});
+assert.deepEqual(missingPersist.state, { completed: true, newLandfall: true });
+assert.equal(missingPersist.event, null);
+assert.equal(missingPersist.message, null);
+assert.deepEqual(unpersistable.events, []);
+
 assert.deepEqual(touchdown, { grounded: true, reason: "touchdown", requiresRecovery: false });
 assert.equal(islands[0].landingZones[0].radius, 60);
