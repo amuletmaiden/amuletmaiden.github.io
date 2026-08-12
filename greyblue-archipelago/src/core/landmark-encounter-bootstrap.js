@@ -3,6 +3,7 @@ import { buildArchipelago } from '../world/archipelago.js';
 import { investigatedLandmarkIdsFromExploration } from './exploration-lifecycle.js';
 import { createLandmarkEncounterState, activateLandmarkEncounter } from './landmark-encounter-model.js';
 import { evaluateLandmarkFlightApproach } from './landmark-flight-approach.js';
+import { shouldRevealLandmarkEncounter } from './landmark-encounter-presentation.js';
 import { loadGame } from './save.js';
 
 const host = document.querySelector('#hud') ?? document.body;
@@ -68,7 +69,7 @@ function statusText(view) {
 function promptText(view) {
   if (!view?.visible) return '';
   if (view.status === 'too-low') return 'Climb through the mist';
-  if (view.status === 'aligned') return 'Hold course into the landmark';
+  if (view.status === 'aligned') return 'Investigate the landmark';
   if (view.status === 'awakened') return view.alreadyInvestigated ? 'Encounter remembered' : 'Landmark awakened';
   return 'Find its bearing and approach with speed';
 }
@@ -84,20 +85,21 @@ function revealEncounter() {
   announcement.textContent = `${result.reveal.title}. ${result.reveal.text}`;
   promptNode.textContent = 'Encounter remembered';
   panel.dataset.available = 'false';
-  globalThis.dispatchEvent?.(new CustomEvent('greyblue:landmark-investigated', {
-    detail: {
-      landmarkId: result.reveal.landmarkId,
-      regionId: currentState?.currentRegion?.id ?? null,
-      encounterClass: approachTelemetry?.encounterClass ?? null,
-      source: 'flight-approach',
-      occurredAt,
-    },
-  }));
   if (revealTimer) clearTimeout(revealTimer);
   revealTimer = setTimeout(() => {
     if (!disposed) revealNode.hidden = true;
   }, 9000);
   return true;
+}
+
+function onLandmarkInvestigated(event) {
+  const currentRegionId = currentState?.currentRegion?.id ?? null;
+  if (!shouldRevealLandmarkEncounter({
+    event: event?.detail ?? null,
+    encounterView,
+    currentRegionId,
+  })) return;
+  revealEncounter();
 }
 
 function render(state) {
@@ -149,8 +151,6 @@ function render(state) {
   panel.dataset.encounterClass = encounterView.encounterClass || 'threshold';
   panel.dataset.available = encounterView.available ? 'true' : 'false';
   panel.dataset.flightStatus = approachTelemetry.status;
-
-  if (approachTelemetry.shouldInvestigate) revealEncounter();
 }
 
 function decoratedState() {
@@ -174,10 +174,12 @@ if (!priorDescriptor || priorDescriptor.configurable) {
   });
 }
 
+globalThis.addEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
 render(currentState);
 
 globalThis.addEventListener?.('beforeunload', () => {
   disposed = true;
+  globalThis.removeEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
   if (revealTimer) clearTimeout(revealTimer);
   panel.remove();
   announcement.remove();
