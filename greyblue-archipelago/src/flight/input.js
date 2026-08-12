@@ -6,11 +6,12 @@ const DEFAULT_BINDINGS = Object.freeze({
   climb: ["Space"],
   descend: ["ShiftLeft", "ShiftRight"],
   toggleFlight: ["KeyE"],
+  interact: ["KeyF"],
   recover: ["KeyR"],
   pause: ["Escape", "KeyP"],
 });
 
-const GAMEPAD_ACTIONS = Object.freeze(["toggleFlight", "recover", "pause"]);
+const GAMEPAD_ACTIONS = Object.freeze(["toggleFlight", "interact", "recover", "pause"]);
 const POINTER_LOOK_SCALE = 1 / 180;
 
 export class FlightInput {
@@ -20,7 +21,7 @@ export class FlightInput {
     this.keys = new Set();
     this.edges = new Set();
     this.gamepad = null;
-    this.gamepadButtons = { toggleFlight: false, recover: false, pause: false };
+    this.gamepadButtons = { toggleFlight: false, interact: false, recover: false, pause: false };
     this.gamepadEdges = new Set();
     this.pointerLook = { x: 0, y: 0 };
     this.enabled = true;
@@ -51,6 +52,7 @@ export class FlightInput {
     const normalized = normalizeGamepad(gamepad, this.deadzone);
     const nextButtons = {
       toggleFlight: Boolean(normalized?.toggleFlight),
+      interact: Boolean(normalized?.interact),
       recover: Boolean(normalized?.recover),
       pause: Boolean(normalized?.pause),
     };
@@ -67,7 +69,7 @@ export class FlightInput {
     this.keys.clear();
     this.edges.clear();
     this.gamepad = null;
-    this.gamepadButtons = { toggleFlight: false, recover: false, pause: false };
+    this.gamepadButtons = { toggleFlight: false, interact: false, recover: false, pause: false };
     this.gamepadEdges.clear();
     this.clearPointerLook();
   }
@@ -98,6 +100,8 @@ export class FlightInput {
       lookY,
       toggleFlight: this.#consumeEdge(this.bindings.toggleFlight)
         || this.gamepadEdges.delete("toggleFlight"),
+      interact: this.#consumeEdge(this.bindings.interact)
+        || this.gamepadEdges.delete("interact"),
       recover: this.#consumeEdge(this.bindings.recover)
         || this.gamepadEdges.delete("recover"),
       pause: this.#consumeEdge(this.bindings.pause)
@@ -134,6 +138,7 @@ export function normalizeGamepad(gamepad, deadzone = 0.14) {
     lookX,
     lookY,
     toggleFlight: (buttons[0] || 0) > 0.5,
+    interact: (buttons[2] || 0) > 0.5,
     recover: (buttons[3] || 0) > 0.5,
     pause: (buttons[9] || 0) > 0.5,
     active,
@@ -178,6 +183,7 @@ function neutralSample() {
     lookX: 0,
     lookY: 0,
     toggleFlight: false,
+    interact: false,
     recover: false,
     pause: false,
     active: false,
