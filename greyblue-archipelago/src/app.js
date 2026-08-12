@@ -15,6 +15,7 @@ import { selectRouteGuidance } from "./core/route-guidance.js";
 import { cycleRouteChoice } from "./core/route-choice.js";
 import { evaluateMysteryRouteUnlocks } from "./core/mystery-route-unlock.js";
 import { LiveRidgeRide, ridgeRideCompletionMessage } from "./core/ridge-ride-live.js";
+import { LiveTouchdownSettle } from "./core/touchdown-settle-live.js";
 import { deriveLiveLandmarkInvestigation } from "./core/landmark-investigation-live.js";
 import { deriveLandmarkInvestigationResponse } from "./core/landmark-investigation-response.js";
 import { createStreamedIslandPool } from "./core/streamed-island-pool.js";
@@ -88,7 +89,9 @@ const chaseCamera = new FreeLookChaseCamera(
 const collisionResolver = new FlightCollisionResolver();
 collisionResolver.reset(position);
 const ridgeRide = new LiveRidgeRide();
+const touchdownSettle = new LiveTouchdownSettle();
 let ridgeRideTelemetry = ridgeRide.publicState();
+let touchdownSettleTelemetry = touchdownSettle.publicState();
 let landmarkInvestigationTelemetry = INACTIVE_LANDMARK_INVESTIGATION;
 let lastCollision = { ...collisionResolver.telemetry };
 let dragon = null;
@@ -251,6 +254,7 @@ function recover() {
   collisionResolver.reset(recovered.position);
   lastCollision = { ...collisionResolver.telemetry };
   ridgeRideTelemetry = ridgeRide.interrupt();
+  touchdownSettleTelemetry = touchdownSettle.interrupt();
   landmarkInvestigationTelemetry = INACTIVE_LANDMARK_INVESTIGATION;
   chaseCamera.snapTo(position, controller.yaw);
   cameraPointerId = null;
@@ -283,6 +287,7 @@ function setPaused(nextPaused, now) {
   controller.setEnvironmentVerticalBias(0);
   if (paused) {
     ridgeRideTelemetry = ridgeRide.interrupt();
+    touchdownSettleTelemetry = touchdownSettle.interrupt();
     landmarkInvestigationTelemetry = INACTIVE_LANDMARK_INVESTIGATION;
   }
   lastFrameAt = now;
@@ -479,6 +484,7 @@ function publishPausedState() {
     camera: lastCameraState,
     cameraLook: lastCameraState?.freeLook || Object.freeze({ active: false, direction: null }),
     ridgeRide: ridgeRideTelemetry,
+    touchdownSettle: touchdownSettleTelemetry,
     landmarkInvestigation: landmarkInvestigationTelemetry,
     routeGuidance: currentRouteGuidance,
     guidancePreference: preferredRouteId,
@@ -526,6 +532,7 @@ addEventListener("blur", () => {
   flightInput.clear();
   clearCameraLook();
   ridgeRideTelemetry = ridgeRide.interrupt();
+  touchdownSettleTelemetry = touchdownSettle.interrupt();
   landmarkInvestigationTelemetry = INACTIVE_LANDMARK_INVESTIGATION;
 });
 renderer.domElement.addEventListener("pointerdown", (event) => {
@@ -649,6 +656,16 @@ function frame(now) {
   position.set(collision.position.x, collision.position.y, collision.position.z);
   Object.assign(controller.velocity, collision.velocity);
   lastCollision = { ...collision.telemetry };
+
+  const touchdownSettleResult = touchdownSettle.update({
+    collision,
+    airborne: controller.airborne,
+    recovering: recovering || Boolean(collision.requiresRecovery),
+    reducedMotion: Boolean(reducedMotionQuery?.matches),
+    dt,
+  });
+  touchdownSettleTelemetry = touchdownSettleResult.state;
+  if (touchdownSettleResult.message) setRouteChoiceStatus(touchdownSettleResult.message);
 
   if (collision.requiresRecovery) {
     recover();
@@ -783,6 +800,7 @@ function frame(now) {
     camera: cameraState,
     cameraLook: cameraState.freeLook,
     ridgeRide: ridgeRideTelemetry,
+    touchdownSettle: touchdownSettleTelemetry,
     landmarkInvestigation: landmarkInvestigationTelemetry,
     fog: currentFogProfile,
     routeGuidance: currentRouteGuidance,
