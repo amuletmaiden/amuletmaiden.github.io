@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { FlightController } from "./flight/controller.js";
 import { FlightInput } from "./flight/input.js";
 import { ChaseCameraRig } from "./flight/chase-camera.js";
+import { FreeLookChaseCamera } from "./flight/camera-free-look-integration.js";
 import { FlightCollisionResolver } from "./flight/collision.js";
 import { createIsleTerrainSampler } from "./flight/isle-terrain-sampler.js";
 import { DragonRuntime } from "./dragon/runtime.js";
@@ -44,6 +45,9 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
+const reducedMotionQuery = typeof matchMedia === "function"
+  ? matchMedia("(prefers-reduced-motion: reduce)")
+  : null;
 
 scene.add(new THREE.HemisphereLight(0xbfd8df, 0x202a28, 2.4));
 const sun = new THREE.DirectionalLight(0xffefd0, 3.2);
@@ -68,7 +72,9 @@ const position = new THREE.Vector3(
 const controller = new FlightController();
 controller.airborne = true;
 const flightInput = new FlightInput();
-const chaseCamera = new ChaseCameraRig({ distance: save?.settings?.cameraDistance ?? 24 });
+const chaseCamera = new FreeLookChaseCamera(
+  new ChaseCameraRig({ distance: save?.settings?.cameraDistance ?? 24 }),
+);
 const collisionResolver = new FlightCollisionResolver();
 collisionResolver.reset(position);
 let lastCollision = { ...collisionResolver.telemetry };
@@ -79,6 +85,7 @@ let heroIsle = null;
 let heroBounds = null;
 let heroTerrain = null;
 let paused = false;
+let cameraPointerId = null;
 let lastCameraState = null;
 let lastSaveAt = performance.now();
 let lastFrameAt = performance.now();
@@ -175,6 +182,12 @@ function terrainHeightAt(x, z) {
   return sampleSurfaceAt(x, z).height;
 }
 
+function clearCameraLook() {
+  cameraPointerId = null;
+  flightInput.clearPointerLook();
+  chaseCamera.resetLook();
+}
+
 function recover() {
   const recovered = safeRespawn({
     seed,
@@ -196,6 +209,8 @@ function recover() {
   collisionResolver.reset(recovered.position);
   lastCollision = { ...collisionResolver.telemetry };
   chaseCamera.snapTo(position, controller.yaw);
+  cameraPointerId = null;
+  flightInput.clearPointerLook();
   activeCrossingRouteId = null;
   persist();
 }
@@ -218,6 +233,7 @@ function persist() {
 function setPaused(nextPaused, now) {
   paused = Boolean(nextPaused);
   flightInput.clear();
+  clearCameraLook();
   lastFrameAt = now;
   if (paused) persist();
 }
@@ -405,6 +421,7 @@ function publishPausedState() {
     collision: lastCollision,
     surface,
     camera: lastCameraState,
+    cameraLook: lastCameraState?.freeLook || Object.freeze({ active: false, direction: null }),
     routeGuidance: currentRouteGuidance,
     guidancePreference: preferredRouteId,
     routeChoice: routeChoiceTelemetry,
@@ -435,7 +452,37 @@ addEventListener("greyblue:landmark-investigated", (event) => {
   applyMysteryRouteUnlock(event?.detail ?? null);
 });
 addEventListener("keyup", (event) => flightInput.keyUp(event.code));
-addEventListener("blur", () => flightInput.clear());
+addEventListener("blur", () => {
+  flightInput.clear();
+  clearCameraLook();
+});
+renderer.domElement.addEventListener("pointerdown", (event) => {
+  if (paused || event.button !== 0 || cameraPointerId !== null) return;
+  cameraPointerId = event.pointerId;
+  flightInput.clearPointerLook();
+  renderer.domElement.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+});
+renderer.domElement.addEventListener("pointermove", (event) => {
+  if (cameraPointerId !== event.pointerId) return;
+  flightInput.pointerDelta(event.movementX, event.movementY);
+  event.preventDefault();
+});
+const finishPointerLook = (event) => {
+  if (cameraPointerId !== event.pointerId) return;
+  if (renderer.domElement.hasPointerCapture?.(event.pointerId)) {
+    renderer.domElement.releasePointerCapture?.(event.pointerId);
+  }
+  cameraPointerId = null;
+  flightInput.clearPointerLook();
+};
+renderer.domElement.addEventListener("pointerup", finishPointerLook);
+renderer.domElement.addEventListener("pointercancel", finishPointerLook);
+renderer.domElement.addEventListener("lostpointercapture", (event) => {
+  if (cameraPointerId !== event.pointerId) return;
+  cameraPointerId = null;
+  flightInput.clearPointerLook();
+});
 addEventListener("beforeunload", () => {
   streamedIslandPresentation.teardown();
   persist();
@@ -507,7 +554,8 @@ function frame(now) {
     renderer.render(scene, camera);
     return;
   }
-  if (input.recover) recover();
+  const recovering = Boolean(input.recover);
+  if (recovering) recover();
 
   const previous = { x: position.x, y: position.y, z: position.z };
   const flight = controller.step(input, dt);
@@ -582,6 +630,10 @@ function frame(now) {
     grounded: collision.grounded,
     dt,
     sampleHeight: terrainHeightAt,
+    lookX: input.lookX,
+    lookY: input.lookY,
+    interrupted: recovering || collision.requiresRecovery,
+    reducedMotion: Boolean(reducedMotionQuery?.matches),
   });
   lastCameraState = cameraState;
   camera.position.set(cameraState.position.x, cameraState.position.y, cameraState.position.z);
@@ -615,6 +667,7 @@ function frame(now) {
     },
     animation: dragonRuntime?.telemetry || null,
     camera: cameraState,
+    cameraLook: cameraState.freeLook,
     fog: currentFogProfile,
     routeGuidance: currentRouteGuidance,
     guidancePreference: preferredRouteId,
