@@ -33,11 +33,22 @@ const { FlightInput, normalizeGamepad } = await import(moduleUrl);
 }
 
 {
+  const input = new FlightInput();
+  input.keyDown("KeyF");
+  assert.equal(input.sample().interact, true, "interaction appears on first sample");
+  assert.equal(input.sample().interact, false, "interaction is edge-triggered");
+  input.keyUp("KeyF");
+  input.keyDown("KeyF");
+  assert.equal(input.sample().interact, true, "interaction rearms after release");
+  assert.equal(input.sample().toggleFlight, false, "interaction does not steal flight toggle");
+}
+
+{
   const normalized = normalizeGamepad({
     axes: [0.5, -0.7, 0.6, -0.4],
     buttons: Array.from({ length: 10 }, (_, index) => ({
-      value: index === 7 ? 0.8 : index === 0 ? 1 : 0,
-      pressed: index === 0,
+      value: index === 7 ? 0.8 : index === 0 || index === 2 ? 1 : 0,
+      pressed: index === 0 || index === 2,
     })),
   });
   assert.ok(normalized.steer > 0);
@@ -46,6 +57,7 @@ const { FlightInput, normalizeGamepad } = await import(moduleUrl);
   assert.ok(normalized.lookY > 0);
   assert.ok(normalized.throttle > 0);
   assert.equal(normalized.toggleFlight, true);
+  assert.equal(normalized.interact, true);
   assert.equal(normalized.active, true);
 }
 
@@ -105,6 +117,7 @@ const { FlightInput, normalizeGamepad } = await import(moduleUrl);
     lookX: 0,
     lookY: 0,
     toggleFlight: false,
+    interact: false,
     recover: false,
     pause: false,
     active: false,
@@ -150,6 +163,16 @@ const { FlightInput, normalizeGamepad } = await import(moduleUrl);
   input.sample();
   input.setGamepad(pressed);
   assert.equal(input.sample().toggleFlight, true, "release and repress creates a new edge");
+}
+
+{
+  const input = new FlightInput();
+  const buttons = Array.from({ length: 4 }, () => ({ value: 0, pressed: false }));
+  buttons[2] = { value: 1, pressed: true };
+  input.setGamepad({ axes: [], buttons });
+  assert.equal(input.sample().interact, true, "gamepad face-button interaction creates one edge");
+  input.setGamepad({ axes: [], buttons });
+  assert.equal(input.sample().interact, false, "held interaction button does not retrigger");
 }
 
 console.log("input tests passed");
