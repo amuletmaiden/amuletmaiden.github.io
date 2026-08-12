@@ -16,6 +16,7 @@ import { cycleRouteChoice } from "./core/route-choice.js";
 import { evaluateMysteryRouteUnlocks } from "./core/mystery-route-unlock.js";
 import { LiveRidgeRide, ridgeRideCompletionMessage } from "./core/ridge-ride-live.js";
 import { LiveTouchdownSettle } from "./core/touchdown-settle-live.js";
+import { applyIslandLandfall } from "./core/island-landfall-live.js";
 import { deriveLiveLandmarkInvestigation } from "./core/landmark-investigation-live.js";
 import { deriveLandmarkInvestigationResponse } from "./core/landmark-investigation-response.js";
 import { createStreamedIslandPool } from "./core/streamed-island-pool.js";
@@ -679,6 +680,18 @@ function frame(now) {
     controller.airborne = true;
     controller.landingRequested = false;
     controller.setEnvironmentVerticalBias(0);
+  }
+
+  if (!collision.requiresRecovery) {
+    applyIslandLandfall({
+      collision,
+      position: { x: position.x, z: position.z },
+      islands: world.islands,
+      discoveredIslandIds: discovered,
+      exploration: mysteryExploration,
+      persist,
+      announce: setRouteChoiceStatus,
+    });
   }
 
   if (position.y < -20 || !Number.isFinite(position.lengthSq())) recover();

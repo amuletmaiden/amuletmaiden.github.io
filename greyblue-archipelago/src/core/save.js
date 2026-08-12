@@ -9,7 +9,7 @@ const WORLD_LIMIT = 24000;
 const ALTITUDE_MIN = -100;
 const ALTITUDE_MAX = 8000;
 const MAX_DISCOVERY_RECORDS = 2048;
-const EXPLORATION_EVENT_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "landmark-flight-encounter", "route-completed", "approach-mastered", "roost-established", "regional-thread-recognized", "regional-flight-memory"]);
+const EXPLORATION_EVENT_KINDS = new Set(["region-entered", "landmark-reached", "landmark-investigated", "landmark-flight-encounter", "route-completed", "approach-mastered", "roost-established", "regional-thread-recognized", "regional-flight-memory", "island-landed"]);
 const REGIONAL_FLIGHT_MEMORY_CLASSES = new Set(["wake", "ring", "hush", "weathering"]);
 let runtimeRecoveryCheckpoint = null;
 let holdRecoveryCheckpointOnce = false;
@@ -323,7 +323,11 @@ function normalizeExploration(exploration) {
   const byKey = new Map();
   for (const candidate of source.slice(0, MAX_DISCOVERY_RECORDS)) {
     if (!isPlainObject(candidate) || !EXPLORATION_EVENT_KINDS.has(candidate.kind)) continue;
-    const id = typeof candidate.id === "string" ? candidate.id.trim() : "";
+    const explicitId = typeof candidate.id === "string" ? candidate.id.trim() : "";
+    const landfallId = candidate.kind === "island-landed" && typeof candidate.islandId === "string"
+      ? candidate.islandId.trim()
+      : "";
+    const id = explicitId || landfallId;
     if (!id) continue;
     const key = `${candidate.kind}:${id}`;
     const event = {
