@@ -3,6 +3,7 @@ import {
   resetStreamedIslandTransition,
   streamedIslandMistOpacity,
 } from './streamed-island-mist-transition.js';
+import { profileStreamedIslandVertices } from './streamed-island-geology.js';
 
 const COLORS = Object.freeze({ ordinary: 0x536e64, landmark: 0x607f74 });
 
@@ -28,6 +29,31 @@ function cameraDistance(mesh, camera) {
   return Math.hypot(Number.isFinite(dx) ? dx : 0, Number.isFinite(dz) ? dz : 0);
 }
 
+function captureBasePositions(geometry) {
+  const source = geometry?.attributes?.position?.array;
+  if (!source || typeof source.length !== 'number') return null;
+  const base = new Float32Array(source.length);
+  for (let index = 0; index < source.length; index += 1) {
+    const value = Number(source[index]);
+    if (!Number.isFinite(value)) return null;
+    base[index] = value;
+  }
+  return base;
+}
+
+function applyIslandGeology(geometry, basePositions, island) {
+  const attribute = geometry?.attributes?.position;
+  if (!attribute?.array || !basePositions || attribute.array.length !== basePositions.length) return false;
+  const profiled = profileStreamedIslandVertices(basePositions, island);
+  if (profiled.length !== basePositions.length) return false;
+  attribute.array.set(profiled);
+  attribute.needsUpdate = true;
+  geometry.computeVertexNormals?.();
+  geometry.computeBoundingBox?.();
+  geometry.computeBoundingSphere?.();
+  return true;
+}
+
 export function createStreamedIslandThreeAdapter({
   THREE,
   scene,
@@ -51,6 +77,7 @@ export function createStreamedIslandThreeAdapter({
   function create(kind) {
     const geometry = new THREE.ConeGeometry(110, 1, 9, 3);
     geometry.translate(0, -0.42, 0);
+    const basePositions = captureBasePositions(geometry);
     const material = new THREE.MeshStandardMaterial({
       color: COLORS[kind] ?? COLORS.ordinary,
       roughness: 0.96,
@@ -80,6 +107,7 @@ export function createStreamedIslandThreeAdapter({
         transitioning: result.transitioning,
       });
     };
+    mesh.userData.streamedIslandBasePositions = basePositions;
     return mesh;
   }
 
@@ -91,10 +119,12 @@ export function createStreamedIslandThreeAdapter({
       : null;
     if (previousId && islandMeshes.get(previousId) === mesh) islandMeshes.delete(previousId);
 
+    const basePositions = mesh.userData?.streamedIslandBasePositions ?? captureBasePositions(mesh.geometry);
     scene.remove(mesh);
     mesh.visible = false;
     clearStreamedIslandTransition(mesh);
-    mesh.userData = {};
+    mesh.userData = { streamedIslandBasePositions: basePositions };
+    applyIslandGeology(mesh.geometry, basePositions, island);
 
     if (!island) {
       mesh.position.set(0, 0, 0);
@@ -104,7 +134,7 @@ export function createStreamedIslandThreeAdapter({
 
     mesh.position.set(island.x, 0, island.z);
     mesh.scale.set(island.scale, island.height, island.scale);
-    mesh.userData = { island, presentationClass: kind };
+    mesh.userData = { island, presentationClass: kind, streamedIslandBasePositions: basePositions };
     resetStreamedIslandTransition(mesh, now());
     mesh.visible = true;
     islandMeshes.set(island.id, mesh);
@@ -126,4 +156,10 @@ export function createStreamedIslandThreeAdapter({
   return Object.freeze({ create, reset, dispose });
 }
 
-export const streamedIslandThreeAdapterInternals = Object.freeze({ COLORS, isMeshLike, cameraDistance });
+export const streamedIslandThreeAdapterInternals = Object.freeze({
+  COLORS,
+  isMeshLike,
+  cameraDistance,
+  captureBasePositions,
+  applyIslandGeology,
+});
