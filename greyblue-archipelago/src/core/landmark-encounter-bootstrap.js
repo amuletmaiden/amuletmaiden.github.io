@@ -4,6 +4,7 @@ import { investigatedLandmarkIdsFromExploration } from './exploration-lifecycle.
 import { createLandmarkEncounterState, activateLandmarkEncounter } from './landmark-encounter-model.js';
 import { evaluateLandmarkFlightApproach } from './landmark-flight-approach.js';
 import { shouldRevealLandmarkEncounter } from './landmark-encounter-presentation.js';
+import { deriveLandmarkSoundSignature } from './landmark-sound-signature.js';
 import { loadGame } from './save.js';
 
 const host = document.querySelector('#hud') ?? document.body;
@@ -85,6 +86,13 @@ function revealEncounter() {
   announcement.textContent = `${result.reveal.title}. ${result.reveal.text}`;
   promptNode.textContent = 'Encounter remembered';
   panel.dataset.available = 'false';
+  const soundSignature = deriveLandmarkSoundSignature({
+    active: true,
+    encounterClass: encounterView?.encounterClass ?? null,
+  });
+  if (soundSignature) {
+    globalThis.dispatchEvent?.(new CustomEvent('greyblue:landmark-flight-encounter', { detail: soundSignature }));
+  }
   if (revealTimer) clearTimeout(revealTimer);
   revealTimer = setTimeout(() => {
     if (!disposed) revealNode.hidden = true;
