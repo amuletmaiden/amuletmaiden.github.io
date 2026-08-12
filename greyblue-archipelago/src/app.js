@@ -13,6 +13,7 @@ import { selectRouteGuidance } from "./core/route-guidance.js";
 import { cycleRouteChoice } from "./core/route-choice.js";
 import { evaluateMysteryRouteUnlocks } from "./core/mystery-route-unlock.js";
 import { LiveRidgeRide, ridgeRideCompletionMessage } from "./core/ridge-ride-live.js";
+import { deriveLiveLandmarkInvestigation } from "./core/landmark-investigation-live.js";
 import { createStreamedIslandPool } from "./core/streamed-island-pool.js";
 import { createStreamedIslandThreeAdapter } from "./core/streamed-island-three-adapter.js";
 import { applyFlightResume, captureFlightResume } from "./core/flight-resume-runtime.js";
@@ -27,6 +28,7 @@ const FALLBACK_SPAWN = Object.freeze({ x: 0, y: 160, z: 0 });
 const ROUTE_CHOICE_RADIUS = 320;
 const CROSSING_COMMIT_PROGRESS = 0.1;
 const RIDGE_LIFT_PROBE_DISTANCE = 46;
+const INACTIVE_LANDMARK_INVESTIGATION = Object.freeze({ available: false, prompt: null });
 const DEFAULT_FOG = Object.freeze({
   color: "#71848b",
   near: 120,
@@ -83,6 +85,7 @@ const collisionResolver = new FlightCollisionResolver();
 collisionResolver.reset(position);
 const ridgeRide = new LiveRidgeRide();
 let ridgeRideTelemetry = ridgeRide.publicState();
+let landmarkInvestigationTelemetry = INACTIVE_LANDMARK_INVESTIGATION;
 let lastCollision = { ...collisionResolver.telemetry };
 let dragon = null;
 let dragonRuntime = null;
@@ -238,6 +241,7 @@ function recover() {
   collisionResolver.reset(recovered.position);
   lastCollision = { ...collisionResolver.telemetry };
   ridgeRideTelemetry = ridgeRide.interrupt();
+  landmarkInvestigationTelemetry = INACTIVE_LANDMARK_INVESTIGATION;
   chaseCamera.snapTo(position, controller.yaw);
   cameraPointerId = null;
   flightInput.clearPointerLook();
@@ -252,6 +256,7 @@ function persist() {
     flight: captureFlightResume(controller),
     discovered,
     discoveredRoutes,
+    exploration: mysteryExploration,
     guidance: {
       activeRouteId: preferredRouteId,
       progress: currentRouteGuidance?.progress ?? 0,
@@ -266,7 +271,10 @@ function setPaused(nextPaused, now) {
   flightInput.clear();
   clearCameraLook();
   controller.setEnvironmentVerticalBias(0);
-  if (paused) ridgeRideTelemetry = ridgeRide.interrupt();
+  if (paused) {
+    ridgeRideTelemetry = ridgeRide.interrupt();
+    landmarkInvestigationTelemetry = INACTIVE_LANDMARK_INVESTIGATION;
+  }
   lastFrameAt = now;
   if (paused) persist();
 }
@@ -344,6 +352,7 @@ function setRouteChoiceStatus(message) {
 }
 
 function applyMysteryRouteUnlock(liveInvestigation = null) {
+  let investigationAdded = false;
   if (liveInvestigation?.landmarkId && liveInvestigation?.regionId) {
     const duplicate = mysteryExploration.events.some((event) =>
       event?.kind === "landmark-investigated" && event.landmarkId === liveInvestigation.landmarkId);
@@ -353,6 +362,7 @@ function applyMysteryRouteUnlock(liveInvestigation = null) {
         landmarkId: liveInvestigation.landmarkId,
         regionId: liveInvestigation.regionId,
       });
+      investigationAdded = true;
     }
   }
 
@@ -377,7 +387,10 @@ function applyMysteryRouteUnlock(liveInvestigation = null) {
     lastUnlockedRouteId: unlockedRouteIds.at(-1) ?? mysteryRouteTelemetry.lastUnlockedRouteId ?? null,
   });
 
-  if (!unlockedRouteIds.length) return false;
+  if (!unlockedRouteIds.length) {
+    if (investigationAdded) persist();
+    return false;
+  }
   const proximity = nearestIsland();
   updateRouteGuidance(proximity);
   persist();
@@ -456,6 +469,7 @@ function publishPausedState() {
     camera: lastCameraState,
     cameraLook: lastCameraState?.freeLook || Object.freeze({ active: false, direction: null }),
     ridgeRide: ridgeRideTelemetry,
+    landmarkInvestigation: landmarkInvestigationTelemetry,
     routeGuidance: currentRouteGuidance,
     guidancePreference: preferredRouteId,
     routeChoice: routeChoiceTelemetry,
@@ -490,6 +504,7 @@ addEventListener("blur", () => {
   flightInput.clear();
   clearCameraLook();
   ridgeRideTelemetry = ridgeRide.interrupt();
+  landmarkInvestigationTelemetry = INACTIVE_LANDMARK_INVESTIGATION;
 });
 renderer.domElement.addEventListener("pointerdown", (event) => {
   if (paused || event.button !== 0 || cameraPointerId !== null) return;
@@ -648,6 +663,27 @@ function frame(now) {
     }
   }
   discoverRoutes();
+
+  const landmarkInvestigation = deriveLiveLandmarkInvestigation({
+    islands: world.islands,
+    discoveredIslandIds: discovered,
+    explorationEvents: mysteryExploration.events,
+    currentRegionId: currentRegion?.id ?? null,
+    position: { x: position.x, y: position.y, z: position.z },
+    yaw: controller.yaw,
+    airborne: controller.airborne,
+    grounded: Boolean(lastCollision.grounded),
+    paused: false,
+    recovering: recovering || Boolean(lastCollision.requiresRecovery),
+    restoring: false,
+    crossing: Boolean(activeCrossingRouteId),
+    interact: input.investigate === true,
+  });
+  landmarkInvestigationTelemetry = landmarkInvestigation.state;
+  if (landmarkInvestigation.completed && landmarkInvestigation.event) {
+    dispatchEvent(new CustomEvent("greyblue:landmark-investigated", { detail: landmarkInvestigation.event }));
+  }
+
   const routeGuidance = updateRouteGuidance(proximity);
   if (!activeCrossingRouteId && routeGuidance?.routeId && routeGuidance.progress >= CROSSING_COMMIT_PROGRESS) {
     activeCrossingRouteId = routeGuidance.routeId;
@@ -701,7 +737,8 @@ function frame(now) {
   const routeLabel = routeGuidance
     ? ` · ${routeGuidance.destinationName} ${routeGuidance.turn} · ${routeGuidance.fogRisk.level} fog`
     : "";
-  stateLine.textContent = `${controller.airborne ? "FLIGHT" : "LANDED"} · ${Math.round(speed)} speed · ${Math.round(position.y)} altitude · ${discovered.size} isles · ${discoveredRoutes.size} routes${regionLabel}${routeLabel}`;
+  const investigationLabel = landmarkInvestigationTelemetry.available ? " · F investigate" : "";
+  stateLine.textContent = `${controller.airborne ? "FLIGHT" : "LANDED"} · ${Math.round(speed)} speed · ${Math.round(position.y)} altitude · ${discovered.size} isles · ${discoveredRoutes.size} routes${regionLabel}${routeLabel}${investigationLabel}`;
 
   const surface = sampleSurfaceAt(position.x, position.z);
   globalThis.__greyblueState = {
@@ -724,6 +761,7 @@ function frame(now) {
     camera: cameraState,
     cameraLook: cameraState.freeLook,
     ridgeRide: ridgeRideTelemetry,
+    landmarkInvestigation: landmarkInvestigationTelemetry,
     fog: currentFogProfile,
     routeGuidance: currentRouteGuidance,
     guidancePreference: preferredRouteId,
