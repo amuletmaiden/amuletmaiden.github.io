@@ -15,6 +15,7 @@ import { evaluateMysteryRouteUnlocks } from "./core/mystery-route-unlock.js";
 import { LiveRidgeRide, ridgeRideCompletionMessage } from "./core/ridge-ride-live.js";
 import { createStreamedIslandPool } from "./core/streamed-island-pool.js";
 import { createStreamedIslandThreeAdapter } from "./core/streamed-island-three-adapter.js";
+import { applyFlightResume, captureFlightResume } from "./core/flight-resume-runtime.js";
 import { loadGame, saveGame, safeRespawn } from "./core/save.js";
 
 const ASSETS = Object.freeze({
@@ -73,7 +74,7 @@ const position = new THREE.Vector3(
 );
 
 const controller = new FlightController();
-controller.airborne = true;
+applyFlightResume(controller, save?.flight);
 const flightInput = new FlightInput();
 const chaseCamera = new FreeLookChaseCamera(
   new ChaseCameraRig({ distance: save?.settings?.cameraDistance ?? 24 }),
@@ -248,6 +249,7 @@ function persist() {
   saveGame({
     seed,
     position: { x: position.x, y: position.y, z: position.z },
+    flight: captureFlightResume(controller),
     discovered,
     discoveredRoutes,
     guidance: {

@@ -1,5 +1,8 @@
+import { normalizeFlightResume } from "./flight-resume.js";
+
 const SAVE_KEY = "greyblue-archipelago-save-v1";
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3;
+const SUPPORTED_VERSIONS = new Set([1, 2, CURRENT_VERSION]);
 const EXPLORATION_VERSION = 1;
 const DEFAULT_SPAWN = Object.freeze({ x: 0, y: 160, z: 0 });
 const WORLD_LIMIT = 24000;
@@ -36,6 +39,7 @@ export function saveGame(state, storage = localStorage, guidanceContext = null) 
     seed: Number.isInteger(state.seed) ? state.seed : 1337,
     position,
     recoveryCheckpoint: normalizePosition(runtimeRecoveryCheckpoint ?? position),
+    flight: normalizeFlightResume(state.flight),
     discovered: normalizeStringSet(state.discovered),
     discoveredRoutes,
     guidance: guidanceResult.guidance,
@@ -55,7 +59,7 @@ export function saveSettingsPatch(settings, storage = localStorage) {
     const raw = storage.getItem(SAVE_KEY);
     if (!raw) return false;
     const parsed = JSON.parse(raw);
-    if (!isPlainObject(parsed) || ![1, CURRENT_VERSION].includes(parsed.version)) return false;
+    if (!isPlainObject(parsed) || !SUPPORTED_VERSIONS.has(parsed.version)) return false;
     parsed.settings = {
       ...(isPlainObject(parsed.settings) ? parsed.settings : {}),
       ...settings,
@@ -72,14 +76,16 @@ export function loadGame(storage = localStorage, guidanceContext = null) {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    if (!parsed || !isPlainObject(parsed) || ![1, CURRENT_VERSION].includes(parsed.version)) return null;
+    if (!parsed || !isPlainObject(parsed) || !SUPPORTED_VERSIONS.has(parsed.version)) return null;
     const discoveredRoutes = normalizeStringSet(parsed.discoveredRoutes);
     const context = guidanceContext
       ? { ...guidanceContext, discoveredRoutes: guidanceContext.discoveredRoutes ?? discoveredRoutes }
       : null;
     const guidanceResult = recoverGuidanceForWorld(parsed.guidance, context);
     const hadExplorationField = Object.hasOwn(parsed, "exploration");
+    const hadFlightField = Object.hasOwn(parsed, "flight");
     const exploration = normalizeExploration(parsed.exploration);
+    const flight = normalizeFlightResume(parsed.flight);
     const position = normalizePosition(parsed.position);
     runtimeRecoveryCheckpoint = isValidWorldPosition(parsed.recoveryCheckpoint)
       ? normalizePosition(parsed.recoveryCheckpoint)
@@ -91,6 +97,11 @@ export function loadGame(storage = localStorage, guidanceContext = null) {
       seed: Number.isInteger(parsed.seed) ? parsed.seed : 1337,
       position,
       recoveryCheckpoint: { ...runtimeRecoveryCheckpoint },
+      flight,
+      flightRecovery: {
+        hadFlightField,
+        recoveredNeutral: !hadFlightField,
+      },
       discovered: normalizeStringSet(parsed.discovered),
       discoveredRoutes,
       guidance: guidanceResult.guidance,
