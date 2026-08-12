@@ -1,4 +1,7 @@
 import { createExplorationJournalState, stepExplorationJournal } from './exploration-journal-model.js';
+import { deriveDurableLandmarkFieldNotes } from './durable-landmark-field-notes.js';
+import { loadGame } from './save.js';
+import { buildArchipelago } from '../world/archipelago.js';
 
 const host = document.querySelector('#hud') ?? document.body;
 const priorDescriptor = Object.getOwnPropertyDescriptor(globalThis, '__greyblueState');
@@ -15,6 +18,14 @@ let roostRestLine = null;
 let familiarCrossingLine = null;
 let familiarLandmarkEchoLine = null;
 let familiarLandmarkEchoTimer = 0;
+
+const journalSave = loadGame();
+const journalSeed = Number.isInteger(journalSave?.seed) ? journalSave.seed : 1337;
+const journalWorld = buildArchipelago({ seed: journalSeed, count: 64, radius: 11000, minGap: 390 });
+const journalExplorationEvents = Array.isArray(journalSave?.exploration?.events)
+  ? journalSave.exploration.events.map((event) => ({ ...event }))
+  : [];
+const persistedDiscovered = Array.isArray(journalSave?.discovered) ? [...journalSave.discovered] : [];
 
 const panel = document.createElement('section');
 panel.id = 'greyblue-exploration-journal';
@@ -51,9 +62,20 @@ const familiarLandmarkEchoNode = panel.querySelector('[data-greyblue-journal-fam
 const omenNode = panel.querySelector('[data-greyblue-journal-omen]');
 const discoveriesNode = panel.querySelector('[data-greyblue-journal-discoveries]');
 
+function fieldNotesFor(state) {
+  return deriveDurableLandmarkFieldNotes({
+    islands: journalWorld.islands,
+    discoveredIslandIds: Array.isArray(state?.discovered) ? state.discovered : persistedDiscovered,
+    explorationEvents: journalExplorationEvents,
+  });
+}
+
 function render(state) {
   if (disposed) return;
-  const next = stepExplorationJournal(journalState, state);
+  const journalLiveState = state && typeof state === 'object'
+    ? { ...state, journalFieldNotes: fieldNotesFor(state) }
+    : { journalFieldNotes: fieldNotesFor(null) };
+  const next = stepExplorationJournal(journalState, journalLiveState);
   journalState = next.state;
   objectiveNode.textContent = next.view.objective;
   contextNode.textContent = next.view.context;
@@ -141,6 +163,16 @@ function onFamiliarLandmarkEcho(event) {
   }, 8500);
 }
 
+function onLandmarkInvestigated(event) {
+  const landmarkId = typeof event?.detail?.landmarkId === 'string' ? event.detail.landmarkId : null;
+  const regionId = typeof event?.detail?.regionId === 'string' ? event.detail.regionId : null;
+  if (!landmarkId || !regionId) return;
+  const duplicate = journalExplorationEvents.some((entry) =>
+    entry?.kind === 'landmark-investigated' && entry.landmarkId === landmarkId);
+  if (!duplicate) journalExplorationEvents.push({ kind: 'landmark-investigated', landmarkId, regionId });
+  render(currentState);
+}
+
 globalThis.addEventListener?.('keydown', onKeyDown);
 globalThis.addEventListener?.('greyblue:regional-omen', onRegionalOmen);
 globalThis.addEventListener?.('greyblue:expedition-context', onExpeditionContext);
@@ -148,6 +180,7 @@ globalThis.addEventListener?.('greyblue:expedition-culmination', onExpeditionCul
 globalThis.addEventListener?.('greyblue:roost-rest', onRoostRest);
 globalThis.addEventListener?.('greyblue:familiar-crossing-signature', onFamiliarCrossingSignature);
 globalThis.addEventListener?.('greyblue:familiar-crossing-landmark-echo', onFamiliarLandmarkEcho);
+globalThis.addEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
 
 if (!priorDescriptor || priorDescriptor.configurable) {
   Object.defineProperty(globalThis, '__greyblueState', {
@@ -174,6 +207,7 @@ globalThis.addEventListener?.('beforeunload', () => {
   globalThis.removeEventListener?.('greyblue:roost-rest', onRoostRest);
   globalThis.removeEventListener?.('greyblue:familiar-crossing-signature', onFamiliarCrossingSignature);
   globalThis.removeEventListener?.('greyblue:familiar-crossing-landmark-echo', onFamiliarLandmarkEcho);
+  globalThis.removeEventListener?.('greyblue:landmark-investigated', onLandmarkInvestigated);
   panel.remove();
   announcement.remove();
 }, { once: true });

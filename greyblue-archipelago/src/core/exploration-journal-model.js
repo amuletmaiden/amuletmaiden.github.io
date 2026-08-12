@@ -14,6 +14,8 @@ export function stepExplorationJournal(previousState, liveState) {
   const discoveries = isNewDiscovery
     ? [label, ...previous.discoveries].slice(0, 5)
     : [...previous.discoveries];
+  const durableNotes = normalizeLabels(liveState?.journalFieldNotes);
+  const visibleDiscoveries = mergeJournalNotes(durableNotes, discoveries);
 
   return Object.freeze({
     state: Object.freeze({
@@ -23,7 +25,7 @@ export function stepExplorationJournal(previousState, liveState) {
     view: Object.freeze({
       objective: objectiveFor(liveState),
       context: contextFor(liveState),
-      discoveries: Object.freeze(discoveries),
+      discoveries: Object.freeze(visibleDiscoveries),
       announcement: isNewDiscovery ? label : null,
     }),
   });
@@ -31,7 +33,23 @@ export function stepExplorationJournal(previousState, liveState) {
 
 function normalizeLabels(values) {
   if (!Array.isArray(values)) return [];
-  return values.filter((value) => typeof value === 'string' && value.trim()).slice(0, 5);
+  return values
+    .filter((value) => typeof value === 'string' && value.trim())
+    .map((value) => value.trim().slice(0, 320))
+    .slice(0, 5);
+}
+
+function mergeJournalNotes(durableNotes, discoveries) {
+  const merged = [];
+  const seen = new Set();
+  for (const label of [...durableNotes, ...discoveries]) {
+    const key = label.toLocaleLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(label);
+    if (merged.length >= 5) break;
+  }
+  return merged;
 }
 
 function finiteDistance(value) {
