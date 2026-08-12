@@ -14,6 +14,7 @@ import { cycleRouteChoice } from "./core/route-choice.js";
 import { evaluateMysteryRouteUnlocks } from "./core/mystery-route-unlock.js";
 import { LiveRidgeRide, ridgeRideCompletionMessage } from "./core/ridge-ride-live.js";
 import { deriveLiveLandmarkInvestigation } from "./core/landmark-investigation-live.js";
+import { deriveLandmarkInvestigationResponse } from "./core/landmark-investigation-response.js";
 import { createStreamedIslandPool } from "./core/streamed-island-pool.js";
 import { createStreamedIslandThreeAdapter } from "./core/streamed-island-three-adapter.js";
 import { applyFlightResume, captureFlightResume } from "./core/flight-resume-runtime.js";
@@ -497,7 +498,19 @@ addEventListener("greyblue:route-completed", () => {
   routeChoiceTelemetry = Object.freeze({ ...routeChoiceTelemetry, reason: "crossing-completed" });
 });
 addEventListener("greyblue:landmark-investigated", (event) => {
-  applyMysteryRouteUnlock(event?.detail ?? null);
+  const detail = event?.detail ?? null;
+  const response = deriveLandmarkInvestigationResponse({
+    event: detail,
+    completed: true,
+    islands: world.islands,
+    discoveredIslandIds: discovered,
+    paused,
+    recovering: Boolean(lastCollision.requiresRecovery),
+    restoring: false,
+    crossing: Boolean(activeCrossingRouteId),
+  });
+  const unlockedRoute = applyMysteryRouteUnlock(detail);
+  if (!unlockedRoute && response.active) setRouteChoiceStatus(response.text);
 });
 addEventListener("keyup", (event) => flightInput.keyUp(event.code));
 addEventListener("blur", () => {
