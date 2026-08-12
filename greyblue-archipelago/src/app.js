@@ -6,6 +6,7 @@ import { ChaseCameraRig } from "./flight/chase-camera.js";
 import { FreeLookChaseCamera } from "./flight/camera-free-look-integration.js";
 import { FlightCollisionResolver } from "./flight/collision.js";
 import { createIsleTerrainSampler } from "./flight/isle-terrain-sampler.js";
+import { deriveRidgeLift } from "./flight/ridge-lift.js";
 import { DragonRuntime } from "./dragon/runtime.js";
 import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
 import { selectRouteGuidance } from "./core/route-guidance.js";
@@ -23,6 +24,7 @@ const STREAMING_RANGES = Object.freeze({ activateRange: 2400, deactivateRange: 3
 const FALLBACK_SPAWN = Object.freeze({ x: 0, y: 160, z: 0 });
 const ROUTE_CHOICE_RADIUS = 320;
 const CROSSING_COMMIT_PROGRESS = 0.1;
+const RIDGE_LIFT_PROBE_DISTANCE = 46;
 const DEFAULT_FOG = Object.freeze({
   color: "#71848b",
   near: 120,
@@ -182,6 +184,28 @@ function terrainHeightAt(x, z) {
   return sampleSurfaceAt(x, z).height;
 }
 
+function deriveLiveRidgeLift() {
+  const speed = Math.hypot(controller.velocity.x, controller.velocity.z);
+  const current = sampleSurfaceAt(position.x, position.z);
+  const forwardX = Math.sin(controller.yaw);
+  const forwardZ = Math.cos(controller.yaw);
+  const ahead = sampleSurfaceAt(
+    position.x + forwardX * RIDGE_LIFT_PROBE_DISTANCE,
+    position.z + forwardZ * RIDGE_LIFT_PROBE_DISTANCE,
+  );
+  const usableTerrain = current.surface === "terrain" && ahead.surface === "terrain";
+  return deriveRidgeLift({
+    speed,
+    clearance: usableTerrain ? position.y - current.height : Number.POSITIVE_INFINITY,
+    terrainRise: usableTerrain ? ahead.height - current.height : 0,
+    airborne: controller.airborne,
+    grounded: lastCollision.grounded,
+    landing: controller.landingRequested,
+    recovering: lastCollision.requiresRecovery,
+    restoring: false,
+  });
+}
+
 function clearCameraLook() {
   cameraPointerId = null;
   flightInput.clearPointerLook();
@@ -206,6 +230,7 @@ function recover() {
   Object.assign(controller.velocity, recovered.velocity);
   controller.airborne = recovered.airborne;
   controller.landingRequested = recovered.landingRequested;
+  controller.setEnvironmentVerticalBias(0);
   collisionResolver.reset(recovered.position);
   lastCollision = { ...collisionResolver.telemetry };
   chaseCamera.snapTo(position, controller.yaw);
@@ -234,6 +259,7 @@ function setPaused(nextPaused, now) {
   paused = Boolean(nextPaused);
   flightInput.clear();
   clearCameraLook();
+  controller.setEnvironmentVerticalBias(0);
   lastFrameAt = now;
   if (paused) persist();
 }
@@ -558,6 +584,7 @@ function frame(now) {
   if (recovering) recover();
 
   const previous = { x: position.x, y: position.y, z: position.z };
+  controller.setEnvironmentVerticalBias(deriveLiveRidgeLift().verticalBias);
   const flight = controller.step(input, dt);
   const proposed = {
     x: previous.x + flight.velocity.x * dt,
@@ -583,9 +610,11 @@ function frame(now) {
     controller.landingRequested = false;
     controller.velocity.y = 0;
     controller.stallFactor = 0;
+    controller.setEnvironmentVerticalBias(0);
   } else if (collision.collided) {
     controller.airborne = true;
     controller.landingRequested = false;
+    controller.setEnvironmentVerticalBias(0);
   }
 
   if (position.y < -20 || !Number.isFinite(position.lengthSq())) recover();
