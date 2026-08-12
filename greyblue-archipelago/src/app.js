@@ -9,6 +9,7 @@ import { createIsleTerrainSampler } from "./flight/isle-terrain-sampler.js";
 import { deriveRidgeLift } from "./flight/ridge-lift.js";
 import { DragonRuntime } from "./dragon/runtime.js";
 import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
+import { createIslandSurfaceSpatialIndex } from "./world/island-surface-spatial-index.js";
 import { selectRouteGuidance } from "./core/route-guidance.js";
 import { cycleRouteChoice } from "./core/route-choice.js";
 import { evaluateMysteryRouteUnlocks } from "./core/mystery-route-unlock.js";
@@ -65,6 +66,7 @@ scene.add(sun);
 const save = loadGame();
 const seed = Number.isInteger(save?.seed) ? save.seed : 1337;
 const world = buildArchipelago({ seed, count: 64, radius: 11000, minGap: 390 });
+const islandSurfaceIndex = createIslandSurfaceSpatialIndex(world.islands);
 const discovered = new Set(save?.discovered || []);
 const discoveredRoutes = new Set(save?.discoveredRoutes || []);
 const mysteryExploration = {
@@ -162,7 +164,7 @@ function nearestLandingZone(island) {
 
 function sampleSurfaceAt(x, z) {
   let result = { height: 0, surface: "water", id: "greyblue-ocean" };
-  for (const island of world.islands) {
+  for (const island of islandSurfaceIndex.query(x, z)) {
     const distance = Math.hypot(x - island.x, z - island.z);
     const radius = 110 * island.scale;
     if (distance < radius) {
