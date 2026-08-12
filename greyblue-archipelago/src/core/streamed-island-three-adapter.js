@@ -4,6 +4,7 @@ import {
   streamedIslandMistOpacity,
 } from './streamed-island-mist-transition.js';
 import { profileStreamedIslandVertices } from './streamed-island-geology.js';
+import { profileStreamedLandingShelfVertices } from './streamed-island-landing-shelf.js';
 
 const COLORS = Object.freeze({ ordinary: 0x536e64, landmark: 0x607f74 });
 
@@ -46,7 +47,9 @@ function applyIslandGeology(geometry, basePositions, island) {
   if (!attribute?.array || !basePositions || attribute.array.length !== basePositions.length) return false;
   const profiled = profileStreamedIslandVertices(basePositions, island);
   if (profiled.length !== basePositions.length) return false;
-  attribute.array.set(profiled);
+  const withLandingShelf = profileStreamedLandingShelfVertices(profiled, island);
+  if (withLandingShelf.length !== basePositions.length) return false;
+  attribute.array.set(withLandingShelf);
   attribute.needsUpdate = true;
   geometry.computeVertexNormals?.();
   geometry.computeBoundingBox?.();
