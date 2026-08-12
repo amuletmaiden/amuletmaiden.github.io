@@ -1,4 +1,4 @@
-import { deriveLandingApproachReadback } from '../world/landing-approach-readback.js';
+import { deriveLiveLandingApproachReadback } from './landing-approach-readback-live.js';
 
 const priorDescriptor = Object.getOwnPropertyDescriptor(globalThis, '__greyblueState');
 const priorGet = typeof priorDescriptor?.get === 'function' ? priorDescriptor.get.bind(globalThis) : null;
@@ -15,49 +15,7 @@ const COPY = Object.freeze({
   steady: 'Descent steady',
   steep: 'Descent steep',
 });
-
-function inactive() {
-  return Object.freeze({ active: false, alignment: null, descent: null });
-}
-
-function interrupted(state) {
-  return state?.paused === true
-    || state?.collision?.requiresRecovery === true
-    || state?.flight?.mode === 'recovery'
-    || state?.restorePublishing === true
-    || state?.explorationRestorePublishing === true
-    || globalThis.__greyblueCrossingObjective?.active === true;
-}
-
-function candidateCorridors(state) {
-  const island = state?.nearestIsland;
-  if (!island?.id || !Array.isArray(island.approachCorridors)) return [];
-  if (!Array.isArray(state?.discovered) || !state.discovered.includes(island.id)) return [];
-  if (!state?.currentRegion?.id || island.regionId !== state.currentRegion.id) return [];
-  return island.approachCorridors;
-}
-
-export function deriveLiveLandingApproachReadback(state, crossingActive = false) {
-  if (!state || crossingActive || interrupted(state)) return inactive();
-  const position = state.position;
-  const yaw = state.flight?.yaw;
-  const verticalVelocity = state.flight?.velocity?.y;
-  const airborne = state.flight?.airborne === true && state.collision?.grounded !== true;
-
-  for (const corridor of candidateCorridors(state)) {
-    const view = deriveLandingApproachReadback({
-      eligible: true,
-      airborne,
-      interrupted: false,
-      position,
-      yaw,
-      verticalVelocity,
-      corridor,
-    });
-    if (view.active) return view;
-  }
-  return inactive();
-}
+const INACTIVE = Object.freeze({ active: false, alignment: null, descent: null });
 
 function ensureNode() {
   let node = document.querySelector('#greyblue-landing-corridor-readback');
@@ -104,10 +62,9 @@ function render(view) {
 }
 
 function apply(state) {
-  const view = deriveLiveLandingApproachReadback(
-    state,
-    globalThis.__greyblueCrossingObjective?.active === true,
-  );
+  const view = deriveLiveLandingApproachReadback(state, {
+    crossingActive: globalThis.__greyblueCrossingObjective?.active === true,
+  });
   render(view);
   globalThis.dispatchEvent?.(new CustomEvent('greyblue:landing-approach-readback', { detail: view }));
 }
@@ -125,7 +82,7 @@ if (!priorDescriptor || priorDescriptor.configurable) {
   });
 }
 
-render(inactive());
+render(INACTIVE);
 if (currentState) apply(currentState);
 
 globalThis.addEventListener?.('beforeunload', () => {
