@@ -77,7 +77,10 @@ export function createStreamedIslandThreeAdapter({
   function create(kind) {
     const geometry = new THREE.ConeGeometry(110, 1, 9, 3);
     geometry.translate(0, -0.42, 0);
-    const basePositions = captureBasePositions(geometry);
+    geometry.userData = {
+      ...(geometry.userData || {}),
+      streamedIslandBasePositions: captureBasePositions(geometry),
+    };
     const material = new THREE.MeshStandardMaterial({
       color: COLORS[kind] ?? COLORS.ordinary,
       roughness: 0.96,
@@ -107,7 +110,6 @@ export function createStreamedIslandThreeAdapter({
         transitioning: result.transitioning,
       });
     };
-    mesh.userData.streamedIslandBasePositions = basePositions;
     return mesh;
   }
 
@@ -119,11 +121,11 @@ export function createStreamedIslandThreeAdapter({
       : null;
     if (previousId && islandMeshes.get(previousId) === mesh) islandMeshes.delete(previousId);
 
-    const basePositions = mesh.userData?.streamedIslandBasePositions ?? captureBasePositions(mesh.geometry);
+    const basePositions = mesh.geometry?.userData?.streamedIslandBasePositions ?? captureBasePositions(mesh.geometry);
     scene.remove(mesh);
     mesh.visible = false;
     clearStreamedIslandTransition(mesh);
-    mesh.userData = { streamedIslandBasePositions: basePositions };
+    mesh.userData = {};
     applyIslandGeology(mesh.geometry, basePositions, island);
 
     if (!island) {
@@ -134,7 +136,7 @@ export function createStreamedIslandThreeAdapter({
 
     mesh.position.set(island.x, 0, island.z);
     mesh.scale.set(island.scale, island.height, island.scale);
-    mesh.userData = { island, presentationClass: kind, streamedIslandBasePositions: basePositions };
+    mesh.userData = { island, presentationClass: kind };
     resetStreamedIslandTransition(mesh, now());
     mesh.visible = true;
     islandMeshes.set(island.id, mesh);
