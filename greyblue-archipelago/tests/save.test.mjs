@@ -1,15 +1,11 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-
-const source = await readFile(new URL("../src/core/save.js", import.meta.url), "utf8");
-const moduleUrl = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`;
-const {
+import {
   saveGame,
   loadGame,
   safeRespawn,
   isValidWorldPosition,
   clearSave,
-} = await import(moduleUrl);
+} from "../src/core/save.js";
 
 class MemoryStorage {
   constructor() { this.data = new Map(); }
@@ -28,7 +24,7 @@ class MemoryStorage {
     guidance: { activeRouteId: " route:b ", progress: 0.42 },
     settings: { cameraDistance: 24 },
   }, storage);
-  assert.equal(saved.version, 2);
+  assert.equal(saved.version, 3);
   assert.deepEqual(saved.position, { x: 12, y: 144, z: -31 });
   assert.deepEqual(saved.recoveryCheckpoint, { x: 12, y: 144, z: -31 });
   assert.deepEqual(saved.discovered, ["isle-1", "isle-2"]);
@@ -54,7 +50,7 @@ class MemoryStorage {
     settings: {},
   }));
   const loaded = loadGame(storage);
-  assert.equal(loaded.version, 2, "v1 saves migrate in memory");
+  assert.equal(loaded.version, 3, "v1 saves migrate in memory");
   assert.equal(loaded.migratedFromVersion, 1);
   assert.deepEqual(loaded.recoveryCheckpoint, { x: 1, y: 160, z: 2 }, "legacy saves use their valid position as the first recovery checkpoint");
   assert.deepEqual(loaded.discoveredRoutes, [], "v1 saves gain an empty route set");
