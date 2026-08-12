@@ -11,6 +11,7 @@ import { DragonRuntime } from "./dragon/runtime.js";
 import { buildArchipelago, updateActiveIslands } from "./world/archipelago.js";
 import { createIslandSurfaceSpatialIndex } from "./world/island-surface-spatial-index.js";
 import { composeLandingShelfHeight } from "./world/landing-shelf-surface.js";
+import { regionalAirCurrentForRegion } from "./world/regional-air-current-metadata.js";
 import { selectRouteGuidance } from "./core/route-guidance.js";
 import { cycleRouteChoice } from "./core/route-choice.js";
 import { evaluateMysteryRouteUnlocks } from "./core/mystery-route-unlock.js";
@@ -252,6 +253,7 @@ function recover() {
   controller.airborne = recovered.airborne;
   controller.landingRequested = recovered.landingRequested;
   controller.setEnvironmentVerticalBias(0);
+  controller.setEnvironmentPlanarCurrent(null);
   collisionResolver.reset(recovered.position);
   lastCollision = { ...collisionResolver.telemetry };
   ridgeRideTelemetry = ridgeRide.interrupt();
@@ -286,6 +288,7 @@ function setPaused(nextPaused, now) {
   flightInput.clear();
   clearCameraLook();
   controller.setEnvironmentVerticalBias(0);
+  controller.setEnvironmentPlanarCurrent(null);
   if (paused) {
     ridgeRideTelemetry = ridgeRide.interrupt();
     touchdownSettleTelemetry = touchdownSettle.interrupt();
@@ -640,6 +643,7 @@ function frame(now) {
   const previous = { x: position.x, y: position.y, z: position.z };
   const ridgeLift = deriveLiveRidgeLift();
   controller.setEnvironmentVerticalBias(ridgeLift.verticalBias);
+  controller.setEnvironmentPlanarCurrent(regionalAirCurrentForRegion(currentRegion?.id));
   const flight = controller.step(input, dt);
   const proposed = {
     x: previous.x + flight.velocity.x * dt,
@@ -676,10 +680,12 @@ function frame(now) {
     controller.velocity.y = 0;
     controller.stallFactor = 0;
     controller.setEnvironmentVerticalBias(0);
+    controller.setEnvironmentPlanarCurrent(null);
   } else if (collision.collided) {
     controller.airborne = true;
     controller.landingRequested = false;
     controller.setEnvironmentVerticalBias(0);
+    controller.setEnvironmentPlanarCurrent(null);
   }
 
   if (!collision.requiresRecovery) {

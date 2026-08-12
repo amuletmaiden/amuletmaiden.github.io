@@ -3,6 +3,7 @@ import { deriveBankedTurnVerticalLoad } from "./banked-turn-load.js";
 import { deriveFlightPathPitchBias } from "./flight-path-pitch.js";
 import { deriveGlideCoastTarget } from "./glide-coast.js";
 import { deriveLandingVerticalTarget } from "./landing-flare.js";
+import { deriveRegionalAirCurrent } from "./regional-air-current.js";
 import {
   advanceTakeoffLiftElapsed,
   deriveTakeoffLift,
@@ -21,11 +22,20 @@ export class FlightController {
     this.stallFactor = 0;
     this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
     this.environmentVerticalBias = 0;
+    this.environmentPlanarCurrent = { x: 0, z: 0 };
   }
 
   setEnvironmentVerticalBias(value = 0) {
     const finiteBias = Number(value);
     this.environmentVerticalBias = Number.isFinite(finiteBias) ? clamp(finiteBias, 0, 2.8) : 0;
+  }
+
+  setEnvironmentPlanarCurrent(value = null) {
+    const x = Number(value?.x);
+    const z = Number(value?.z);
+    this.environmentPlanarCurrent = Number.isFinite(x) && Number.isFinite(z)
+      ? { x, z }
+      : { x: 0, z: 0 };
   }
 
   step(input, dt) {
@@ -91,9 +101,19 @@ export class FlightController {
       }
     }
 
+    const regionalCurrent = deriveRegionalAirCurrent({
+      airCurrent: this.environmentPlanarCurrent,
+      airborne: this.airborne,
+      landingRequested: this.landingRequested,
+      takeoffActive: takeoffLiftActive,
+      stallFactor: stallPressure,
+      grounded: !this.airborne,
+      recovering: stallPressure > 0.35,
+      planarSpeed,
+    });
     const planarResponse = 1 - Math.exp(-(this.airborne ? 2.35 : 5.5) * frame);
-    this.velocity.x += (forward.x * targetSpeed - this.velocity.x) * planarResponse;
-    this.velocity.z += (forward.z * targetSpeed - this.velocity.z) * planarResponse;
+    this.velocity.x += (forward.x * targetSpeed + regionalCurrent.x - this.velocity.x) * planarResponse;
+    this.velocity.z += (forward.z * targetSpeed + regionalCurrent.z - this.velocity.z) * planarResponse;
 
     const updatedPlanarSpeed = Math.hypot(this.velocity.x, this.velocity.z);
     this.stallFactor = this.airborne
@@ -136,6 +156,7 @@ export class FlightController {
       this.velocity.y = 0;
       this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
       this.environmentVerticalBias = 0;
+      this.environmentPlanarCurrent = { x: 0, z: 0 };
     }
 
     const bankTarget = steer * (0.45 + Math.min(updatedPlanarSpeed / 70, 1) * 0.32);
@@ -177,6 +198,7 @@ export class FlightController {
         this.stallFactor = 0;
         this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
         this.environmentVerticalBias = 0;
+        this.environmentPlanarCurrent = { x: 0, z: 0 };
       }
     }
     return position;
@@ -215,6 +237,8 @@ export class FlightController {
       this.bank,
       this.takeoffLiftElapsed,
       this.environmentVerticalBias,
+      this.environmentPlanarCurrent.x,
+      this.environmentPlanarCurrent.z,
     ];
     if (values.every(Number.isFinite)) return;
     this.velocity = { x: 0, y: 0, z: 0 };
@@ -226,6 +250,7 @@ export class FlightController {
     this.stallFactor = 1;
     this.takeoffLiftElapsed = TAKEOFF_LIFT_DURATION;
     this.environmentVerticalBias = 0;
+    this.environmentPlanarCurrent = { x: 0, z: 0 };
   }
 }
 
