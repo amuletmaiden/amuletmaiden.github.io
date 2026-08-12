@@ -24,13 +24,16 @@ export function applyIslandLandfall({
     explorationEvents: events,
   });
 
-  if (!result.state.newLandfall || !result.event || !Array.isArray(exploration?.events)) {
+  if (!result.state.newLandfall
+    || !result.event
+    || !Array.isArray(exploration?.events)
+    || typeof persist !== "function") {
     return Object.freeze({ state: result.state || INACTIVE, event: null, message: null });
   }
 
   const event = Object.freeze({ ...result.event });
   exploration.events.push(event);
-  if (typeof persist === "function") persist();
+  persist();
   const message = safeMessage(result.islandName);
   if (typeof announce === "function") announce(message);
 
