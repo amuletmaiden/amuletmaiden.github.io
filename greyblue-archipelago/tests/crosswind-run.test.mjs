@@ -12,6 +12,11 @@ const tick = (run, x, direction="cross-left", extra={}) => run.update({ ...base,
   const done=tick(run,45,"withwind");
   assert.deepEqual(done,{available:true,active:false,phase:"release",completed:true});
   assert.deepEqual(Object.keys(done),["available","active","phase","completed"]);
+  const cleared=tick(run,46,"withwind");
+  assert.deepEqual(cleared,{available:true,active:false,phase:"catch",completed:false});
+  const rearmed=tick(run,50,"cross-left");
+  assert.equal(rearmed.active,true);
+  assert.equal(rearmed.completed,false);
 }
 {
   const run=new CrosswindRun({requiredTravel:40,minStep:4,maxStep:50});
