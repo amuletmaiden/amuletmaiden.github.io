@@ -1,6 +1,8 @@
 const MAX_CURRENT_SPEED = 4.2;
 const FULL_AUTHORITY_SPEED = 24;
 const MIN_AUTHORITY_SPEED = 12;
+const TRANSITION_TIME_SECONDS = 0.42;
+const TRANSITION_EPSILON = 0.015;
 
 function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -8,6 +10,11 @@ function clamp(value, minimum, maximum) {
 
 function neutral() {
   return Object.freeze({ active: false, x: 0, z: 0 });
+}
+
+function finiteOrZero(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
 }
 
 export function deriveRegionalAirCurrent({
@@ -44,6 +51,51 @@ export function deriveRegionalAirCurrent({
     active: true,
     x: x / magnitude * cappedMagnitude,
     z: z / magnitude * cappedMagnitude,
+  });
+}
+
+export function createRegionalAirCurrentTransition(initialCurrent = null) {
+  const x = finiteOrZero(initialCurrent?.x);
+  const z = finiteOrZero(initialCurrent?.z);
+  return Object.freeze({ x, z, transitioning: false });
+}
+
+export function stepRegionalAirCurrentTransition({
+  state = null,
+  targetCurrent = null,
+  dt = 0,
+  interrupted = false,
+} = {}) {
+  if (interrupted) return createRegionalAirCurrentTransition();
+
+  const previousX = finiteOrZero(state?.x);
+  const previousZ = finiteOrZero(state?.z);
+  const targetX = finiteOrZero(targetCurrent?.x);
+  const targetZ = finiteOrZero(targetCurrent?.z);
+  const seconds = clamp(finiteOrZero(dt), 0, 0.1);
+  const alpha = seconds > 0 ? 1 - Math.exp(-seconds / TRANSITION_TIME_SECONDS) : 0;
+
+  let x = previousX + (targetX - previousX) * alpha;
+  let z = previousZ + (targetZ - previousZ) * alpha;
+  const remaining = Math.hypot(targetX - x, targetZ - z);
+  if (remaining <= TRANSITION_EPSILON) {
+    x = targetX;
+    z = targetZ;
+  }
+
+  return Object.freeze({
+    x,
+    z,
+    transitioning: Math.hypot(targetX - x, targetZ - z) > TRANSITION_EPSILON,
+  });
+}
+
+export function regionalAirCurrentTransitionPublicState(state = null) {
+  const x = finiteOrZero(state?.x);
+  const z = finiteOrZero(state?.z);
+  return Object.freeze({
+    active: Math.hypot(x, z) >= TRANSITION_EPSILON,
+    transitioning: state?.transitioning === true,
   });
 }
 
