@@ -29,6 +29,10 @@ export class CrosswindRun {
   }
 
   update(input = {}) {
+    if (this.completed) {
+      this.completed = false;
+      this.phase = "catch";
+    }
     if (!stable(input)) {
       this.reset();
       return this.publicState();
