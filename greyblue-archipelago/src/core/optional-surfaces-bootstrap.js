@@ -4,6 +4,7 @@ const OPTIONAL_SURFACES = [
   ["guidance", () => import("../interface/live-guidance-bootstrap.js")],
   ["journal", () => import("./exploration-journal-bootstrap.js")],
   ["flight-instruments", () => import("../interface/live-flight-instruments-bootstrap.js")],
+  ["regional-air-current-readback", () => import("../interface/regional-air-current-readback-bootstrap.js")],
   ["frame-pressure", () => import("./optional-frame-pressure-bootstrap.js")],
   ["landing-approach", () => import("../interface/live-landing-approach-bootstrap.js")],
   ["landing-approach-readback", () => import("../interface/landing-approach-readback-bootstrap.js")],
