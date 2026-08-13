@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { deriveRegionalAirCurrentAtmosphere, regionalAirCurrentAtmospherePublicState } from "../src/core/regional-air-current-atmosphere.js";
 
 const base = Object.freeze({
@@ -43,4 +44,20 @@ deriveRegionalAirCurrentAtmosphere({ ...base, airCurrent: source });
 assert.equal(JSON.stringify(source), before);
 assert.deepEqual(Object.keys(regionalAirCurrentAtmospherePublicState({ active: true })), ["active"]);
 
-console.log(JSON.stringify({ status: "pass", suppressed: suppressed.length, publicKeys: ["active"] }));
+const bootstrap = await readFile(new URL("../src/core/bank-mist-arcs-bootstrap.js", import.meta.url), "utf8");
+assert.match(bootstrap, /regionalAirCurrentForRegion\(state\?\.currentRegion\?\.id\)/);
+assert.match(bootstrap, /deriveRegionalAirCurrentAtmosphere\(/);
+assert.match(bootstrap, /AIR_STREAK_COUNT = 10/);
+assert.match(bootstrap, /greyblue-regional-air-streaks/);
+assert.match(bootstrap, /__greyblueRegionalAirAtmosphere/);
+assert.doesNotMatch(bootstrap, /requestAnimationFrame\s*\(/);
+assert.doesNotMatch(bootstrap, /setInterval\s*\(/);
+assert.doesNotMatch(bootstrap, /setTimeout\s*\(/);
+
+console.log(JSON.stringify({
+  status: "pass",
+  suppressed: suppressed.length,
+  publicKeys: ["active"],
+  livePresentation: "existing-render-owner",
+  fixedPool: 10,
+}));
