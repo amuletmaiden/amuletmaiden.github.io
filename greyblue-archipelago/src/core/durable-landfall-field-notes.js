@@ -5,29 +5,77 @@ export function deriveDurableLandfallFieldNotes({
   discoveredIslandIds = [],
   explorationEvents = [],
 } = {}) {
+  const context = buildContext(islands, discoveredIslandIds);
+  return deriveNotes(explorationEvents, context, { includeLandmarks: false });
+}
+
+export function deriveDurableExplorationFieldNotes({
+  islands = [],
+  discoveredIslandIds = [],
+  explorationEvents = [],
+} = {}) {
+  const context = buildContext(islands, discoveredIslandIds);
+  return deriveNotes(explorationEvents, context, { includeLandmarks: true });
+}
+
+function buildContext(islands, discoveredIslandIds) {
   const discovered = new Set(normalizeIds(discoveredIslandIds));
-  const candidates = new Map();
+  const landfalls = new Map();
+  const landmarks = new Map();
 
   for (const island of Array.isArray(islands) ? islands : []) {
-    if (!validId(island?.id) || !validId(island?.regionId)) continue;
-    if (!discovered.has(island.id) || !validText(island?.name)) continue;
-    candidates.set(island.id, Object.freeze({
+    if (!validId(island?.id) || !validId(island?.regionId) || !discovered.has(island.id)) continue;
+
+    if (validText(island?.name)) {
+      landfalls.set(island.id, Object.freeze({
+        regionId: island.regionId,
+        name: cleanText(island.name, 120),
+      }));
+    }
+
+    const landmark = island?.landmarkRecord;
+    const encounter = landmark?.encounter;
+    if (!validId(landmark?.id) || !validText(landmark?.title) || !validText(encounter?.revealText)) continue;
+    landmarks.set(landmark.id, Object.freeze({
       regionId: island.regionId,
-      name: cleanText(island.name, 120),
+      title: cleanText(landmark.title, 120),
+      revealText: cleanText(encounter.revealText, 180),
     }));
   }
 
+  return Object.freeze({ landfalls, landmarks });
+}
+
+function deriveNotes(explorationEvents, context, { includeLandmarks }) {
   const notes = [];
-  const seen = new Set();
+  const seenLandfalls = new Set();
+  const seenLandmarks = new Set();
   const events = Array.isArray(explorationEvents) ? explorationEvents : [];
+
   for (let index = events.length - 1; index >= 0 && notes.length < MAX_FIELD_NOTES; index -= 1) {
     const event = events[index];
-    if (event?.kind !== "island-landed" || !validId(event.islandId) || !validId(event.regionId)) continue;
-    if (seen.has(event.islandId)) continue;
-    const candidate = candidates.get(event.islandId);
+
+    if (event?.kind === "island-landed" && validId(event.islandId) && validId(event.regionId)) {
+      if (seenLandfalls.has(event.islandId)) continue;
+      const candidate = context.landfalls.get(event.islandId);
+      if (!candidate || candidate.regionId !== event.regionId) continue;
+      seenLandfalls.add(event.islandId);
+      notes.push(`Landed: ${candidate.name}`);
+      continue;
+    }
+
+    if (!includeLandmarks
+      || event?.kind !== "landmark-investigated"
+      || !validId(event.landmarkId)
+      || !validId(event.regionId)
+      || seenLandmarks.has(event.landmarkId)) {
+      continue;
+    }
+
+    const candidate = context.landmarks.get(event.landmarkId);
     if (!candidate || candidate.regionId !== event.regionId) continue;
-    seen.add(event.islandId);
-    notes.push(`Landed: ${candidate.name}`);
+    seenLandmarks.add(event.landmarkId);
+    notes.push(`Investigated: ${candidate.title} — ${candidate.revealText}`);
   }
 
   return Object.freeze(notes);
