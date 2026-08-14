@@ -1,5 +1,5 @@
 import { createExplorationJournalState, stepExplorationJournal } from './exploration-journal-model.js';
-import { deriveDurableLandmarkFieldNotes } from './durable-landmark-field-notes.js';
+import { deriveDurableExplorationFieldNotes } from './durable-landfall-field-notes.js';
 import { loadGame } from './save.js';
 import { buildArchipelago } from '../world/archipelago.js';
 
@@ -63,7 +63,7 @@ const omenNode = panel.querySelector('[data-greyblue-journal-omen]');
 const discoveriesNode = panel.querySelector('[data-greyblue-journal-discoveries]');
 
 function fieldNotesFor(state) {
-  return deriveDurableLandmarkFieldNotes({
+  return deriveDurableExplorationFieldNotes({
     islands: journalWorld.islands,
     discoveredIslandIds: Array.isArray(state?.discovered) ? state.discovered : persistedDiscovered,
     explorationEvents: journalExplorationEvents,
