@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Amulet Archive</title>
+  <style>
+    :root {
+      --bg:#0b0f0d;
+      --panel:#111814;
+      --panel2:#162019;
+      --ink:#eef8f0;
+      --muted:#9eb0a2;
+      --line:#26352a;
+      --green:#45e67b;
+      --blue:#62b7ff;
+      --red:#ff6d62;
+      --shadow:0 18px 50px rgba(0,0,0,.28);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{background:
+      radial-gradient(circle at 18% -12%,rgba(69,230,123,.16),transparent 32rem),
+      radial-gradient(circle at 90% 0%,rgba(98,183,255,.12),transparent 30rem),
+      var(--bg)}
+    a{color:inherit}
+    .wrap{width:min(1120px,calc(100% - 32px));margin:0 auto;padding:46px 0 70px}
+    header{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;margin-bottom:26px}
+    .brand h1{margin:0;font-size:clamp(2rem,7vw,4.8rem);letter-spacing:-.065em;line-height:.92;font-weight:780}
+    .brand h1 .a{color:var(--green)}
+    .brand h1 .b{color:var(--blue)}
+    .brand p{margin:12px 0 0;color:var(--muted);max-width:720px;font-size:1rem;line-height:1.55}
+    .badge{flex:0 0 auto;border:1px solid var(--line);background:rgba(17,24,20,.72);padding:9px 12px;border-radius:999px;color:var(--muted);font-size:.82rem;white-space:nowrap}
+    .searchbox{display:grid;grid-template-columns:1fr auto;gap:10px;padding:10px;border:1px solid var(--line);background:rgba(17,24,20,.88);border-radius:18px;box-shadow:var(--shadow);position:sticky;top:12px;z-index:5;backdrop-filter:blur(14px)}
+    input{width:100%;border:0;outline:0;background:transparent;color:var(--ink);font:inherit;font-size:1.05rem;padding:12px 14px;min-width:0}
+    input::placeholder{color:#718178}
+    button{border:0;background:var(--green);color:#07100a;border-radius:12px;padding:0 20px;font:inherit;font-weight:760;cursor:pointer}
+    button:hover{filter:brightness(1.06)}
+    button:disabled{opacity:.55;cursor:wait}
+    .bar{display:flex;justify-content:space-between;gap:18px;align-items:center;margin:18px 2px 12px;color:var(--muted);font-size:.9rem;min-height:24px}
+    .bar .error{color:#ff9b93}
+    .results{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+    .book{display:grid;grid-template-columns:86px 1fr;gap:14px;min-height:168px;padding:14px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,rgba(22,32,25,.9),rgba(14,20,16,.9));box-shadow:0 8px 24px rgba(0,0,0,.18)}
+    .cover{width:86px;height:128px;object-fit:cover;border-radius:8px;background:#202a23;border:1px solid #314139;box-shadow:0 8px 20px rgba(0,0,0,.24)}
+    .cover.placeholder{display:grid;place-items:center;color:#617069;font-size:.72rem;text-align:center;padding:8px}
+    .meta{min-width:0;display:flex;flex-direction:column}
+    .title{font-weight:760;line-height:1.2;margin:1px 0 5px;font-size:1.03rem}
+    .author{color:var(--muted);font-size:.88rem;line-height:1.35;margin-bottom:8px}
+    .facts{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+    .fact{border:1px solid var(--line);border-radius:999px;padding:3px 7px;color:#aebdb2;font-size:.7rem}
+    .downloads{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+    .dl{display:inline-flex;text-decoration:none;align-items:center;justify-content:center;border-radius:8px;padding:7px 9px;background:#203126;border:1px solid #32483a;color:#dff5e5;font-size:.75rem;font-weight:700}
+    .dl.primary{background:rgba(69,230,123,.16);border-color:rgba(69,230,123,.48);color:#93f7b1}
+    .dl:hover{background:#2b4031}
+    .empty{grid-column:1/-1;border:1px dashed var(--line);border-radius:16px;padding:34px;text-align:center;color:var(--muted)}
+    .pager{display:flex;justify-content:center;gap:8px;margin-top:20px}
+    .pager button{background:var(--panel2);color:var(--ink);border:1px solid var(--line);padding:10px 15px}
+    footer{margin-top:34px;padding-top:20px;border-top:1px solid var(--line);color:#7f9285;font-size:.82rem;line-height:1.55}
+    footer strong{color:#a8b9ad}
+    @media(max-width:650px){
+      .wrap{width:min(100% - 22px,1120px);padding-top:28px}
+      header{align-items:flex-start;flex-direction:column}
+      .badge{display:none}
+      .searchbox{grid-template-columns:1fr}
+      button{padding:12px 16px}
+      .book{grid-template-columns:74px 1fr}
+      .cover{width:74px;height:111px}
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div class="brand">
+        <h1><span class="a">amulet</span><span class="b">archive</span></h1>
+        <p>A very small book-fetching front end: search public-domain books and download the file directly. No account, no interstitials, no archive-site navigation.</p>
+      </div>
+      <div class="badge">public domain · Project Gutenberg</div>
+    </header>
+
+    <form id="searchForm" class="searchbox">
+      <input id="q" name="q" autocomplete="off" placeholder="Title or author — e.g. Ursula Le Guin, Dracula, Austen" aria-label="Search books">
+      <button id="searchButton" type="submit">Search</button>
+    </form>
+
+    <div class="bar">
+      <span id="status">Popular public-domain books</span>
+      <span id="count"></span>
+    </div>
+
+    <section id="results" class="results" aria-live="polite"></section>
+    <nav id="pager" class="pager" aria-label="Search result pages"></nav>
+
+    <footer>
+      <strong>Scope.</strong> This page deliberately limits fetching to books Gutendex marks public-domain in the United States. Metadata comes from Gutendex’s Project Gutenberg catalog mirror; download links point to the ebook files supplied in that catalog. Copyright status can differ by country, so check your local law before downloading.
+    </footer>
+  </main>
+
+<script>
+(() => {
+  const API = 'https://gutendex.com/books/';
+  const form = document.querySelector('#searchForm');
+  const input = document.querySelector('#q');
+  const button = document.querySelector('#searchButton');
+  const results = document.querySelector('#results');
+  const status = document.querySelector('#status');
+  const count = document.querySelector('#count');
+  const pager = document.querySelector('#pager');
+  let currentUrl = null;
+
+  const fmtLabels = [
+    ['application/epub+zip', 'EPUB'],
+    ['application/x-mobipocket-ebook', 'Kindle'],
+    ['text/html', 'HTML'],
+    ['text/plain; charset=utf-8', 'Text'],
+    ['text/plain; charset=us-ascii', 'Text'],
+    ['application/pdf', 'PDF']
+  ];
+
+  function elt(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function authorLine(book) {
+    if (!book.authors || !book.authors.length) return 'Unknown author';
+    return book.authors.map(a => a.name).join(', ');
+  }
+
+  function bestCover(book) {
+    return book.formats && book.formats['image/jpeg'] ? book.formats['image/jpeg'] : null;
+  }
+
+  function downloadableFormats(book) {
+    const f = book.formats || {};
+    const seen = new Set();
+    const out = [];
+    for (const [mime, label] of fmtLabels) {
+      const url = f[mime];
+      if (!url || seen.has(label)) continue;
+      seen.add(label);
+      out.push({label, url});
+    }
+    return out;
+  }
+
+  function renderBook(book) {
+    const card = elt('article', 'book');
+    const coverUrl = bestCover(book);
+    if (coverUrl) {
+      const img = elt('img', 'cover');
+      img.src = coverUrl;
+      img.alt = '';
+      img.loading = 'lazy';
+      img.referrerPolicy = 'no-referrer';
+      card.append(img);
+    } else {
+      card.append(elt('div', 'cover placeholder', 'no cover'));
+    }
+
+    const meta = elt('div', 'meta');
+    meta.append(elt('div', 'title', book.title || 'Untitled'));
+    meta.append(elt('div', 'author', authorLine(book)));
+
+    const facts = elt('div', 'facts');
+    if (book.languages && book.languages.length) facts.append(elt('span', 'fact', book.languages.join(', ').toUpperCase()));
+    if (Number.isFinite(book.download_count)) facts.append(elt('span', 'fact', book.download_count.toLocaleString() + ' downloads'));
+    facts.append(elt('span', 'fact', 'Gutenberg #' + book.id));
+    meta.append(facts);
+
+    const dl = elt('div', 'downloads');
+    const formats = downloadableFormats(book);
+    if (!formats.length) {
+      dl.append(elt('span', 'author', 'No direct format listed'));
+    } else {
+      formats.forEach((item, i) => {
+        const a = elt('a', 'dl' + (i === 0 ? ' primary' : ''), item.label);
+        a.href = item.url;
+        a.rel = 'noopener';
+        a.target = '_blank';
+        dl.append(a);
+      });
+    }
+    meta.append(dl);
+    card.append(meta);
+    return card;
+  }
+
+  function setLoading(on) {
+    button.disabled = on;
+    button.textContent = on ? 'Searching…' : 'Search';
+  }
+
+  async function load(url, pushState = false) {
+    currentUrl = url;
+    setLoading(true);
+    status.className = '';
+    status.textContent = 'Fetching catalog…';
+    count.textContent = '';
+    pager.replaceChildren();
+
+    try {
+      const response = await fetch(url, {headers:{'Accept':'application/json'}});
+      if (!response.ok) throw new Error('Catalog returned ' + response.status);
+      const data = await response.json();
+      results.replaceChildren();
+
+      if (!data.results || !data.results.length) {
+        results.append(elt('div', 'empty', 'No public-domain matches found.'));
+      } else {
+        const frag = document.createDocumentFragment();
+        data.results.forEach(book => frag.append(renderBook(book)));
+        results.append(frag);
+      }
+
+      const q = new URL(url).searchParams.get('search');
+      status.textContent = q ? `Results for “${q}”` : 'Popular public-domain books';
+      count.textContent = Number.isFinite(data.count) ? data.count.toLocaleString() + ' matches' : '';
+
+      if (data.previous) {
+        const prev = elt('button', '', '← Previous');
+        prev.type = 'button';
+        prev.addEventListener('click', () => load(data.previous));
+        pager.append(prev);
+      }
+      if (data.next) {
+        const next = elt('button', '', 'Next →');
+        next.type = 'button';
+        next.addEventListener('click', () => load(data.next));
+        pager.append(next);
+      }
+
+      if (pushState) {
+        const u = new URL(location.href);
+        if (q) u.searchParams.set('q', q); else u.searchParams.delete('q');
+        history.replaceState(null, '', u);
+      }
+    } catch (err) {
+      results.replaceChildren(elt('div', 'empty', 'Could not reach the book catalog. Try again in a moment.'));
+      status.className = 'error';
+      status.textContent = err && err.message ? err.message : 'Catalog request failed';
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const q = input.value.trim();
+    const url = new URL(API);
+    url.searchParams.set('copyright', 'false');
+    url.searchParams.set('languages', 'en');
+    if (q) url.searchParams.set('search', q);
+    load(url.toString(), true);
+  });
+
+  const initial = new URL(location.href).searchParams.get('q') || '';
+  input.value = initial;
+  const url = new URL(API);
+  url.searchParams.set('copyright', 'false');
+  url.searchParams.set('languages', 'en');
+  if (initial) url.searchParams.set('search', initial);
+  load(url.toString());
+})();
+</script>
+</body>
+</html>
