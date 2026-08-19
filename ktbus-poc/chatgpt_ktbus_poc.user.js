@@ -29,6 +29,7 @@
   const root = document.documentElement;
   let runs = 0;
   let tagged = 0;
+  let normalizeTimer = null;
 
   function textOf(node) {
     return String(node?.innerText || node?.textContent || '').trim();
@@ -81,14 +82,26 @@
     } catch {}
   }
 
+  function scheduleNormalize() {
+    if (normalizeTimer !== null) return;
+    normalizeTimer = setTimeout(() => {
+      normalizeTimer = null;
+      normalizeAssistantTurns();
+    }, 100);
+  }
+
   try { globalThis.__KTBUS_DOM_NORMALIZER_STOP__?.(); } catch {}
   normalizeAssistantTurns();
-  const observer = new MutationObserver(() => queueMicrotask(normalizeAssistantTurns));
+  const observer = new MutationObserver(scheduleNormalize);
   observer.observe(document.documentElement, {subtree: true, childList: true, characterData: true});
   const interval = setInterval(normalizeAssistantTurns, 750);
   globalThis.__KTBUS_DOM_NORMALIZER_STOP__ = () => {
     try { observer.disconnect(); } catch {}
     try { clearInterval(interval); } catch {}
+    if (normalizeTimer !== null) {
+      try { clearTimeout(normalizeTimer); } catch {}
+      normalizeTimer = null;
+    }
   };
 
   console.info('[KT-Bus relay] bootstrap v1.5.1 loaded with composer repair + assistant-turn normalization + pinned KTBUS2/DAT bridges');
