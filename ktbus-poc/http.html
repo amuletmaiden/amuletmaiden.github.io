@@ -1,0 +1,12 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>DAT direct HTTP prototype</title>
+<style>body{font:16px/1.5 system-ui;max-width:780px;margin:48px auto;padding:0 20px;background:#09100c;color:#edf8f0}a{color:#58b8ff}code{background:#16231b;padding:.15em .35em;border-radius:.3em}.box{border:1px solid #294035;border-radius:14px;padding:20px;background:#111b15}</style>
+<h1>DAT direct HTTP prototype</h1>
+<div class="box">
+<p>This userscript lets Browser ChatGPT call the DAT helper directly on <code>127.0.0.1:8765</code>, bypassing GitHub for command transport.</p>
+<p>It supports one call or a batch of up to 64 local DAT operations per ChatGPT round trip. The local helper remains responsible for filesystem/write/exec policy.</p>
+<p><a href="chatgpt_dat_http_poc.user.js">Install the DAT HTTP userscript</a></p>
+</div>
+<p>Harmless smoke marker: <code>DAT_HTTP_REQUEST {"id":"hello-1","op":"hello"}</code></p>
