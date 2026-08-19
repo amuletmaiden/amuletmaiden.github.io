@@ -1,16 +1,18 @@
 # Katherine's Stacks
 
-A portable personal-library shell for humans and agents. It is one Python file and uses only the standard library.
+A portable personal-library shell for humans and agents.
 
-## Start the human interface
+## Human use
 
-```bash
-python katherines_stacks.py serve
-```
+Download `Katherines Stacks.pyw` and double-click it. It starts quietly, opens the Stacks search page in the default browser, and shows no terminal window. The launcher loads the current Stacks core automatically, so the human-facing install is one file.
 
-Then open `http://127.0.0.1:8765/`.
+The human interface is an ordinary search page with results, covers, record inspection, and acquisition choices.
 
-## Agent / CLI interface
+## Agent use
+
+The portable core is `katherines_stacks.py`. It uses only the Python standard library and exposes the same operations as JSON.
+
+CLI operations (for agents or integrations that prefer subprocess tools):
 
 ```bash
 python katherines_stacks.py search "Pride and Prejudice"
@@ -18,11 +20,7 @@ python katherines_stacks.py book <32-hex-record-id>
 python katherines_stacks.py options <32-hex-record-id>
 ```
 
-Each command prints JSON.
-
-## Agent / HTTP interface
-
-Once `serve` is running:
+HTTP operations while the core is serving:
 
 - `GET /api/status`
 - `GET /api/search?q=<query>&limit=40`
@@ -46,4 +44,4 @@ Optional environment variables:
 - `STACKS_TIMEOUT` — request timeout in seconds (default 20).
 - `STACKS_CACHE_TTL` — metadata cache duration in seconds (default 90).
 
-No database, Node, browser extension, package install, account, or kt-bus installation is required.
+No Node, browser extension, database, account, or kt-bus installation is required.
