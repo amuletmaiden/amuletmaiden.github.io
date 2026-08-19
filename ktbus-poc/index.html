@@ -1,8 +1,12 @@
 <!doctype html>
 <meta charset="utf-8">
-<meta name="robots" content="index,follow">
-<title>KT-Bus direct transport probe</title>
-<h1>KT-Bus direct transport probe</h1>
-<p>This page is a temporary, non-sensitive discovery hop for testing ChatGPT Web → HTTPS tunnel → Katherine's machine.</p>
-<p><a href="https://trusted-manner-pepper-conversation.trycloudflare.com/healthz">Live local-sidecar health</a></p>
-<p>No bearer capability, file path, local data, or write endpoint is published here.</p>
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>KT-Bus browser relay POC</title>
+<style>body{font:16px/1.5 system-ui;max-width:760px;margin:48px auto;padding:0 20px;background:#09100c;color:#edf8f0}a{color:#58b8ff}code{background:#16231b;padding:.15em .35em;border-radius:.3em}.box{border:1px solid #294035;border-radius:14px;padding:20px;background:#111b15}</style>
+<h1>KT-Bus browser relay POC</h1>
+<div class="box">
+<p>This is a deliberately harmless proof of concept. It lets an explicit assistant message ask the browser to read only <code>http://127.0.0.1:8765/api/status</code>, then posts the status back into the same ChatGPT conversation.</p>
+<p><strong>It cannot read files, run commands, browse, or write anything.</strong></p>
+<p><a href="chatgpt_ktbus_poc.user.js">Install the ping-only userscript</a></p>
+</div>
+<p>After installation, reload the ChatGPT tab. The test marker is <code>KTBUS_POC_REQUEST {"id":"...","op":"ping"}</code>.</p>
