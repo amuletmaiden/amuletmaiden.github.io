@@ -1,9 +1,0 @@
-<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex,nofollow,noarchive"><title>KT-Bus recovery probe</title><body>sending</body><script>
-(async()=>{
-  const payload={jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'files_write',arguments:{root:'agent-vault',path:'DAT-smoke/ktbus-localhost-post-probe.txt',text:'localhost MCP POST probe 2026-08-19T14:05-07:00\n',overwrite:true}}};
-  try {
-    await fetch('http://127.0.0.1:8765/mcp',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(payload),cache:'no-store'});
-    document.body.textContent='sent';
-  } catch(e) { document.body.textContent='error '+e; }
-})();
-</script>
