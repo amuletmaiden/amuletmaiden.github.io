@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DAT Local Bridge POC
 // @namespace    https://github.com/amuletmaiden/kt-bus
-// @version      0.1.0
+// @version      0.2.0
 // @description  Direct ChatGPT -> localhost MCP bridge with bounded local file attachment.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
@@ -18,20 +18,27 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
   const REQUEST_RE = /DAT_POC_REQUEST\s+({[^\n]+})/g;
   const RESULT_PREFIX = 'DAT_POC_RESULT ';
   const KTBUSD_MCP = 'http://127.0.0.1:8765/mcp';
   const DAT_MCP = 'http://127.0.0.1:8767/mcp';
   const DAT_HEALTH = 'http://127.0.0.1:8767/healthz';
-  const CAP_KEY = 'dat-local-bridge-cap-v1';
-  const SEEN_KEY = 'dat-local-bridge-seen-v1';
-  const MAX_SEEN = 500;
-  const MAX_SCAN_MESSAGES = 16;
+  const KEYS = {
+    cap: 'dat-local-bridge-cap-v1',
+    seen: 'dat-local-bridge-seen-v2',
+    results: 'dat-local-bridge-results-v2',
+  };
+  const MAX_SEEN = 1000;
+  const MAX_RESULTS = 100;
+  const MAX_SCAN_MESSAGES = 20;
   const MAX_RESULT_CHARS = 120000;
   const MAX_FILE_BYTES = 64 * 1024 * 1024;
   const BINARY_CHUNK = 512 * 1024;
-  let busy = false;
+  const SEND_TIMEOUT_MS = 120000;
+  let executing = false;
+  let flushing = false;
+  const inflight = new Set();
 
   function getValue(key, fallback) {
     try { return GM_getValue(key, fallback); } catch { return fallback; }
@@ -48,10 +55,10 @@
   }
 
   function capability() {
-    let cap = String(getValue(CAP_KEY, '') || '');
+    let cap = String(getValue(KEYS.cap, '') || '');
     if (!/^[a-f0-9]{64,128}$/i.test(cap)) {
       cap = newCap();
-      setValue(CAP_KEY, cap);
+      setValue(KEYS.cap, cap);
     }
     return cap;
   }
@@ -61,7 +68,7 @@
   }
 
   function loadSeen() {
-    const raw = getValue(SEEN_KEY, []);
+    const raw = getValue(KEYS.seen, []);
     return new Set(Array.isArray(raw) ? raw.filter(validId).slice(-MAX_SEEN) : []);
   }
 
@@ -69,7 +76,31 @@
 
   function remember(id) {
     seen.add(id);
-    setValue(SEEN_KEY, [...seen].slice(-MAX_SEEN));
+    setValue(KEYS.seen, [...seen].slice(-MAX_SEEN));
+  }
+
+  function loadResults() {
+    const raw = getValue(KEYS.results, []);
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(row => row && validId(row.id) && row.payload && typeof row.payload === 'object').slice(-MAX_RESULTS);
+  }
+
+  function saveResults(rows) {
+    setValue(KEYS.results, rows.slice(-MAX_RESULTS));
+  }
+
+  function queueResult(id, payload) {
+    const rows = loadResults().filter(row => row.id !== id);
+    rows.push({id, payload, created_at: Date.now()});
+    saveResults(rows);
+  }
+
+  function dropResult(id) {
+    saveResults(loadResults().filter(row => row.id !== id));
+  }
+
+  function hasQueuedResult(id) {
+    return loadResults().some(row => row.id === id);
   }
 
   function isVisible(element) {
@@ -91,6 +122,18 @@
 
   function assistantMessages() {
     return [...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-MAX_SCAN_MESSAGES);
+  }
+
+  function userMessages() {
+    return [...document.querySelectorAll('[data-message-author-role="user"]')].slice(-60);
+  }
+
+  function resultDelivered(id) {
+    const needle = `\"id\":\"${id}\"`;
+    return userMessages().some(message => {
+      const text = message.innerText || message.textContent || '';
+      return text.includes(RESULT_PREFIX) && text.includes(needle);
+    });
   }
 
   function composer() {
@@ -127,23 +170,67 @@
     ) || null;
   }
 
-  async function submit(payload) {
+  async function sleep(ms) {
+    await new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function submitResult(id, payload) {
+    if (resultDelivered(id)) return;
     let text = RESULT_PREFIX + JSON.stringify(payload);
     if (text.length > MAX_RESULT_CHARS) {
       text = RESULT_PREFIX + JSON.stringify({
-        id: payload?.id ?? null,
+        id,
         status: 'error',
         error: `DAT result is ${text.length} characters; request a smaller result`,
       });
     }
+
     const box = composer();
     if (!box) throw new Error('ChatGPT composer not found');
-    if (composerText(box).trim()) throw new Error('ChatGPT composer is not empty');
-    setComposerText(box, text);
-    await new Promise(resolve => setTimeout(resolve, 150));
-    const button = sendButton();
-    if (!button || button.disabled) throw new Error('ChatGPT send button unavailable');
-    button.click();
+    const existing = composerText(box).trim();
+    if (!existing) {
+      setComposerText(box, text);
+    } else if (existing !== text) {
+      throw new Error('ChatGPT composer contains unrelated user text');
+    }
+
+    const deadline = Date.now() + SEND_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      if (resultDelivered(id)) return;
+      if (!generationInProgress()) {
+        const button = sendButton();
+        if (button && !button.disabled) {
+          button.click();
+          const confirmDeadline = Date.now() + 12000;
+          while (Date.now() < confirmDeadline) {
+            if (resultDelivered(id)) return;
+            await sleep(100);
+          }
+          throw new Error('ChatGPT send click was not confirmed in conversation');
+        }
+      }
+      await sleep(150);
+    }
+    throw new Error('ChatGPT result send timed out');
+  }
+
+  async function flushResults() {
+    if (flushing || executing) return;
+    const row = loadResults()[0];
+    if (!row) return;
+    flushing = true;
+    try {
+      if (resultDelivered(row.id)) {
+        dropResult(row.id);
+        return;
+      }
+      await submitResult(row.id, row.payload);
+      dropResult(row.id);
+    } catch (error) {
+      console.warn('[DAT bridge] result remains queued', row.id, error);
+    } finally {
+      flushing = false;
+    }
   }
 
   function gmRequest({method = 'GET', url, body, headers = {}, timeout = 120000}) {
@@ -183,6 +270,19 @@
     throw new Error('endpoint must be "ktbusd" or "dat"');
   }
 
+  function parseMcpBody(raw, endpointName) {
+    if (raw && typeof raw === 'object') return raw;
+    if (typeof raw !== 'string') throw new Error(`${endpointName} MCP returned unsupported response`);
+    const trimmed = raw.trim();
+    try { return JSON.parse(trimmed); } catch {}
+    const dataLines = trimmed.split(/\r?\n/).filter(line => line.startsWith('data:'));
+    for (let index = dataLines.length - 1; index >= 0; index -= 1) {
+      const data = dataLines[index].slice(5).trim();
+      try { return JSON.parse(data); } catch {}
+    }
+    throw new Error(`${endpointName} MCP returned unparseable JSON/SSE`);
+  }
+
   async function mcpRequest(endpointName, method, params = {}, requestId = `mcp-${Date.now()}`) {
     const target = endpoint(endpointName);
     const headers = {'Accept': 'application/json, text/event-stream'};
@@ -193,8 +293,7 @@
       headers,
       body: {jsonrpc: '2.0', id: requestId, method, params},
     });
-    const body = response.body;
-    if (!body || typeof body !== 'object') throw new Error(`${endpointName} MCP returned non-object JSON`);
+    const body = parseMcpBody(response.body, endpointName);
     if (body.error) throw new Error(`${endpointName} MCP: ${body.error.message || JSON.stringify(body.error)}`);
     return body.result;
   }
@@ -293,17 +392,25 @@
     });
     if (attachmentButton) {
       attachmentButton.click();
-      await new Promise(resolve => setTimeout(resolve, 250));
+      await sleep(250);
       input = chooseFileInput();
       if (input) return input;
     }
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await sleep(100);
       input = chooseFileInput();
       if (input) return input;
     }
     throw new Error('ChatGPT file input not found');
+  }
+
+  function attachmentVisible(name) {
+    const escaped = String(name);
+    return [...document.querySelectorAll('[data-testid], [aria-label], button, div, span')].some(node => {
+      const text = `${node.getAttribute?.('aria-label') || ''} ${node.textContent || ''}`;
+      return text.includes(escaped);
+    });
   }
 
   async function attachLocal(root, path, requestedName) {
@@ -317,9 +424,15 @@
     input.files = transfer.files;
     input.dispatchEvent(new Event('input', {bubbles: true}));
     input.dispatchEvent(new Event('change', {bubbles: true}));
-    await new Promise(resolve => setTimeout(resolve, 400));
-    const attached = [...input.files].some(item => item.name === name && item.size === file.size);
-    if (!attached) throw new Error('ChatGPT file input did not retain the attached file');
+
+    const deadline = Date.now() + 10000;
+    let accepted = false;
+    while (Date.now() < deadline) {
+      accepted = [...input.files].some(item => item.name === name && item.size === file.size) || attachmentVisible(name);
+      if (accepted) break;
+      await sleep(100);
+    }
+    if (!accepted) throw new Error('ChatGPT did not accept the attached file');
     return {
       attached: true,
       name,
@@ -367,26 +480,29 @@
   }
 
   async function handle(request) {
-    if (busy || generationInProgress() || !request || !validId(request.id) || seen.has(request.id)) return;
-    busy = true;
-    remember(request.id);
+    if (executing || !request || !validId(request.id) || seen.has(request.id) || hasQueuedResult(request.id) || inflight.has(request.id)) return;
+    executing = true;
+    inflight.add(request.id);
     let payload;
     try {
-      payload = await execute(request);
-    } catch (error) {
-      payload = {id: request.id, op: request.op, status: 'error', version: VERSION, error: String(error?.message || error)};
-    }
-    try {
-      await submit(payload);
-    } catch (error) {
-      console.error('[DAT bridge] failed to submit result', error, payload);
+      try {
+        payload = await execute(request);
+      } catch (error) {
+        payload = {id: request.id, op: request.op, status: 'error', version: VERSION, error: String(error?.message || error)};
+      }
+      // Persist the result before recording execution. Once seen is durable, the
+      // operation is never re-executed merely because ChatGPT was busy.
+      queueResult(request.id, payload);
+      remember(request.id);
     } finally {
-      busy = false;
+      inflight.delete(request.id);
+      executing = false;
     }
+    await flushResults();
   }
 
   function scan() {
-    if (busy || generationInProgress()) return;
+    if (executing) return;
     for (const message of assistantMessages()) {
       const text = message.innerText || '';
       REQUEST_RE.lastIndex = 0;
@@ -394,7 +510,7 @@
       while ((match = REQUEST_RE.exec(text))) {
         try {
           const request = JSON.parse(match[1]);
-          if (validId(request?.id) && !seen.has(request.id)) {
+          if (validId(request?.id) && !seen.has(request.id) && !hasQueuedResult(request.id) && !inflight.has(request.id)) {
             void handle(request);
             return;
           }
@@ -403,10 +519,15 @@
     }
   }
 
-  const observer = new MutationObserver(() => setTimeout(scan, 0));
+  async function tick() {
+    await flushResults();
+    scan();
+  }
+
+  const observer = new MutationObserver(() => setTimeout(() => void tick(), 0));
   observer.observe(document.documentElement, {subtree: true, childList: true, characterData: true});
-  setInterval(scan, 1000);
+  setInterval(() => void tick(), 1000);
   capability();
-  scan();
+  void tick();
   console.info(`[DAT bridge] v${VERSION} loaded`);
 })();
