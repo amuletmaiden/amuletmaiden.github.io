@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "runtime": {
+    "version": "0.9.0",
+    "protocol": "KTBUS2",
+    "min_loader": "1.5.0",
+    "url": "https://raw.githubusercontent.com/amuletmaiden/amuletmaiden.github.io/6675b091ccfee9b80549364f892ea26ff5f3f29c/ktbus-poc/chatgpt_ktbus_runtime.js",
+    "git_blob_sha1": "40b3e531bf9136c74cf6c881acd7ba54d5bedcdb"
+  }
+}
