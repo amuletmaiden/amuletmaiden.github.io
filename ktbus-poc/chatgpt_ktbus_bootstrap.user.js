@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         KT-Bus ChatGPT Relay Bootstrap
+// @name         KT-Bus ChatGPT Browser Relay POC
 // @namespace    https://github.com/amuletmaiden/kt-bus
 // @version      1.0.0
 // @description  Stable bootstrap for the KT-Bus ChatGPT relay; loads and caches the current runtime.
