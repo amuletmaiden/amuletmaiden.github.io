@@ -1,14 +1,13 @@
 // ==UserScript==
 // @name         KT-Bus ChatGPT Browser Relay POC
 // @namespace    https://github.com/amuletmaiden/kt-bus
-// @version      1.1.0
-// @description  Stable KT-Bus ChatGPT relay bootstrap; loads a version-checked cached runtime.
+// @version      1.1.1
+// @description  Stable KT-Bus ChatGPT relay bootstrap; loads a version-checked cached runtime without visible-tab authority.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @grant        GM_openInTab
 // @connect      amuletmaiden.github.io
 // @connect      127.0.0.1
 // @connect      localhost
@@ -20,7 +19,7 @@
 (() => {
   'use strict';
 
-  const BOOTSTRAP_VERSION = '1.1.0';
+  const BOOTSTRAP_VERSION = '1.1.1';
   const RUNTIME_URL = 'https://amuletmaiden.github.io/ktbus-poc/chatgpt_ktbus_runtime.js';
   const MIN_RUNTIME = [0, 8, 0];
   const CACHE_KEY = 'ktbus-relay-runtime-cache-v2';
@@ -86,6 +85,10 @@
     });
   }
 
+  function denyVisibleTab() {
+    throw new Error('visible helper tabs disabled by KT-Bus bootstrap policy');
+  }
+
   function runRuntime(code, version, source) {
     const root = document.documentElement;
     const already = root?.dataset?.ktbusRelayRuntimeVersion || '';
@@ -97,9 +100,9 @@
       'GM_xmlhttpRequest', 'GM_getValue', 'GM_setValue', 'GM_openInTab',
       `${code}\n//# sourceURL=ktbus-chatgpt-runtime.js`
     );
-    launch(GM_xmlhttpRequest, GM_getValue, GM_setValue, GM_openInTab);
+    launch(GM_xmlhttpRequest, GM_getValue, GM_setValue, denyVisibleTab);
     if (root?.dataset) root.dataset.ktbusRelayRuntimeVersion = versionString(version);
-    console.info(`[KT-Bus bootstrap] v${BOOTSTRAP_VERSION} loaded runtime v${versionString(version)} from ${source}`);
+    console.info(`[KT-Bus bootstrap] v${BOOTSTRAP_VERSION} loaded runtime v${versionString(version)} from ${source}; visible helper tabs denied`);
   }
 
   (async () => {
