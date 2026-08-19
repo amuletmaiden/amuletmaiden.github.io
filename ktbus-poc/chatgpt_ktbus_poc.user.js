@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         KT-Bus ChatGPT Browser Relay POC
 // @namespace    https://github.com/amuletmaiden/kt-bus
-// @version      0.6.0
-// @description  Guarded ChatGPT browser relay with local schedules and cross-chat dispatch.
+// @version      0.7.0
+// @description  Guarded ChatGPT browser relay with retryable results, local schedules, and cross-chat dispatch.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @grant        GM_xmlhttpRequest
@@ -19,33 +19,36 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.6.0';
+  const VERSION = '0.7.0';
   const REQUEST_RE = /KTBUS_POC_REQUEST\s+({[^\n]+})/g;
   const STATUS_URLS = [
     'http://127.0.0.1:8765/healthz',
     'http://127.0.0.1:8765/api/status',
   ];
   const KEYS = {
-    seen: 'ktbus-relay-seen-v3',
-    jobs: 'ktbus-relay-jobs-v2',
-    chats: 'ktbus-relay-chats-v2',
+    seen: 'ktbus-relay-seen-v4',
+    jobs: 'ktbus-relay-jobs-v3',
+    chats: 'ktbus-relay-chats-v3',
     cap: 'ktbus-relay-cap-v1',
+    results: 'ktbus-relay-results-v1',
   };
   const TAB_ID = `tab-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  const TICK_MS = 10000;
+  const TICK_MS = 3000;
   const CLAIM_MS = 45000;
   const WAKE_RETRY_MS = 90000;
   const HELPER_LIFETIME_MS = 90000;
-  const MIN_INTERVAL_MINUTES = 5;
-  const MAX_INTERVAL_MINUTES = 1440;
-  const MAX_COUNT = 48;
   const MAX_MESSAGE_CHARS = 6000;
   const MAX_JOBS = 200;
   const MAX_CHATS = 200;
-  const MAX_SEEN = 800;
-  const MAX_SCAN_MESSAGES = 14;
+  const MAX_SEEN = 1000;
+  const MAX_RESULTS = 100;
+  const MAX_SCAN_MESSAGES = 20;
+  const MIN_INTERVAL_MINUTES = 5;
+  const MAX_INTERVAL_MINUTES = 1440;
+  const MAX_COUNT = 48;
 
   let sending = false;
+  let handling = false;
   const openedTabs = new Map();
 
   function getValue(key, fallback) {
@@ -58,7 +61,9 @@
     return typeof v === 'string' && /^[A-Za-z0-9._-]{1,120}$/.test(v);
   }
   function newCap() {
-    if (globalThis.crypto?.randomUUID) return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+    if (globalThis.crypto?.randomUUID) {
+      return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+    }
     return Array.from(crypto.getRandomValues(new Uint8Array(32)), x => x.toString(16).padStart(2, '0')).join('');
   }
   function capability() {
@@ -72,10 +77,10 @@
 
   function normalizeChatUrl(value) {
     try {
-      const url = new URL(value, location.origin);
-      if (!['chatgpt.com', 'chat.openai.com'].includes(url.hostname)) return null;
-      const match = url.pathname.match(/^\/c\/([A-Za-z0-9-]{8,})\/?$/);
-      return match ? `${url.origin}/c/${match[1]}` : null;
+      const u = new URL(value, location.origin);
+      if (!['chatgpt.com', 'chat.openai.com'].includes(u.hostname)) return null;
+      const m = u.pathname.match(/^\/c\/([A-Za-z0-9-]{8,})\/?$/);
+      return m ? `${u.origin}/c/${m[1]}` : null;
     } catch { return null; }
   }
   function currentChatUrl() { return normalizeChatUrl(location.href); }
@@ -85,6 +90,21 @@
   }
   function chatTitle() {
     return String(document.title || '').replace(/\s*[|\-–—]\s*ChatGPT\s*$/i, '').trim() || 'ChatGPT conversation';
+  }
+
+  function isVisible(el) {
+    if (!(el instanceof Element)) return false;
+    const style = getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  }
+  function generationInProgress() {
+    const candidates = [
+      ...document.querySelectorAll('button[data-testid="stop-button"]'),
+      ...[...document.querySelectorAll('button')].filter(b => /stop generating|stop response/i.test(b.getAttribute('aria-label') || '')),
+    ];
+    return candidates.some(b => isVisible(b) && !b.disabled && b.getAttribute('aria-hidden') !== 'true');
   }
 
   function loadSeen() {
@@ -104,14 +124,14 @@
       const url = normalizeChatUrl(item?.url);
       if (!url) continue;
       const id = chatIdFromUrl(url);
-      const c = {
+      const candidate = {
         id,
         url,
         title: String(item.title || id).trim().slice(0, 180) || id,
         last_seen: Number(item.last_seen) || Date.now(),
       };
       const old = byId.get(id);
-      if (!old || c.last_seen >= old.last_seen) byId.set(id, c);
+      if (!old || candidate.last_seen >= old.last_seen) byId.set(id, candidate);
     }
     setValue(KEYS.chats, [...byId.values()].sort((a, b) => b.last_seen - a.last_seen).slice(0, MAX_CHATS));
   }
@@ -135,6 +155,18 @@
   }
   function loadJobs() { return normalizeJobs(getValue(KEYS.jobs, [])); }
   function saveJobs(jobs) { setValue(KEYS.jobs, normalizeJobs(jobs)); }
+
+  function loadResults() {
+    const raw = getValue(KEYS.results, []);
+    return Array.isArray(raw) ? raw.filter(x => x && validId(x.id) && x.payload).slice(-MAX_RESULTS) : [];
+  }
+  function saveResults(rows) { setValue(KEYS.results, rows.slice(-MAX_RESULTS)); }
+  function queueResult(id, payload) {
+    const rows = loadResults().filter(x => x.id !== id);
+    rows.push({id, payload, created_at: Date.now()});
+    saveResults(rows);
+  }
+  function dropResult(id) { saveResults(loadResults().filter(x => x.id !== id)); }
 
   function assistantMessages() {
     const direct = [...document.querySelectorAll('[data-message-author-role="assistant"]')];
@@ -167,29 +199,23 @@
     node.dispatchEvent(new InputEvent('input', {bubbles: true, inputType: 'insertText', data: text}));
   }
   function sendButton() {
-    return document.querySelector('button[data-testid="send-button"]') ||
-      [...document.querySelectorAll('button')].find(b => /send/i.test(b.getAttribute('aria-label') || ''));
+    const preferred = document.querySelector('button[data-testid="send-button"]');
+    if (preferred && isVisible(preferred)) return preferred;
+    return [...document.querySelectorAll('button')].find(b => isVisible(b) && /send/i.test(b.getAttribute('aria-label') || '')) || null;
   }
-  function generationInProgress() {
-    return Boolean(document.querySelector('button[data-testid="stop-button"]')) ||
-      [...document.querySelectorAll('button')].some(b => /stop generating|stop response/i.test(b.getAttribute('aria-label') || ''));
-  }
-  async function sendText(text, {requireEmpty = false} = {}) {
+  async function sendText(text, {requireEmpty = true} = {}) {
     if (sending || generationInProgress()) throw new Error('chat busy');
     const box = composer();
-    if (!box) throw new Error('ChatGPT composer not found');
+    if (!box) throw new Error('composer missing');
     if (requireEmpty && composerText(box).trim()) throw new Error('composer not empty');
     sending = true;
     try {
       setComposerText(box, text);
-      await new Promise(r => setTimeout(r, 220));
+      await new Promise(r => setTimeout(r, 300));
       const button = sendButton();
-      if (!button || button.disabled) throw new Error('ChatGPT send button unavailable');
+      if (!button || button.disabled) throw new Error('send button unavailable');
       button.click();
     } finally { sending = false; }
-  }
-  async function sendResult(payload) {
-    await sendText(`KTBUS_POC_RESULT ${JSON.stringify(payload)}`, {requireEmpty: true});
   }
 
   function gmGet(url) {
@@ -199,7 +225,7 @@
         method: 'GET', url, timeout: 5000,
         headers: {'Cache-Control': 'no-cache'},
         onload: r => {
-          let body = null;
+          let body;
           try { body = JSON.parse(r.responseText); } catch { body = String(r.responseText || '').slice(0, 500); }
           if (r.status < 200 || r.status >= 300) return reject(new Error(`${url} -> HTTP ${r.status}`));
           resolve({url, status: r.status, body});
@@ -249,12 +275,7 @@
     return job;
   }
   function makeBaseJob(id, targetUrl, message) {
-    return {
-      id, target_url: targetUrl, message,
-      next_at: Date.now(), remaining: 1, interval_ms: 0,
-      claimed_by: null, claim_until: 0, wake_after: 0,
-      created_at: Date.now(),
-    };
+    return {id, target_url: targetUrl, message, next_at: Date.now(), remaining: 1, interval_ms: 0, claimed_by: null, claim_until: 0, wake_after: 0, created_at: Date.now()};
   }
   function enqueueSend(request) {
     return addJob(makeBaseJob(`send-${request.id}`.slice(0, 120), targetFromRequest(request), validateMessage(request)));
@@ -282,51 +303,74 @@
     return next.length !== jobs.length;
   }
 
-  async function handle(request) {
-    if (!request || !validId(request.id) || seen.has(request.id)) return;
-    if (generationInProgress()) return;
-    seen.add(request.id);
-    saveSeen();
-    try {
-      if (request.op === 'hello') {
-        await sendResult({id: request.id, op: 'hello', status: 'ok', version: VERSION, cap: capability(), chat: {id: chatIdFromUrl(currentChatUrl()), url: currentChatUrl()}});
-        return;
-      }
-      if (request.op === 'ping') {
-        const localhost = await probeLocalhost();
-        await sendResult({id: request.id, op: 'ping', status: 'ok', version: VERSION, pong: true, localhost});
-        return;
-      }
-      requireCap(request);
-      if (request.op === 'list_chats') {
-        discoverChats();
-        await sendResult({id: request.id, op: 'list_chats', status: 'ok', version: VERSION, chats: loadChats().slice(0, 30)});
-      } else if (request.op === 'chat_send') {
-        const job = enqueueSend(request);
-        await sendResult({id: request.id, op: 'chat_send', status: 'queued', version: VERSION, dispatch: {id: job.id, target_chat_id: chatIdFromUrl(job.target_url)}});
-      } else if (request.op === 'schedule') {
-        const job = schedule(request);
-        await sendResult({id: request.id, op: 'schedule', status: 'ok', version: VERSION, schedule: {id: job.id, target_chat_id: chatIdFromUrl(job.target_url), next_at: job.next_at, remaining: job.remaining, interval_ms: job.interval_ms}});
-      } else if (request.op === 'cancel_schedule') {
-        await sendResult({id: request.id, op: 'cancel_schedule', status: 'ok', cancelled: cancel(request.schedule_id), schedule_id: request.schedule_id});
-      } else if (request.op === 'list_schedules') {
-        await sendResult({id: request.id, op: 'list_schedules', status: 'ok', schedules: loadJobs().map(j => ({id: j.id, target_chat_id: chatIdFromUrl(j.target_url), next_at: j.next_at, remaining: j.remaining, interval_ms: j.interval_ms}))});
-      } else {
-        throw new Error('unsupported op');
-      }
-    } catch (e) {
-      try { await sendResult({id: request.id, op: request.op, status: 'error', error: String(e)}); } catch (sendError) { console.error('[KT-Bus relay] result send failed', sendError); }
+  async function execute(request) {
+    if (request.op === 'hello') {
+      const stops = [...document.querySelectorAll('button')].filter(b => /stop generating|stop response/i.test(b.getAttribute('aria-label') || '') || b.dataset.testid === 'stop-button');
+      return {id: request.id, op: 'hello', status: 'ok', version: VERSION, cap: capability(), chat: {id: chatIdFromUrl(currentChatUrl()), url: currentChatUrl()}, diagnostics: {stop_candidates: stops.length, visible_stop_candidates: stops.filter(isVisible).length}};
     }
+    if (request.op === 'ping') {
+      return {id: request.id, op: 'ping', status: 'ok', version: VERSION, pong: true, localhost: await probeLocalhost()};
+    }
+    requireCap(request);
+    if (request.op === 'list_chats') {
+      discoverChats();
+      return {id: request.id, op: 'list_chats', status: 'ok', version: VERSION, chats: loadChats().slice(0, 30)};
+    }
+    if (request.op === 'chat_send') {
+      const job = enqueueSend(request);
+      return {id: request.id, op: 'chat_send', status: 'queued', version: VERSION, dispatch: {id: job.id, target_chat_id: chatIdFromUrl(job.target_url)}};
+    }
+    if (request.op === 'schedule') {
+      const job = schedule(request);
+      return {id: request.id, op: 'schedule', status: 'ok', version: VERSION, schedule: {id: job.id, target_chat_id: chatIdFromUrl(job.target_url), next_at: job.next_at, remaining: job.remaining, interval_ms: job.interval_ms}};
+    }
+    if (request.op === 'cancel_schedule') {
+      return {id: request.id, op: 'cancel_schedule', status: 'ok', cancelled: cancel(request.schedule_id), schedule_id: request.schedule_id};
+    }
+    if (request.op === 'list_schedules') {
+      return {id: request.id, op: 'list_schedules', status: 'ok', schedules: loadJobs().map(j => ({id: j.id, target_chat_id: chatIdFromUrl(j.target_url), next_at: j.next_at, remaining: j.remaining, interval_ms: j.interval_ms}))};
+    }
+    throw new Error('unsupported op');
+  }
+
+  async function handle(request) {
+    if (handling || !request || !validId(request.id) || seen.has(request.id) || generationInProgress()) return;
+    handling = true;
+    try {
+      let payload;
+      try { payload = await execute(request); }
+      catch (e) { payload = {id: request.id, op: request.op, status: 'error', error: String(e)}; }
+      queueResult(request.id, payload);
+    } finally { handling = false; }
+    await flushResults();
+  }
+
+  async function flushResults() {
+    if (sending || generationInProgress()) return;
+    const row = loadResults()[0];
+    if (!row) return;
+    try {
+      await sendText(`KTBUS_POC_RESULT ${JSON.stringify(row.payload)}`, {requireEmpty: true});
+      dropResult(row.id);
+      seen.add(row.id);
+      saveSeen();
+    } catch {}
   }
 
   function scan() {
-    if (generationInProgress() || sending) return;
+    if (generationInProgress() || sending || handling) return;
     for (const message of assistantMessages()) {
       const text = message.innerText || '';
       REQUEST_RE.lastIndex = 0;
       let match;
       while ((match = REQUEST_RE.exec(text))) {
-        try { void handle(JSON.parse(match[1])); } catch {}
+        try {
+          const request = JSON.parse(match[1]);
+          if (validId(request?.id) && !seen.has(request.id) && !loadResults().some(r => r.id === request.id)) {
+            void handle(request);
+            return;
+          }
+        } catch {}
       }
     }
   }
@@ -348,16 +392,18 @@
     const jobs = loadJobs();
     const job = jobs.find(j => j.id === id);
     if (job?.claimed_by === TAB_ID) {
-      job.claimed_by = null; job.claim_until = 0; saveJobs(jobs);
+      job.claimed_by = null;
+      job.claim_until = 0;
+      saveJobs(jobs);
     }
   }
   async function runLocalJob() {
-    if (sending || generationInProgress()) return;
+    if (sending || handling || generationInProgress()) return;
     const job = claimLocalJob();
     if (!job) return;
     const sentAt = Date.now();
     try { await sendText(job.message, {requireEmpty: true}); }
-    catch (e) { releaseClaim(job.id); return; }
+    catch { releaseClaim(job.id); return; }
     const jobs = loadJobs();
     const index = jobs.findIndex(j => j.id === job.id && j.claimed_by === TAB_ID);
     if (index < 0) return;
@@ -386,7 +432,10 @@
         openedTabs.set(job.id, tab);
         setTimeout(() => {
           const t = openedTabs.get(job.id);
-          if (t === tab) { try { t.close(); } catch {} openedTabs.delete(job.id); }
+          if (t === tab) {
+            try { t.close(); } catch {}
+            openedTabs.delete(job.id);
+          }
         }, HELPER_LIFETIME_MS);
       }
     } catch (e) { console.error('[KT-Bus relay] background wake failed', e); }
@@ -394,12 +443,13 @@
 
   function tick() {
     discoverChats();
+    void flushResults();
     scan();
     void runLocalJob();
     wakeRemoteJob();
   }
 
-  const observer = new MutationObserver(() => queueMicrotask(scan));
+  const observer = new MutationObserver(() => setTimeout(tick, 250));
   observer.observe(document.documentElement, {subtree: true, childList: true, characterData: true});
   setInterval(tick, TICK_MS);
   capability();
