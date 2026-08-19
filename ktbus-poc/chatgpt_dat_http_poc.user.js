@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         DAT Direct Local HTTP POC
 // @namespace    https://github.com/amuletmaiden/kt-bus
-// @version      0.1.0
-// @description  Direct ChatGPT -> Tampermonkey -> 127.0.0.1 DAT command relay.
+// @version      0.2.0
+// @description  Direct ChatGPT -> Tampermonkey -> 127.0.0.1 DAT command relay with result wake watchdog.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @grant        GM_xmlhttpRequest
@@ -18,15 +18,19 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.2.0';
   const REQUEST_RE = /DAT_HTTP_REQUEST\s+({[^\n]+})/g;
   const RESULT_PREFIX = 'DAT_HTTP_RESULT ';
+  const WAKE_PREFIX = 'DAT_HTTP_WAKE ';
   const BASE = 'http://127.0.0.1:8765';
   const CAP_KEY = 'dat-http-relay-cap-v1';
   const SEEN_KEY = 'dat-http-relay-seen-v1';
   const MAX_SEEN = 500;
   const MAX_RESULT_CHARS = 100000;
   const MAX_SCAN_MESSAGES = 12;
+  const WAKE_AFTER_MS = 8000;
+  const WAKE_RETRY_MS = 8000;
+  const MAX_WAKE_ATTEMPTS = 3;
   let busy = false;
 
   function getValue(key, fallback) {
@@ -91,6 +95,19 @@
   function assistantMessages() {
     return [...document.querySelectorAll('[data-message-author-role="assistant"]')].slice(-MAX_SCAN_MESSAGES);
   }
+  function assistantFingerprint() {
+    const messages = assistantMessages();
+    const last = messages[messages.length - 1];
+    return {
+      count: messages.length,
+      id: last?.getAttribute('data-message-id') || '',
+      text: String(last?.innerText || '').slice(-300),
+    };
+  }
+  function assistantAdvanced(baseline) {
+    const now = assistantFingerprint();
+    return now.count !== baseline.count || now.id !== baseline.id || now.text !== baseline.text;
+  }
   function composer() {
     return document.querySelector('#prompt-textarea') ||
       document.querySelector('[contenteditable="true"][data-virtualkeyboard="true"]') ||
@@ -121,6 +138,46 @@
     return Boolean(document.querySelector('button[data-testid="stop-button"]')) ||
       [...document.querySelectorAll('button')].some(b => /stop generating|stop response/i.test(b.getAttribute('aria-label') || ''));
   }
+
+  async function sendText(text) {
+    const box = composer();
+    if (!box) throw new Error('ChatGPT composer not found');
+    if (composerText(box).trim()) throw new Error('ChatGPT composer is not empty');
+    setComposerText(box, text);
+    await new Promise(r => setTimeout(r, 120));
+    const button = sendButton();
+    if (!button || button.disabled) throw new Error('ChatGPT send button unavailable');
+    button.click();
+  }
+
+  function armWakeWatchdog(id, baseline) {
+    let attempts = 0;
+    const tick = async () => {
+      if (assistantAdvanced(baseline)) return;
+      if (attempts >= MAX_WAKE_ATTEMPTS) {
+        console.error(`[DAT HTTP] no assistant wake after ${MAX_WAKE_ATTEMPTS} attempts for ${id}`);
+        return;
+      }
+      if (generationInProgress()) {
+        setTimeout(tick, 1500);
+        return;
+      }
+      const box = composer();
+      if (!box || composerText(box).trim()) {
+        setTimeout(tick, 1500);
+        return;
+      }
+      attempts += 1;
+      try {
+        await sendText(WAKE_PREFIX + JSON.stringify({id, attempt: attempts, reason: 'result-posted-no-assistant-response'}));
+      } catch (error) {
+        console.error('[DAT HTTP] wake retry failed', error);
+      }
+      setTimeout(tick, WAKE_RETRY_MS);
+    };
+    setTimeout(tick, WAKE_AFTER_MS);
+  }
+
   async function submit(payload) {
     let text = RESULT_PREFIX + JSON.stringify(payload);
     if (text.length > MAX_RESULT_CHARS) {
@@ -130,14 +187,9 @@
         error: `DAT result is ${text.length} characters; request a smaller read/result`,
       });
     }
-    const box = composer();
-    if (!box) throw new Error('ChatGPT composer not found');
-    if (composerText(box).trim()) throw new Error('ChatGPT composer is not empty');
-    setComposerText(box, text);
-    await new Promise(r => setTimeout(r, 100));
-    const button = sendButton();
-    if (!button || button.disabled) throw new Error('ChatGPT send button unavailable');
-    button.click();
+    const baseline = assistantFingerprint();
+    await sendText(text);
+    if (validId(payload?.id)) armWakeWatchdog(payload.id, baseline);
   }
 
   function requireChatCap(request) {
@@ -203,5 +255,5 @@
   const observer = new MutationObserver(() => setTimeout(scan, 0));
   observer.observe(document.documentElement, {subtree: true, childList: true, characterData: true});
   setInterval(scan, 1200);
-  console.info(`[DAT HTTP] direct localhost relay ${VERSION} loaded`);
+  console.info(`[DAT HTTP] direct localhost relay ${VERSION} loaded; wake watchdog enabled`);
 })();
