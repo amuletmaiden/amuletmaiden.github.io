@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KT-Bus ChatGPT Browser Relay POC
 // @namespace    https://github.com/amuletmaiden/kt-bus
-// @version      1.4.0
+// @version      1.4.1
 // @description  Guarded KT-Bus ChatGPT relay in Tampermonkey's DOM sandbox; no dynamic runtime eval or visible helper tabs.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
@@ -19,13 +19,75 @@
 
 (() => {
   'use strict';
-  // The pinned KTBUS2 runtime is executed by Tampermonkey via @require in the
-  // same DOM sandbox. This body intentionally contains no remote-code loader.
-  try {
-    if (document.documentElement?.dataset) {
-      document.documentElement.dataset.ktbusRelayBootstrapVersion = '1.4.0';
-      document.documentElement.dataset.ktbusRelayLoader = 'tampermonkey-require';
+
+  // KTBUS2 v0.9 deliberately scans only DOM nodes explicitly classified as
+  // assistant messages. ChatGPT's current turn containers do not always retain
+  // data-message-author-role="assistant", so v1.4.1 normalizes only turns that
+  // have independent assistant provenance. User turns are never promoted.
+  const root = document.documentElement;
+  let runs = 0;
+  let tagged = 0;
+
+  function textOf(node) {
+    return String(node?.innerText || node?.textContent || '').trim();
+  }
+
+  function hasAssistantProvenance(turn) {
+    if (!(turn instanceof Element)) return false;
+    if (turn.matches('[data-message-author-role="assistant"], [data-author="assistant"], [data-role="assistant"]')) return true;
+    if (turn.querySelector('[data-message-author-role="assistant"], [data-author="assistant"], [data-role="assistant"]')) return true;
+    if (turn.matches('[data-message-author-role="user"], [data-author="user"], [data-role="user"]')) return false;
+    if (turn.querySelector('[data-message-author-role="user"], [data-author="user"], [data-role="user"]')) return false;
+
+    // Current ChatGPT conversation turns expose an accessible speaker label such
+    // as “ChatGPT said”. Restrict this fallback to known turn/article containers.
+    const labelled = turn.matches('[data-testid^="conversation-turn-"]') || turn.tagName === 'ARTICLE';
+    if (!labelled) return false;
+    for (const node of turn.querySelectorAll('h1,h2,h3,h4,h5,h6,[aria-label]')) {
+      const label = String(node.getAttribute?.('aria-label') || textOf(node)).replace(/\s+/g, ' ').trim();
+      if (/^(you|user)\s+said\b/i.test(label)) return false;
+      if (/^(chatgpt|assistant)\s+said\b/i.test(label)) return true;
     }
-  } catch {}
-  console.info('[KT-Bus relay] bootstrap v1.4.0 loaded via @sandbox DOM + pinned @require');
+    return false;
+  }
+
+  function normalizeAssistantTurns() {
+    runs += 1;
+    const candidates = new Set([
+      ...document.querySelectorAll('[data-message-author-role="assistant"]'),
+      ...document.querySelectorAll('[data-testid^="conversation-turn-"]'),
+      ...document.querySelectorAll('article'),
+    ]);
+    let found = 0;
+    for (const candidate of candidates) {
+      if (!hasAssistantProvenance(candidate)) continue;
+      found += 1;
+      const turn = candidate.closest('[data-testid^="conversation-turn-"]') || candidate;
+      if (turn.getAttribute('data-message-author-role') !== 'assistant') {
+        turn.setAttribute('data-message-author-role', 'assistant');
+        tagged += 1;
+      }
+    }
+    try {
+      root.dataset.ktbusRelayBootstrapVersion = '1.4.1';
+      root.dataset.ktbusRelayLoader = 'tampermonkey-require';
+      root.dataset.ktbusRelayNormalizer = 'active';
+      root.dataset.ktbusRelayNormalizerRuns = String(runs);
+      root.dataset.ktbusRelayAssistantTurns = String(found);
+      root.dataset.ktbusRelayAssistantTurnsTagged = String(tagged);
+      root.dataset.ktbusRelayRuntimeLoaded = root.dataset.ktbusRelayRuntimeVersion ? 'true' : 'false';
+    } catch {}
+  }
+
+  try { globalThis.__KTBUS_DOM_NORMALIZER_STOP__?.(); } catch {}
+  normalizeAssistantTurns();
+  const observer = new MutationObserver(() => queueMicrotask(normalizeAssistantTurns));
+  observer.observe(document.documentElement, {subtree: true, childList: true, characterData: true});
+  const interval = setInterval(normalizeAssistantTurns, 750);
+  globalThis.__KTBUS_DOM_NORMALIZER_STOP__ = () => {
+    try { observer.disconnect(); } catch {}
+    try { clearInterval(interval); } catch {}
+  };
+
+  console.info('[KT-Bus relay] bootstrap v1.4.1 loaded; current ChatGPT assistant-turn normalizer active');
 })();
