@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         KT-Bus ChatGPT Browser Relay POC
 // @namespace    https://github.com/amuletmaiden/kt-bus
-// @version      0.3.0
-// @description  Side-effect-free ChatGPT -> existing localhost service -> ChatGPT proof-of-concept.
+// @version      0.4.0
+// @description  ChatGPT <-> localhost relay POC with a bounded current-chat continuation scheduler.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @grant        GM_xmlhttpRequest
+// @grant        GM_getValue
+// @grant        GM_setValue
 // @connect      127.0.0.1
 // @connect      localhost
 // @run-at       document-idle
@@ -16,16 +18,43 @@
 (() => {
   'use strict';
 
+  const VERSION = '0.4.0';
   const STATUS_URLS = [
     'http://127.0.0.1:8765/healthz',
     'http://127.0.0.1:8765/api/status',
   ];
   const REQUEST_RE = /KTBUS_POC_REQUEST\s+({[^\n]+})/g;
-  const seen = new Set(JSON.parse(sessionStorage.getItem('ktbus-poc-seen') || '[]'));
+  const SEEN_KEY = 'ktbus-poc-seen';
+  const JOBS_KEY = 'ktbus-relay-jobs-v1';
+  const MIN_INTERVAL_MINUTES = 5;
+  const MAX_INTERVAL_MINUTES = 24 * 60;
+  const MAX_COUNT = 48;
+  const MAX_MESSAGE_CHARS = 6000;
+  const TICK_MS = 15000;
+
+  const seen = new Set(JSON.parse(sessionStorage.getItem(SEEN_KEY) || '[]'));
   let sending = false;
 
   function saveSeen() {
-    sessionStorage.setItem('ktbus-poc-seen', JSON.stringify([...seen].slice(-200)));
+    sessionStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-300)));
+  }
+
+  function currentChatUrl() {
+    return `${location.origin}${location.pathname}`;
+  }
+
+  function normalizeJobs(value) {
+    if (!Array.isArray(value)) return [];
+    return value.filter(job => job && typeof job === 'object' && typeof job.id === 'string');
+  }
+
+  function loadJobs() {
+    try { return normalizeJobs(GM_getValue(JOBS_KEY, [])); }
+    catch { return []; }
+  }
+
+  function saveJobs(jobs) {
+    GM_setValue(JOBS_KEY, normalizeJobs(jobs).slice(-200));
   }
 
   function assistantMessages() {
@@ -78,6 +107,12 @@
       document.querySelector('textarea');
   }
 
+  function composerText(node) {
+    if (!node) return '';
+    if (node instanceof HTMLTextAreaElement) return node.value || '';
+    return node.innerText || node.textContent || '';
+  }
+
   function setComposerText(node, text) {
     node.focus();
     if (node instanceof HTMLTextAreaElement) {
@@ -93,16 +128,26 @@
     node.dispatchEvent(new InputEvent('input', {bubbles: true, inputType: 'insertText', data: text}));
   }
 
-  async function sendResult(text) {
-    if (sending) throw new Error('send already in progress');
+  function sendButton() {
+    return document.querySelector('button[data-testid="send-button"]') ||
+      [...document.querySelectorAll('button')].find(b => /send/i.test(b.getAttribute('aria-label') || ''));
+  }
+
+  function generationInProgress() {
+    return Boolean(document.querySelector('button[data-testid="stop-button"]')) ||
+      [...document.querySelectorAll('button')].some(b => /stop generating|stop response/i.test(b.getAttribute('aria-label') || ''));
+  }
+
+  async function sendText(text, {requireEmpty = false} = {}) {
+    if (sending || generationInProgress()) throw new Error('chat busy');
     sending = true;
     try {
       const box = composer();
       if (!box) throw new Error('ChatGPT composer not found');
+      if (requireEmpty && composerText(box).trim()) throw new Error('composer not empty');
       setComposerText(box, text);
-      await new Promise(resolve => setTimeout(resolve, 150));
-      const button = document.querySelector('button[data-testid="send-button"]') ||
-        [...document.querySelectorAll('button')].find(b => /send/i.test(b.getAttribute('aria-label') || ''));
+      await new Promise(resolve => setTimeout(resolve, 180));
+      const button = sendButton();
       if (!button || button.disabled) throw new Error('ChatGPT send button unavailable');
       button.click();
     } finally {
@@ -110,23 +155,108 @@
     }
   }
 
+  async function sendResult(payload) {
+    await sendText(`KTBUS_POC_RESULT ${JSON.stringify(payload)}`);
+  }
+
+  function validId(value) {
+    return typeof value === 'string' && /^[A-Za-z0-9._-]{1,120}$/.test(value);
+  }
+
+  function scheduleJob(request) {
+    const scheduleId = request.schedule_id || request.id;
+    if (!validId(scheduleId)) throw new Error('invalid schedule id');
+    const every = Number(request.every_minutes);
+    const delay = request.delay_minutes == null ? every : Number(request.delay_minutes);
+    const count = Number(request.count);
+    const message = String(request.message || '');
+    if (!Number.isFinite(every) || every < MIN_INTERVAL_MINUTES || every > MAX_INTERVAL_MINUTES) {
+      throw new Error(`every_minutes must be ${MIN_INTERVAL_MINUTES}..${MAX_INTERVAL_MINUTES}`);
+    }
+    if (!Number.isFinite(delay) || delay < 0 || delay > MAX_INTERVAL_MINUTES) {
+      throw new Error(`delay_minutes must be 0..${MAX_INTERVAL_MINUTES}`);
+    }
+    if (!Number.isInteger(count) || count < 1 || count > MAX_COUNT) {
+      throw new Error(`count must be 1..${MAX_COUNT}`);
+    }
+    if (!message || message.length > MAX_MESSAGE_CHARS) {
+      throw new Error(`message must be 1..${MAX_MESSAGE_CHARS} characters`);
+    }
+
+    const jobs = loadJobs().filter(job => job.id !== scheduleId);
+    const job = {
+      id: scheduleId,
+      target_url: currentChatUrl(),
+      message,
+      interval_ms: Math.round(every * 60000),
+      next_at: Date.now() + Math.round(delay * 60000),
+      remaining: count,
+      created_at: Date.now(),
+    };
+    jobs.push(job);
+    saveJobs(jobs);
+    return job;
+  }
+
+  function cancelJob(scheduleId) {
+    if (!validId(scheduleId)) throw new Error('invalid schedule id');
+    const jobs = loadJobs();
+    const filtered = jobs.filter(job => job.id !== scheduleId);
+    saveJobs(filtered);
+    return jobs.length !== filtered.length;
+  }
+
+  function listCurrentJobs() {
+    const here = currentChatUrl();
+    return loadJobs()
+      .filter(job => job.target_url === here)
+      .map(job => ({id: job.id, next_at: job.next_at, remaining: job.remaining, interval_ms: job.interval_ms}));
+  }
+
   async function handle(request) {
-    if (!request || request.op !== 'ping' || typeof request.id !== 'string') return;
-    if (!/^[A-Za-z0-9._-]{1,120}$/.test(request.id) || seen.has(request.id)) return;
+    if (!request || !validId(request.id) || seen.has(request.id)) return;
     seen.add(request.id);
     saveSeen();
+
     try {
-      const localhost = await probeLocalhost();
-      await sendResult(`KTBUS_POC_RESULT ${JSON.stringify({
-        id: request.id,
-        op: 'ping',
-        status: 'ok',
-        pong: true,
-        transport: 'userscript-gm-xhr-to-localhost',
-        localhost,
-      })}`);
+      if (request.op === 'ping') {
+        const localhost = await probeLocalhost();
+        await sendResult({
+          id: request.id,
+          op: 'ping',
+          status: 'ok',
+          pong: true,
+          version: VERSION,
+          transport: 'userscript-gm-xhr-to-localhost',
+          localhost,
+        });
+        return;
+      }
+
+      if (request.op === 'schedule') {
+        const job = scheduleJob(request);
+        await sendResult({
+          id: request.id,
+          op: 'schedule',
+          status: 'ok',
+          version: VERSION,
+          schedule: {id: job.id, next_at: job.next_at, remaining: job.remaining, interval_ms: job.interval_ms},
+        });
+        return;
+      }
+
+      if (request.op === 'cancel_schedule') {
+        const cancelled = cancelJob(request.schedule_id);
+        await sendResult({id: request.id, op: 'cancel_schedule', status: 'ok', cancelled, schedule_id: request.schedule_id});
+        return;
+      }
+
+      if (request.op === 'list_schedules') {
+        await sendResult({id: request.id, op: 'list_schedules', status: 'ok', schedules: listCurrentJobs()});
+      }
     } catch (error) {
-      await sendResult(`KTBUS_POC_RESULT ${JSON.stringify({id: request.id, status: 'error', error: String(error)})}`);
+      try { await sendResult({id: request.id, op: request.op, status: 'error', error: String(error)}); }
+      catch (sendError) { console.error('[KT-Bus POC] failed to report request error', sendError); }
     }
   }
 
@@ -142,9 +272,36 @@
     }
   }
 
+  async function runDueJob() {
+    if (sending || generationInProgress()) return;
+    const jobs = loadJobs();
+    const here = currentChatUrl();
+    const now = Date.now();
+    const index = jobs.findIndex(job => job.target_url === here && job.remaining > 0 && Number(job.next_at) <= now);
+    if (index < 0) return;
+
+    const job = jobs[index];
+    try {
+      await sendText(job.message, {requireEmpty: true});
+    } catch (error) {
+      if (!/chat busy|composer not empty|send button unavailable/.test(String(error))) {
+        console.error('[KT-Bus POC] scheduled send failed', error);
+      }
+      return;
+    }
+
+    job.remaining -= 1;
+    job.last_sent_at = now;
+    if (job.remaining <= 0) jobs.splice(index, 1);
+    else job.next_at = now + Number(job.interval_ms);
+    saveJobs(jobs);
+  }
+
   const observer = new MutationObserver(() => queueMicrotask(scan));
   observer.observe(document.documentElement, {subtree: true, childList: true, characterData: true});
+  setInterval(() => { void runDueJob(); }, TICK_MS);
   scan();
+  void runDueJob();
 
-  console.info('[KT-Bus POC] userscript v0.3.0 loaded; localhost health ping only');
+  console.info(`[KT-Bus POC] userscript v${VERSION} loaded; localhost ping + bounded current-chat scheduler`);
 })();
