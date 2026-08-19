@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - '.github/workflows/build-rationality-library-epub.yml'
+  pull_request:
+    paths:
+      - '.github/rationality-library-build-trigger'
 
 permissions:
   contents: read
