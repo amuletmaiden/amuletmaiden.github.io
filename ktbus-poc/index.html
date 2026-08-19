@@ -1,12 +1,14 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,nofollow,noarchive">
-<title>KT-Bus browser relay POC</title>
+<title>KT-Bus browser relay</title>
 <style>body{font:16px/1.5 system-ui;max-width:760px;margin:48px auto;padding:0 20px;background:#09100c;color:#edf8f0}a{color:#58b8ff}code{background:#16231b;padding:.15em .35em;border-radius:.3em}.box{border:1px solid #294035;border-radius:14px;padding:20px;background:#111b15}</style>
-<h1>KT-Bus browser relay POC</h1>
+<h1>KT-Bus browser relay</h1>
 <div class="box">
-<p>This is a deliberately harmless proof of concept. It lets an explicit assistant message ask the browser to read only <code>http://127.0.0.1:8765/api/status</code>, then posts the status back into the same ChatGPT conversation.</p>
-<p><strong>It cannot read files, run commands, browse, or write anything.</strong></p>
-<p><a href="chatgpt_ktbus_poc.user.js">Install the ping-only userscript</a></p>
+<p><strong>Current relay runtime: v0.8.0+</strong></p>
+<p>The installed userscript is now a small version-checking bootstrap. On each ChatGPT page load it fetches the current relay runtime with cache busting, rejects runtimes older than v0.8.0, and falls back only to a previously validated v0.8+ cache.</p>
+<p>The bootstrap has no authority to open visible helper tabs. The v0.8 relay supports guarded localhost status checks, exactly-once request claims, bounded schedules, and invisible cross-chat delivery.</p>
+<p><a href="chatgpt_ktbus_poc.user.js">Install or update the KT-Bus relay bootstrap</a></p>
 </div>
-<p>After installation, reload the ChatGPT tab. The test marker is <code>KTBUS_POC_REQUEST {"id":"...","op":"ping"}</code>.</p>
+<p><strong>Upgrading from v0.7:</strong> use the install/update link once, accept the userscript-manager update, then reload the ChatGPT tab. Existing v0.7 JavaScript already running in a tab cannot replace itself in place.</p>
+<p>After reload, verify with <code>KTBUS_POC_REQUEST {"id":"relay-version-check","op":"hello"}</code>. The result should report <code>"version":"0.8.0"</code> or newer.</p>
