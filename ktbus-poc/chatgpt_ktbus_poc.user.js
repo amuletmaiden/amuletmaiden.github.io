@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         KT-Bus ChatGPT Browser Relay POC
 // @namespace    https://github.com/amuletmaiden/kt-bus
-// @version      0.2.0
+// @version      0.3.0
 // @description  Side-effect-free ChatGPT -> existing localhost service -> ChatGPT proof-of-concept.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
@@ -9,11 +9,17 @@
 // @connect      127.0.0.1
 // @connect      localhost
 // @run-at       document-idle
+// @downloadURL  https://amuletmaiden.github.io/ktbus-poc/chatgpt_ktbus_poc.user.js
+// @updateURL    https://amuletmaiden.github.io/ktbus-poc/chatgpt_ktbus_poc.user.js
 // ==/UserScript==
 
 (() => {
   'use strict';
-  const STATUS_URL = 'http://127.0.0.1:8765/api/status';
+
+  const STATUS_URLS = [
+    'http://127.0.0.1:8765/healthz',
+    'http://127.0.0.1:8765/api/status',
+  ];
   const REQUEST_RE = /KTBUS_POC_REQUEST\s+({[^\n]+})/g;
   const seen = new Set(JSON.parse(sessionStorage.getItem('ktbus-poc-seen') || '[]'));
   let sending = false;
@@ -42,19 +48,28 @@
         timeout: 5000,
         headers: {'Cache-Control': 'no-cache'},
         onload: response => {
-          let value;
-          try { value = JSON.parse(response.responseText); }
-          catch { reject(new Error(`localhost returned non-JSON: ${String(response.responseText).slice(0, 200)}`)); return; }
+          let value = null;
+          try { value = JSON.parse(response.responseText); } catch {}
           if (response.status < 200 || response.status >= 300) {
-            reject(new Error(value.error || `HTTP ${response.status}`));
+            const detail = value?.error || String(response.responseText || '').slice(0, 160) || `HTTP ${response.status}`;
+            reject(new Error(`${url} -> ${response.status}: ${detail}`));
             return;
           }
-          resolve(value);
+          resolve({url, status: response.status, body: value ?? String(response.responseText || '').slice(0, 500)});
         },
-        onerror: () => reject(new Error('localhost request failed')),
-        ontimeout: () => reject(new Error('localhost request timed out')),
+        onerror: () => reject(new Error(`${url} -> network error`)),
+        ontimeout: () => reject(new Error(`${url} -> timed out`)),
       });
     });
+  }
+
+  async function probeLocalhost() {
+    const failures = [];
+    for (const url of STATUS_URLS) {
+      try { return await gmGet(url); }
+      catch (error) { failures.push(String(error)); }
+    }
+    throw new Error(failures.join(' | '));
   }
 
   function composer() {
@@ -101,14 +116,14 @@
     seen.add(request.id);
     saveSeen();
     try {
-      const status = await gmGet(STATUS_URL);
+      const localhost = await probeLocalhost();
       await sendResult(`KTBUS_POC_RESULT ${JSON.stringify({
         id: request.id,
         op: 'ping',
         status: 'ok',
         pong: true,
         transport: 'userscript-gm-xhr-to-localhost',
-        localhost: status,
+        localhost,
       })}`);
     } catch (error) {
       await sendResult(`KTBUS_POC_RESULT ${JSON.stringify({id: request.id, status: 'error', error: String(error)})}`);
@@ -131,5 +146,5 @@
   observer.observe(document.documentElement, {subtree: true, childList: true, characterData: true});
   scan();
 
-  console.info('[KT-Bus POC] userscript loaded; existing localhost status ping only');
+  console.info('[KT-Bus POC] userscript v0.3.0 loaded; localhost health ping only');
 })();
